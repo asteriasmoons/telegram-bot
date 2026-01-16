@@ -1,12 +1,13 @@
 import { config } from "./config";
 import { connectDb } from "./db";
 import { createBot } from "./bot";
-import { startHealthServer } from "./health";
 import { createScheduler, makeInstanceId } from "./scheduler";
-import { createInstanceLock } from "./instanceLock";
+import { startServer } from "./health";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing required env var: ${name}`);
+  return v;
 }
 
 function getNumberEnv(name: string, fallback: number) {
@@ -18,40 +19,33 @@ function getNumberEnv(name: string, fallback: number) {
 }
 
 async function main() {
-  // Keep Render happy
-  startHealthServer();
-
-  // DB connection
+  // 1) Connect DB
   const conn = await connectDb(config.mongoUri);
   console.log("Connected to MongoDB:", conn.name);
 
-  const instanceId = process.env.INSTANCE_ID || makeInstanceId();
-
-  // Acquire a distributed lock BEFORE launching polling
-  const lock = createInstanceLock({
-    key: "telegram_polling_lock",
-    instanceId,
-    leaseMs: 60_000,
-    renewEveryMs: 20_000
-  });
-
-  await lock.waitForAcquire();
-  lock.startRenewal();
-
+  // 2) Create bot (NO polling launch)
   const bot = createBot(config.botToken);
 
-  console.log("Clearing webhook (if any)...");
-  await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-  console.log("Webhook cleared.");
+  // 3) Webhook config
+  const webhookDomain = requireEnv("WEBHOOK_DOMAIN"); // e.g. "https://telegram-bot-yt3w.onrender.com"
+  const webhookPath = process.env.WEBHOOK_PATH || "/telegram"; // e.g. "/telegram"
+  const webhookUrl = `${webhookDomain}${webhookPath}`;
+
+  // 4) Start HTTP server first (Render port binding + webhook receiver)
+  const server = startServer({ bot, webhookPath });
+
+  // 5) Register webhook with Telegram
+  console.log("Setting webhook:", webhookUrl);
+  await bot.telegram.setWebhook(webhookUrl, {
+    drop_pending_updates: true
+  });
+  console.log("Webhook set.");
 
   const me = await bot.telegram.getMe();
   console.log("Bot identity:", `@${me.username}`, me.id);
 
-  // Now safe: we are the only poller allowed to launch
-  await bot.launch({ dropPendingUpdates: true });
-  console.log("Bot launched.");
-
-  // Start scheduler (polling DB for due reminders/habits)
+  // 6) Start scheduler (DB polling for due reminders/habits)
+  const instanceId = process.env.INSTANCE_ID || makeInstanceId();
   const pollIntervalMs = getNumberEnv("SCHEDULER_INTERVAL_MS", 10_000);
   const lockTtlMs = getNumberEnv("SCHEDULER_LOCK_TTL_MS", 60_000);
 
@@ -63,27 +57,24 @@ async function main() {
 
   scheduler.start();
 
-  async function shutdown(signal: string) {
+  // 7) Graceful shutdown
+  function shutdown(signal: string) {
     console.log(`Shutdown signal received: ${signal}`);
-
     scheduler.stop();
 
     try {
-      bot.stop(signal);
+      server.close(() => {
+        console.log("HTTP server closed.");
+        process.exit(0);
+      });
     } catch (e) {
-      console.error("Bot stop error:", e);
+      console.error("Server close error:", e);
+      process.exit(0);
     }
-
-    await lock.release();
-
-    // Small delay to let logs flush
-    await sleep(250);
-
-    process.exit(0);
   }
 
-  process.once("SIGINT", () => void shutdown("SIGINT"));
-  process.once("SIGTERM", () => void shutdown("SIGTERM"));
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 main().catch((e) => {
