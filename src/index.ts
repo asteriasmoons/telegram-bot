@@ -2,16 +2,21 @@ import { config } from "./config";
 import { connectDb } from "./db";
 import { createBot } from "./bot";
 import { startHealthServer } from "./health";
+import { createScheduler, makeInstanceId } from "./scheduler";
 
-async function main() {
-  // 1) Start a tiny HTTP server so Render detects an open port
-  startHealthServer();
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  // 2) Connect DB
-  const conn = await connectDb(config.mongoUri);
-  console.log("Connected to MongoDB:", conn.name);
+function getNumberEnv(name: string, fallback: number) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return n;
+}
 
-  // 3) Start bot
+async function launchBotWithRetry() {
   const bot = createBot(config.botToken);
 
   console.log("Clearing webhook (if any)...");
@@ -21,14 +26,63 @@ async function main() {
   const me = await bot.telegram.getMe();
   console.log("Bot identity:", `@${me.username}`, me.id);
 
-  await bot.launch({ dropPendingUpdates: true });
-  console.log("Bot launched.");
+  while (true) {
+    try {
+      await bot.launch({ dropPendingUpdates: true });
+      console.log("Bot launched.");
+      break;
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      const is409 = msg.includes("409") && msg.toLowerCase().includes("conflict");
+
+      console.error("Bot launch error:", msg);
+
+      if (is409) {
+        console.error(
+          "Telegram 409 Conflict: another instance is polling getUpdates. Stop the other instance."
+        );
+        await sleep(5000);
+        continue;
+      }
+
+      throw e;
+    }
+  }
 
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));
+
+  return bot;
+}
+
+async function main() {
+  // Keep Render happy (open port)
+  startHealthServer();
+
+  // DB connection
+  const conn = await connectDb(config.mongoUri);
+  console.log("Connected to MongoDB:", conn.name);
+
+  // Bot launch
+  await launchBotWithRetry();
+
+  // Scheduler config (env-controlled)
+  const pollIntervalMs = getNumberEnv("SCHEDULER_INTERVAL_MS", 10_000);
+  const lockTtlMs = getNumberEnv("SCHEDULER_LOCK_TTL_MS", 60_000);
+  const instanceId = process.env.INSTANCE_ID || makeInstanceId();
+
+  const scheduler = createScheduler({
+    pollIntervalMs,
+    lockTtlMs,
+    instanceId
+  });
+
+  scheduler.start();
+
+  process.once("SIGINT", () => scheduler.stop());
+  process.once("SIGTERM", () => scheduler.stop());
 }
 
 main().catch((e) => {
   console.error("Fatal startup error:", e);
-  process.exit(1);
 });
