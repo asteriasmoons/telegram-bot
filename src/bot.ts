@@ -1,11 +1,12 @@
-import { Telegraf, Markup } from "telegraf";
+import { Telegraf } from "telegraf";
 import { registerRemindFlow } from "./flows/remind";
 import { UserSettings } from "./models/UserSettings";
+import { Reminder } from "./models/Reminder";
+import { addMinutes } from "./utils/time";
 
 export function createBot(token: string) {
   const bot = new Telegraf(token);
 
-  // Log update type (helps debugging)
   bot.use(async (ctx, next) => {
     console.log("Update received:", ctx.updateType);
     return next();
@@ -16,14 +17,10 @@ export function createBot(token: string) {
     const chat = ctx.chat;
 
     if (userId && chat && chat.type === "private") {
-      // Save DM chat id so reminders can always be delivered to DM
       await UserSettings.findOneAndUpdate(
         { userId },
         {
-          $set: {
-            userId,
-            dmChatId: chat.id
-          },
+          $set: { userId, dmChatId: chat.id },
           $setOnInsert: {
             timezone: "America/Chicago",
             quietHours: { enabled: false, start: "23:00", end: "08:00" }
@@ -34,7 +31,7 @@ export function createBot(token: string) {
     }
 
     await ctx.reply(
-      "Bot is alive.\n\nUse /remind to create a reminder.\nYour reminders will be delivered to DM (private chat)."
+      "Bot is alive.\n\nUse /remind to create a reminder.\nReminders deliver to DM (private chat)."
     );
   });
 
@@ -42,19 +39,65 @@ export function createBot(token: string) {
     await ctx.reply("pong");
   });
 
-  // Reminder delivery buttons (will be used by scheduler messages)
+  bot.command("webhookinfo", async (ctx) => {
+    try {
+      const info = await bot.telegram.getWebhookInfo();
+      const lines: string[] = [];
+      lines.push("Webhook info:");
+      lines.push("");
+      lines.push(`url: ${info.url || "(empty)"}`);
+      lines.push(`pending_update_count: ${String(info.pending_update_count)}`);
+      lines.push(`ip_address: ${info.ip_address || "(none)"}`);
+      lines.push(`last_error_message: ${info.last_error_message || "(none)"}`);
+      await ctx.reply(lines.join("\n"));
+    } catch (e: any) {
+      await ctx.reply(`Failed to fetch webhook info: ${String(e?.message || e)}`);
+    }
+  });
+
+  // Reminder message buttons
   bot.action(/^r:done:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
+    const data = (ctx.callbackQuery as any)?.data as string;
+    const reminderId = data.split(":")[2];
+
+    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "sent" } });
     await ctx.reply("Marked done.");
   });
 
   bot.action(/^r:snooze:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
-    await ctx.reply("Snoozed.");
+    const data = (ctx.callbackQuery as any)?.data as string;
+    const parts = data.split(":"); // r:snooze:10:<id>
+    const minutes = Number(parts[2]);
+    const reminderId = parts[3];
+
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      await ctx.reply("Invalid snooze time.");
+      return;
+    }
+
+    const reminder = await Reminder.findById(reminderId);
+    if (!reminder) {
+      await ctx.reply("That reminder no longer exists.");
+      return;
+    }
+
+    const nextRunAt = addMinutes(new Date(), minutes);
+    await Reminder.updateOne(
+      { _id: reminderId },
+      { $set: { nextRunAt, status: "scheduled" } }
+    );
+
+    await ctx.reply(`Snoozed for ${minutes} minutes.`);
   });
 
   bot.action(/^r:del:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
+    const data = (ctx.callbackQuery as any)?.data as string;
+    const reminderId = data.split(":")[2];
+
+    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "deleted" } });
     await ctx.reply("Deleted.");
   });
 

@@ -107,8 +107,7 @@ const DraftSchema = new Schema<DraftDoc>(
     reminder: { type: ReminderDraftSchema, required: false },
     habit: { type: HabitDraftSchema, required: false },
 
-    expiresAt: { type: Date, required: true, index: true }
-  },
+expiresAt: { type: Date, required: true },
   { timestamps: true }
 );
 

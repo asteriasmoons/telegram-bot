@@ -16,7 +16,9 @@ export function startServer(opts: ServerOptions) {
     const url = req.url || "/";
     const method = req.method || "GET";
 
-    // Health check endpoint for Render
+    // Log every request so we can confirm Telegram is POSTing to the webhook path
+    console.log(`[HTTP] ${method} ${url}`);
+
     if (url === "/health") {
       res.statusCode = 200;
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -24,13 +26,19 @@ export function startServer(opts: ServerOptions) {
       return;
     }
 
-    // Telegram webhook endpoint
     if (url === opts.webhookPath && method === "POST") {
       webhookCallback(req, res);
       return;
     }
 
-    // Friendly root response
+    // Helpful GET on the webhook path (so you can test it in a browser)
+    if (url === opts.webhookPath && method === "GET") {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.end("Webhook endpoint is up. Telegram must POST here.");
+      return;
+    }
+
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.end("Bot is running. Use /health for status.");
