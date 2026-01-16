@@ -1,6 +1,7 @@
 import { config } from "./config";
 import { connectDb } from "./db";
 import { createBot } from "./bot";
+console.log("Token loaded?", config.botToken ? "yes" : "no");
 
 async function main() {
   const conn = await connectDb(config.mongoUri);
