@@ -1,5 +1,9 @@
 import mongoose, { Schema, Model, Types } from "mongoose";
 
+/* ----------------------------
+   Draft core types
+----------------------------- */
+
 export type DraftKind = "reminder" | "habit";
 
 export type DraftStep =
@@ -9,38 +13,54 @@ export type DraftStep =
   | "confirm"
   | "done";
 
-export type ReminderDraftAwaiting = "date" | "time" | "interval" | "message";
+/* ----------------------------
+   Reminder draft types
+----------------------------- */
+
+export type ReminderDraftAwaiting =
+  | "date"
+  | "time"
+  | "interval"
+  | "message";
 
 export type ReminderDraftData = {
-  // Date/time selection
-  dateISO?: string;    // "YYYY-MM-DD"
-  timeHHMM?: string;   // "HH:MM"
+  // Date & time selection
+  dateISO?: string;        // YYYY-MM-DD
+  timeHHMM?: string;       // HH:MM (24h)
 
-  // Message
+  // Reminder message
   text?: string;
 
-  // Frequency selection
+  // Frequency
   repeatKind?: "none" | "daily" | "weekly" | "interval";
 
-  // Weekly
-  daysOfWeek?: number[]; // Sun=0..Sat=6 (optional for future)
+  // Weekly (future-safe)
+  daysOfWeek?: number[];   // Sun=0 .. Sat=6
 
   // Interval
   intervalMinutes?: number;
 
-  // Used to route typed input after pressing a "custom" button
+  // Used to route typed input
   awaiting?: ReminderDraftAwaiting;
 };
+
+/* ----------------------------
+   Habit draft types (future)
+----------------------------- */
 
 export type HabitDraftData = {
   name?: string;
   description?: string;
   scheduleKind?: "daily" | "weekly" | "interval";
-  timeOfDay?: string;      // "HH:MM"
+  timeOfDay?: string;      // HH:MM
   daysOfWeek?: number[];
   intervalMinutes?: number;
   nextRunAt?: Date;
 };
+
+/* ----------------------------
+   Draft document
+----------------------------- */
 
 export type DraftDoc = {
   _id: Types.ObjectId;
@@ -56,40 +76,53 @@ export type DraftDoc = {
   reminder?: ReminderDraftData;
   habit?: HabitDraftData;
 
-  // TTL field: Mongo will delete the doc after expiresAt
+  // TTL cleanup
   expiresAt: Date;
 
   createdAt: Date;
   updatedAt: Date;
 };
 
+/* ----------------------------
+   Schemas
+----------------------------- */
+
 const ReminderDraftSchema = new Schema<ReminderDraftData>(
   {
-    dateISO: { type: String, required: false },
-    timeHHMM: { type: String, required: false },
+    dateISO: { type: String },
+    timeHHMM: { type: String },
 
-    text: { type: String, required: false },
+    text: { type: String },
 
-    repeatKind: { type: String, required: false, enum: ["none", "daily", "weekly", "interval"] },
+    repeatKind: {
+      type: String,
+      enum: ["none", "daily", "weekly", "interval"]
+    },
 
-    daysOfWeek: { type: [Number], required: false },
+    daysOfWeek: { type: [Number] },
 
-    intervalMinutes: { type: Number, required: false },
+    intervalMinutes: { type: Number },
 
-    awaiting: { type: String, required: false, enum: ["date", "time", "interval", "message"] }
+    awaiting: {
+      type: String,
+      enum: ["date", "time", "interval", "message"]
+    }
   },
   { _id: false }
 );
 
 const HabitDraftSchema = new Schema<HabitDraftData>(
   {
-    name: { type: String, required: false },
-    description: { type: String, required: false },
-    scheduleKind: { type: String, required: false, enum: ["daily", "weekly", "interval"] },
-    timeOfDay: { type: String, required: false },
-    daysOfWeek: { type: [Number], required: false },
-    intervalMinutes: { type: Number, required: false },
-    nextRunAt: { type: Date, required: false }
+    name: { type: String },
+    description: { type: String },
+    scheduleKind: {
+      type: String,
+      enum: ["daily", "weekly", "interval"]
+    },
+    timeOfDay: { type: String },
+    daysOfWeek: { type: [Number] },
+    intervalMinutes: { type: Number },
+    nextRunAt: { type: Date }
   },
   { _id: false }
 );
@@ -97,25 +130,43 @@ const HabitDraftSchema = new Schema<HabitDraftData>(
 const DraftSchema = new Schema<DraftDoc>(
   {
     userId: { type: Number, required: true, index: true },
-    chatId: { type: Number, required: true, index: true },
+    chatId: { type: Number, required: true },
 
-    kind: { type: String, required: true, enum: ["reminder", "habit"], index: true },
-    step: { type: String, required: true, index: true },
+    kind: {
+      type: String,
+      required: true,
+      enum: ["reminder", "habit"],
+      index: true
+    },
+
+    step: { type: String, required: true },
 
     timezone: { type: String, required: true },
 
-    reminder: { type: ReminderDraftSchema, required: false },
-    habit: { type: HabitDraftSchema, required: false },
+    reminder: { type: ReminderDraftSchema },
+    habit: { type: HabitDraftSchema },
 
-expiresAt: { type: Date, required: true },
+    expiresAt: { type: Date, required: true }
+  },
   { timestamps: true }
 );
 
-// TTL index: documents expire automatically
-DraftSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+/* ----------------------------
+   Indexes
+----------------------------- */
 
-// Useful for fetching current draft per user/kind
+// TTL index -- Mongo will auto-delete expired drafts
+DraftSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0 }
+);
+
+// Fetch active draft per user
 DraftSchema.index({ userId: 1, kind: 1 });
+
+/* ----------------------------
+   Model export
+----------------------------- */
 
 export const Draft: Model<DraftDoc> =
   (mongoose.models.Draft as Model<DraftDoc>) ||
