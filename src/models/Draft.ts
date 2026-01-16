@@ -4,19 +4,32 @@ export type DraftKind = "reminder" | "habit";
 
 export type DraftStep =
   | "choose_time"
-  | "enter_text"
   | "choose_repeat"
+  | "enter_text"
   | "confirm"
   | "done";
 
+export type ReminderDraftAwaiting = "date" | "time" | "interval" | "message";
+
 export type ReminderDraftData = {
-  whenLabel?: string;      // e.g. "in 10 minutes", "tomorrow"
-  nextRunAt?: Date;        // computed date
+  // Date/time selection
+  dateISO?: string;    // "YYYY-MM-DD"
+  timeHHMM?: string;   // "HH:MM"
+
+  // Message
   text?: string;
+
+  // Frequency selection
   repeatKind?: "none" | "daily" | "weekly" | "interval";
-  timeOfDay?: string;      // "HH:MM" if repeating
-  daysOfWeek?: number[];   // weekly
+
+  // Weekly
+  daysOfWeek?: number[]; // Sun=0..Sat=6 (optional for future)
+
+  // Interval
   intervalMinutes?: number;
+
+  // Used to route typed input after pressing a "custom" button
+  awaiting?: ReminderDraftAwaiting;
 };
 
 export type HabitDraftData = {
@@ -52,13 +65,18 @@ export type DraftDoc = {
 
 const ReminderDraftSchema = new Schema<ReminderDraftData>(
   {
-    whenLabel: { type: String, required: false },
-    nextRunAt: { type: Date, required: false },
+    dateISO: { type: String, required: false },
+    timeHHMM: { type: String, required: false },
+
     text: { type: String, required: false },
+
     repeatKind: { type: String, required: false, enum: ["none", "daily", "weekly", "interval"] },
-    timeOfDay: { type: String, required: false },
+
     daysOfWeek: { type: [Number], required: false },
-    intervalMinutes: { type: Number, required: false }
+
+    intervalMinutes: { type: Number, required: false },
+
+    awaiting: { type: String, required: false, enum: ["date", "time", "interval", "message"] }
   },
   { _id: false }
 );
@@ -95,7 +113,6 @@ const DraftSchema = new Schema<DraftDoc>(
 );
 
 // TTL index: documents expire automatically
-// NOTE: MongoDB Atlas may take 1–2 minutes (sometimes longer) to delete expired docs.
 DraftSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // Useful for fetching current draft per user/kind
