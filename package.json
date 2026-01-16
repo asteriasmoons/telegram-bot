@@ -6,6 +6,7 @@
     "telegraf": "^4.16.3"
   },
   "devDependencies": {
+    "@types/luxon": "^3.4.2",
     "@types/node": "^25.0.9",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
