@@ -17,14 +17,13 @@ export function createBot(token: string) {
   });
 
   bot.action("test:ping", async (ctx) => {
-    await ctx.answerCbQuery("Callback received!");
-    await ctx.reply("Button press worked ✅");
+    // Important: answer the callback so Telegram stops "loading"
+    await ctx.answerCbQuery();
+    await ctx.reply("Button press worked");
   });
 
-  bot.catch((err, ctx) => {
+  bot.catch((err) => {
     console.error("Bot error:", err);
-    // Avoid crashing on unexpected updates
-    // (We keep it simple here; later we’ll add richer logging)
   });
 
   return bot;
