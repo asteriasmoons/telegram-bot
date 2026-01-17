@@ -1,5 +1,8 @@
 import { Telegraf } from "telegraf";
+
 import { registerRemindFlow } from "./flows/remind";
+import { registerRemindersFlow } from "./flows/reminders";
+
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
 import { addMinutes } from "./utils/time";
@@ -7,6 +10,7 @@ import { addMinutes } from "./utils/time";
 export function createBot(token: string) {
   const bot = new Telegraf(token);
 
+  // Basic update log (helps debugging without being noisy)
   bot.use(async (ctx, next) => {
     console.log("Update received:", ctx.updateType);
     return next();
@@ -16,6 +20,7 @@ export function createBot(token: string) {
     const userId = ctx.from?.id;
     const chat = ctx.chat;
 
+    // Save DM chat ID for delivery
     if (userId && chat && chat.type === "private") {
       await UserSettings.findOneAndUpdate(
         { userId },
@@ -31,7 +36,7 @@ export function createBot(token: string) {
     }
 
     await ctx.reply(
-      "Bot is alive.\n\nUse /remind to create a reminder.\nReminders deliver to DM (private chat)."
+      "Bot is alive.\n\nCommands:\n/start\n/ping\n/remind\n/reminders\n\nReminders deliver to DM (private chat)."
     );
   });
 
@@ -39,29 +44,21 @@ export function createBot(token: string) {
     await ctx.reply("pong");
   });
 
-  bot.command("webhookinfo", async (ctx) => {
-    try {
-      const info = await bot.telegram.getWebhookInfo();
-      const lines: string[] = [];
-      lines.push("Webhook info:");
-      lines.push("");
-      lines.push(`url: ${info.url || "(empty)"}`);
-      lines.push(`pending_update_count: ${String(info.pending_update_count)}`);
-      lines.push(`ip_address: ${info.ip_address || "(none)"}`);
-      lines.push(`last_error_message: ${info.last_error_message || "(none)"}`);
-      await ctx.reply(lines.join("\n"));
-    } catch (e: any) {
-      await ctx.reply(`Failed to fetch webhook info: ${String(e?.message || e)}`);
-    }
-  });
+  /* ----------------------------
+     Reminder delivery buttons
+     These are pressed on the reminder message that fires in DM.
+  ----------------------------- */
 
-  // Reminder message buttons
   bot.action(/^r:done:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
     const data = (ctx.callbackQuery as any)?.data as string;
     const reminderId = data.split(":")[2];
 
-    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "sent" } });
+    await Reminder.updateOne(
+      { _id: reminderId },
+      { $set: { status: "sent" } }
+    );
+
     await ctx.reply("Marked done.");
   });
 
@@ -77,13 +74,8 @@ export function createBot(token: string) {
       return;
     }
 
-    const reminder = await Reminder.findById(reminderId);
-    if (!reminder) {
-      await ctx.reply("That reminder no longer exists.");
-      return;
-    }
-
     const nextRunAt = addMinutes(new Date(), minutes);
+
     await Reminder.updateOne(
       { _id: reminderId },
       { $set: { nextRunAt, status: "scheduled" } }
@@ -97,12 +89,23 @@ export function createBot(token: string) {
     const data = (ctx.callbackQuery as any)?.data as string;
     const reminderId = data.split(":")[2];
 
-    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "deleted" } });
+    await Reminder.updateOne(
+      { _id: reminderId },
+      { $set: { status: "deleted" } }
+    );
+
     await ctx.reply("Deleted.");
   });
 
-  // Register /remind flow
+  /* ----------------------------
+     Flows
+  ----------------------------- */
+
+  // Create reminders
   registerRemindFlow(bot);
+
+  // List/edit scheduled/active reminders
+  registerRemindersFlow(bot);
 
   bot.catch((err) => {
     console.error("Bot error:", err);

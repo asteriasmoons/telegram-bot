@@ -4,48 +4,37 @@ import mongoose, { Schema, Model, Types } from "mongoose";
    Draft core types
 ----------------------------- */
 
-export type DraftKind = "reminder" | "habit";
+export type DraftKind = "reminder" | "habit" | "reminder_edit";
 
 export type DraftStep =
   | "choose_time"
   | "choose_repeat"
   | "enter_text"
   | "confirm"
+  | "edit"
   | "done";
 
 /* ----------------------------
-   Reminder draft types
+   Reminder create draft types
 ----------------------------- */
 
-export type ReminderDraftAwaiting =
-  | "date"
-  | "time"
-  | "interval"
-  | "message";
+export type ReminderDraftAwaiting = "date" | "time" | "interval" | "message";
 
 export type ReminderDraftData = {
-  // Date & time selection
   dateISO?: string;        // YYYY-MM-DD
-  timeHHMM?: string;       // HH:MM (24h)
+  timeHHMM?: string;       // HH:MM
 
-  // Reminder message
-  text?: string;
+  text?: string;           // reminder message (you can include title + body)
 
-  // Frequency
   repeatKind?: "none" | "daily" | "weekly" | "interval";
-
-  // Weekly (future-safe)
-  daysOfWeek?: number[];   // Sun=0 .. Sat=6
-
-  // Interval
+  daysOfWeek?: number[];   // Sun=0..Sat=6 (future-safe)
   intervalMinutes?: number;
 
-  // Used to route typed input
   awaiting?: ReminderDraftAwaiting;
 };
 
 /* ----------------------------
-   Habit draft types (future)
+   Habit draft types (future-safe)
 ----------------------------- */
 
 export type HabitDraftData = {
@@ -59,7 +48,17 @@ export type HabitDraftData = {
 };
 
 /* ----------------------------
-   Draft document
+   Reminder edit draft types
+----------------------------- */
+
+export type ReminderEditDraft = {
+  awaiting?: ReminderDraftAwaiting; // what typed input we are waiting for
+  editMode?: "none" | "message" | "date" | "time" | "frequency";
+  stagedText?: string;              // staged new message before save
+};
+
+/* ----------------------------
+   Draft document type
 ----------------------------- */
 
 export type DraftDoc = {
@@ -73,8 +72,14 @@ export type DraftDoc = {
 
   timezone: string;
 
+  // create drafts
   reminder?: ReminderDraftData;
   habit?: HabitDraftData;
+
+  // edit drafts
+  targetReminderId?: string;
+  page?: number;
+  edit?: ReminderEditDraft;
 
   // TTL cleanup
   expiresAt: Date;
@@ -127,6 +132,21 @@ const HabitDraftSchema = new Schema<HabitDraftData>(
   { _id: false }
 );
 
+const ReminderEditDraftSchema = new Schema<ReminderEditDraft>(
+  {
+    awaiting: {
+      type: String,
+      enum: ["date", "time", "interval", "message"]
+    },
+    editMode: {
+      type: String,
+      enum: ["none", "message", "date", "time", "frequency"]
+    },
+    stagedText: { type: String }
+  },
+  { _id: false }
+);
+
 const DraftSchema = new Schema<DraftDoc>(
   {
     userId: { type: Number, required: true, index: true },
@@ -135,7 +155,7 @@ const DraftSchema = new Schema<DraftDoc>(
     kind: {
       type: String,
       required: true,
-      enum: ["reminder", "habit"],
+      enum: ["reminder", "habit", "reminder_edit"],
       index: true
     },
 
@@ -146,6 +166,10 @@ const DraftSchema = new Schema<DraftDoc>(
     reminder: { type: ReminderDraftSchema },
     habit: { type: HabitDraftSchema },
 
+    targetReminderId: { type: String },
+    page: { type: Number },
+    edit: { type: ReminderEditDraftSchema },
+
     expiresAt: { type: Date, required: true }
   },
   { timestamps: true }
@@ -155,13 +179,10 @@ const DraftSchema = new Schema<DraftDoc>(
    Indexes
 ----------------------------- */
 
-// TTL index -- Mongo will auto-delete expired drafts
-DraftSchema.index(
-  { expiresAt: 1 },
-  { expireAfterSeconds: 0 }
-);
+// TTL index: documents expire automatically
+DraftSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// Fetch active draft per user
+// Helpful lookup
 DraftSchema.index({ userId: 1, kind: 1 });
 
 /* ----------------------------
