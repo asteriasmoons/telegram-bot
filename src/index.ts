@@ -38,6 +38,8 @@ async function main() {
   console.log("Setting webhook:", webhookUrl);
   await bot.telegram.setWebhook(webhookUrl);
   console.log("Webhook set.");
+  const info = await bot.telegram.getWebhookInfo();
+console.log("Webhook info:", JSON.stringify(info, null, 2));
 
   // Log identity
   const me = await bot.telegram.getMe();
