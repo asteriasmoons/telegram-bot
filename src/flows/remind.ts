@@ -15,6 +15,47 @@ async function getSettings(userId: number) {
   return UserSettings.findOne({ userId }).lean();
 }
 
+async function getDraft(userId: number) {
+  return Draft.findOne({ userId, kind: "reminder" }).lean() as any;
+}
+
+async function clearDraft(userId: number) {
+  await Draft.deleteOne({ userId, kind: "reminder" });
+}
+
+async function upsertDraft(params: {
+  userId: number;
+  chatId: number;
+  timezone: string;
+  patch?: Record<string, any>;
+  awaiting?: Awaiting;
+}) {
+  const { userId, chatId, timezone, patch, awaiting } = params;
+
+  const current = await getDraft(userId);
+  const curReminder = current?.reminder || {};
+
+  await Draft.findOneAndUpdate(
+    { userId, kind: "reminder" },
+    {
+      $set: {
+        userId,
+        chatId,
+        kind: "reminder",
+        step: "confirm",
+        timezone,
+        reminder: {
+          ...curReminder,
+          ...(patch || {}),
+          awaiting: awaiting || undefined
+        },
+        expiresAt: expiresIn(30)
+      }
+    },
+    { upsert: true, new: true }
+  );
+}
+
 function parseISODate(input: string) {
   const s = input.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -36,89 +77,19 @@ function computeNextRunAt(tz: string, dateISO: string, timeHHMM: string) {
   return dt.isValid ? dt.toJSDate() : null;
 }
 
-function kbStart() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback("Set message", "rm:step:message")],
-    [Markup.button.callback("Cancel", "rm:cancel")]
-  ]);
+function normalizeRepeatKind(v: any) {
+  if (v === "daily") return "daily";
+  if (v === "weekly") return "weekly";
+  if (v === "interval") return "interval";
+  return "none";
 }
 
-function kbPickDate() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback("Today", "rm:date:today"), Markup.button.callback("Tomorrow", "rm:date:tomorrow")],
-    [Markup.button.callback("Type a date (YYYY-MM-DD)", "rm:date:custom")],
-    [Markup.button.callback("Cancel", "rm:cancel")]
-  ]);
-}
-
-function kbPickTime() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback("09:00", "rm:time:09:00"), Markup.button.callback("12:00", "rm:time:12:00")],
-    [Markup.button.callback("18:00", "rm:time:18:00"), Markup.button.callback("21:00", "rm:time:21:00")],
-    [Markup.button.callback("Type a time (HH:MM)", "rm:time:custom")],
-    [Markup.button.callback("Cancel", "rm:cancel")]
-  ]);
-}
-
-function kbPickFreq() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback("Once", "rm:freq:once")],
-    [Markup.button.callback("Daily", "rm:freq:daily"), Markup.button.callback("Weekly", "rm:freq:weekly")],
-    [Markup.button.callback("Every X minutes", "rm:freq:interval")],
-    [Markup.button.callback("Cancel", "rm:cancel")]
-  ]);
-}
-
-function kbConfirm() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback("Save reminder", "rm:save")],
-    [Markup.button.callback("Cancel", "rm:cancel")]
-  ]);
-}
-
-async function getDraft(userId: number) {
-  return Draft.findOne({ userId, kind: "reminder" }).lean() as any;
-}
-
-async function setDraft(params: {
-  userId: number;
-  chatId: number;
-  timezone: string;
-  awaiting?: Awaiting;
-  patch?: Record<string, any>;
-}) {
-  const { userId, chatId, timezone, awaiting, patch } = params;
-
-  await Draft.findOneAndUpdate(
-    { userId, kind: "reminder" },
-    {
-      $set: {
-        userId,
-        chatId,
-        kind: "reminder",
-        step: "confirm",
-        timezone,
-        reminder: {
-          ...(patch || {}),
-          awaiting: awaiting || undefined
-        },
-        expiresAt: expiresIn(30)
-      }
-    },
-    { upsert: true, new: true }
-  );
-}
-
-async function clearDraft(userId: number) {
-  await Draft.deleteOne({ userId, kind: "reminder" });
-}
-
-function previewText(d: any) {
+function controlPanelText(d: any) {
   const msg = d?.reminder?.text ? String(d.reminder.text) : "(not set)";
-  const dateISO = d?.reminder?.dateISO || "(not set)";
-  const timeHHMM = d?.reminder?.timeHHMM || "(not set)";
-  const freq = d?.reminder?.repeatKind || "once";
-  const interval = d?.reminder?.intervalMinutes ? `${d.reminder.intervalMinutes}m` : "";
+  const dateISO = d?.reminder?.dateISO ? String(d.reminder.dateISO) : "(not set)";
+  const timeHHMM = d?.reminder?.timeHHMM ? String(d.reminder.timeHHMM) : "(not set)";
+  const repeat = normalizeRepeatKind(d?.reminder?.repeatKind);
+  const interval = d?.reminder?.intervalMinutes ? String(d.reminder.intervalMinutes) : "";
 
   const lines: string[] = [];
   lines.push("New reminder");
@@ -128,53 +99,83 @@ function previewText(d: any) {
   lines.push("");
   lines.push(`Date: ${dateISO}`);
   lines.push(`Time: ${timeHHMM}`);
-  lines.push(`Frequency: ${freq}${interval ? ` (${interval})` : ""}`);
+  lines.push(`Frequency: ${repeat}${repeat === "interval" && interval ? ` (${interval} minutes)` : ""}`);
+  lines.push("");
+  lines.push("Use the buttons below to set each part.");
   return lines.join("\n");
 }
 
-export function registerRemindersFlow(bot: Telegraf<any>) {
-  // IMPORTANT: This registers /remind (create flow)
+function kbMain() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("Set message", "rm:msg")],
+    [Markup.button.callback("Set date", "rm:date"), Markup.button.callback("Set time", "rm:time")],
+    [Markup.button.callback("Set frequency", "rm:freq")],
+    [Markup.button.callback("Preview", "rm:preview"), Markup.button.callback("Save", "rm:save")],
+    [Markup.button.callback("Cancel", "rm:cancel")]
+  ]);
+}
+
+function kbPickDate() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("Today", "rm:date:today"), Markup.button.callback("Tomorrow", "rm:date:tomorrow")],
+    [Markup.button.callback("+3 days", "rm:date:plus3"), Markup.button.callback("+7 days", "rm:date:plus7")],
+    [Markup.button.callback("Custom (type date)", "rm:date:custom")],
+    [Markup.button.callback("Back", "rm:back")]
+  ]);
+}
+
+function kbPickTime() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("09:00", "rm:time:09:00"), Markup.button.callback("12:00", "rm:time:12:00")],
+    [Markup.button.callback("15:00", "rm:time:15:00"), Markup.button.callback("18:00", "rm:time:18:00")],
+    [Markup.button.callback("21:00", "rm:time:21:00"), Markup.button.callback("23:00", "rm:time:23:00")],
+    [Markup.button.callback("Custom (type time)", "rm:time:custom")],
+    [Markup.button.callback("Back", "rm:back")]
+  ]);
+}
+
+function kbPickFreq() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("Once", "rm:freq:once")],
+    [Markup.button.callback("Daily", "rm:freq:daily"), Markup.button.callback("Weekly", "rm:freq:weekly")],
+    [Markup.button.callback("Interval (minutes)", "rm:freq:interval")],
+    [Markup.button.callback("Back", "rm:back")]
+  ]);
+}
+
+export function registerRemindFlow(bot: Telegraf<any>) {
   bot.command("remind", async (ctx) => {
     const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    if (!userId || !chatId) return;
+    if (!userId) return;
 
     const settings = await getSettings(userId);
 
-    // Must have a DM chat id for delivery (your design)
+    // You want reminders delivered to DM; require dmChatId
     if (!settings?.dmChatId) {
       await ctx.reply("Open a DM with this bot and run /start first. Reminders deliver to DM.");
       return;
     }
 
     const tz = settings.timezone || "America/Chicago";
-    await clearDraft(userId);
 
-    // Create the draft and start by asking for message
-    await setDraft({
+    // fresh session
+    await clearDraft(userId);
+    await upsertDraft({
       userId,
       chatId: settings.dmChatId,
       timezone: tz,
-      awaiting: "message",
-      patch: {}
+      patch: { repeatKind: "none" }
     });
 
-    await ctx.reply("Let’s create a reminder. Type the reminder message (you can include a title + body).");
+    const d = await getDraft(userId);
+    await ctx.reply(controlPanelText(d), kbMain());
   });
 
   bot.action(/^rm:/, async (ctx) => {
     const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    const data = (ctx.callbackQuery as any)?.data as string;
-    if (!userId || !chatId) return;
+    if (!userId) return;
 
     await ctx.answerCbQuery().catch(() => {});
-
-    if (data === "rm:cancel") {
-      await clearDraft(userId);
-      await ctx.reply("Cancelled.");
-      return;
-    }
 
     const settings = await getSettings(userId);
     if (!settings?.dmChatId) {
@@ -184,16 +185,40 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
     }
 
     const tz = settings.timezone || "America/Chicago";
-    const d = await getDraft(userId);
+    const data = (ctx.callbackQuery as any)?.data as string;
 
+    const d = await getDraft(userId);
     if (!d) {
       await ctx.reply("No active /remind session. Run /remind again.");
       return;
     }
 
-    if (data === "rm:step:message") {
-      await setDraft({ userId, chatId: settings.dmChatId, timezone: tz, awaiting: "message", patch: d.reminder || {} });
-      await ctx.reply("Type the reminder message (you can include a title + body).");
+    if (data === "rm:cancel") {
+      await clearDraft(userId);
+      await ctx.reply("Cancelled.");
+      return;
+    }
+
+    if (data === "rm:back") {
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
+      return;
+    }
+
+    if (data === "rm:preview") {
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
+      return;
+    }
+
+    if (data === "rm:msg") {
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, awaiting: "message" });
+      await ctx.reply("Send the reminder message now (title + body is fine).");
+      return;
+    }
+
+    if (data === "rm:date") {
+      await ctx.reply("Pick a date:", kbPickDate());
       return;
     }
 
@@ -201,24 +226,26 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       const mode = data.split(":")[2];
 
       if (mode === "custom") {
-        await setDraft({ userId, chatId: settings.dmChatId, timezone: tz, awaiting: "date", patch: d.reminder || {} });
+        await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, awaiting: "date" });
         await ctx.reply("Type the date as YYYY-MM-DD (example: 2026-01-16).");
         return;
       }
 
-      const now = DateTime.now().setZone(tz);
-      const dateISO =
-        mode === "tomorrow"
-          ? now.plus({ days: 1 }).toFormat("yyyy-LL-dd")
-          : now.toFormat("yyyy-LL-dd");
+      const now = DateTime.now().setZone(tz).startOf("day");
+      let dateISO = now.toFormat("yyyy-LL-dd");
 
-      await setDraft({
-        userId,
-        chatId: settings.dmChatId,
-        timezone: tz,
-        patch: { ...(d.reminder || {}), dateISO }
-      });
+      if (mode === "tomorrow") dateISO = now.plus({ days: 1 }).toFormat("yyyy-LL-dd");
+      if (mode === "plus3") dateISO = now.plus({ days: 3 }).toFormat("yyyy-LL-dd");
+      if (mode === "plus7") dateISO = now.plus({ days: 7 }).toFormat("yyyy-LL-dd");
 
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { dateISO } });
+
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
+      return;
+    }
+
+    if (data === "rm:time") {
       await ctx.reply("Pick a time:", kbPickTime());
       return;
     }
@@ -227,7 +254,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       const t = data.split(":")[2];
 
       if (t === "custom") {
-        await setDraft({ userId, chatId: settings.dmChatId, timezone: tz, awaiting: "time", patch: d.reminder || {} });
+        await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, awaiting: "time" });
         await ctx.reply("Type the time as HH:MM (24-hour). Example: 13:45");
         return;
       }
@@ -238,13 +265,14 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         return;
       }
 
-      await setDraft({
-        userId,
-        chatId: settings.dmChatId,
-        timezone: tz,
-        patch: { ...(d.reminder || {}), timeHHMM }
-      });
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { timeHHMM } });
 
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
+      return;
+    }
+
+    if (data === "rm:freq") {
       await ctx.reply("Pick a frequency:", kbPickFreq());
       return;
     }
@@ -253,52 +281,48 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       const kind = data.split(":")[2]; // once|daily|weekly|interval
 
       if (kind === "interval") {
-        await setDraft({
+        await upsertDraft({
           userId,
           chatId: settings.dmChatId,
           timezone: tz,
-          awaiting: "interval",
-          patch: { ...(d.reminder || {}), repeatKind: "interval" }
+          patch: { repeatKind: "interval" },
+          awaiting: "interval"
         });
         await ctx.reply("Type the interval in minutes (example: 90).");
         return;
       }
 
       const repeatKind = kind === "daily" ? "daily" : kind === "weekly" ? "weekly" : "none";
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { repeatKind, intervalMinutes: undefined } });
 
-      await setDraft({
-        userId,
-        chatId: settings.dmChatId,
-        timezone: tz,
-        patch: { ...(d.reminder || {}), repeatKind }
-      });
-
-      const updated = await getDraft(userId);
-      await ctx.reply(previewText(updated), kbConfirm());
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
       return;
     }
 
     if (data === "rm:save") {
       const fresh = await getDraft(userId);
-      if (!fresh?.reminder?.text) {
-        await ctx.reply("Missing message. Start again with /remind.");
+
+      const text = fresh?.reminder?.text ? String(fresh.reminder.text) : "";
+      const dateISO = fresh?.reminder?.dateISO ? String(fresh.reminder.dateISO) : "";
+      const timeHHMM = fresh?.reminder?.timeHHMM ? String(fresh.reminder.timeHHMM) : "";
+      const repeatKind = normalizeRepeatKind(fresh?.reminder?.repeatKind);
+      const intervalMinutes = Number(fresh?.reminder?.intervalMinutes);
+
+      if (!text.trim()) {
+        await ctx.reply("Message is not set yet. Tap "Set message".");
         return;
       }
-      if (!fresh?.reminder?.dateISO || !fresh?.reminder?.timeHHMM) {
-        await ctx.reply("Missing date/time. Start again with /remind.");
+      if (!dateISO || !timeHHMM) {
+        await ctx.reply("Date/time not set yet. Tap "Set date" and "Set time".");
         return;
       }
 
-      const dateISO = String(fresh.reminder.dateISO);
-      const timeHHMM = String(fresh.reminder.timeHHMM);
       const nextRunAt = computeNextRunAt(tz, dateISO, timeHHMM);
-
       if (!nextRunAt) {
-        await ctx.reply("Could not compute the date/time. Start again with /remind.");
+        await ctx.reply("Could not compute date/time. Please re-set date/time.");
         return;
       }
-
-      const repeatKind = fresh.reminder.repeatKind || "none";
 
       let schedule: any = { kind: "once" as const };
 
@@ -309,20 +333,17 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         const dow = dt.isValid ? (dt.weekday % 7) : (DateTime.now().setZone(tz).weekday % 7);
         schedule = { kind: "weekly" as const, timeOfDay: timeHHMM, daysOfWeek: [dow] };
       } else if (repeatKind === "interval") {
-        const mins = Number(fresh.reminder.intervalMinutes);
-        if (!Number.isFinite(mins) || mins <= 0) {
-          await ctx.reply("Interval minutes must be a positive number. Start again with /remind.");
+        if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
+          await ctx.reply("Interval minutes are not set/invalid. Tap "Set frequency" → Interval.");
           return;
         }
-        schedule = { kind: "interval" as const, intervalMinutes: mins };
-      } else {
-        schedule = { kind: "once" as const };
+        schedule = { kind: "interval" as const, intervalMinutes };
       }
 
       await Reminder.create({
         userId,
         chatId: settings.dmChatId,
-        text: String(fresh.reminder.text),
+        text,
         status: "scheduled",
         nextRunAt,
         schedule,
@@ -336,12 +357,10 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
     }
   });
 
-  // Text input handler for the create flow
+  // typed input ONLY happens after pressing a button that sets awaiting
   bot.on("text", async (ctx) => {
     const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    const text = ctx.message?.text;
-    if (!userId || !chatId || !text) return;
+    if (!userId) return;
 
     const d = await getDraft(userId);
     if (!d) return;
@@ -355,17 +374,14 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
 
     const tz = settings.timezone || "America/Chicago";
     const awaiting: Awaiting | undefined = d.reminder?.awaiting;
-
     if (!awaiting) return;
 
+    const text = ctx.message?.text || "";
+
     if (awaiting === "message") {
-      await setDraft({
-        userId,
-        chatId: settings.dmChatId,
-        timezone: tz,
-        patch: { ...(d.reminder || {}), text, awaiting: undefined }
-      });
-      await ctx.reply("Pick a date:", kbPickDate());
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { text }, awaiting: undefined });
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
       return;
     }
 
@@ -375,15 +391,9 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         await ctx.reply("Invalid date. Use YYYY-MM-DD (example: 2026-01-16).");
         return;
       }
-
-      await setDraft({
-        userId,
-        chatId: settings.dmChatId,
-        timezone: tz,
-        patch: { ...(d.reminder || {}), dateISO, awaiting: undefined }
-      });
-
-      await ctx.reply("Pick a time:", kbPickTime());
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { dateISO }, awaiting: undefined });
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
       return;
     }
 
@@ -393,15 +403,9 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         await ctx.reply("Invalid time. Use HH:MM (24-hour), like 13:45.");
         return;
       }
-
-      await setDraft({
-        userId,
-        chatId: settings.dmChatId,
-        timezone: tz,
-        patch: { ...(d.reminder || {}), timeHHMM, awaiting: undefined }
-      });
-
-      await ctx.reply("Pick a frequency:", kbPickFreq());
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { timeHHMM }, awaiting: undefined });
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
       return;
     }
 
@@ -411,16 +415,9 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         await ctx.reply("Interval must be a positive number of minutes (example: 90).");
         return;
       }
-
-      await setDraft({
-        userId,
-        chatId: settings.dmChatId,
-        timezone: tz,
-        patch: { ...(d.reminder || {}), intervalMinutes: mins, awaiting: undefined }
-      });
-
-      const updated = await getDraft(userId);
-      await ctx.reply(previewText(updated), kbConfirm());
+      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { intervalMinutes: mins }, awaiting: undefined });
+      const fresh = await getDraft(userId);
+      await ctx.reply(controlPanelText(fresh), kbMain());
       return;
     }
   });
