@@ -207,7 +207,28 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       return;
     }
 
-    if (data === "rm:preview" || data === "rm:back") {
+    if (data === "rm:preview") {
+      const fresh = await getDraft(userId);
+
+      // Show the actual message with entities
+      const text = fresh?.reminder?.text;
+      const entities = Array.isArray(fresh?.reminder?.entities) ? fresh.reminder.entities : undefined;
+
+      if (text) {
+        if (entities && entities.length > 0) {
+          await ctx.reply(text, { entities } as any);
+        } else {
+          await ctx.reply(text);
+        }
+      } else {
+        await ctx.reply("(No message set yet)");
+      }
+
+      await ctx.reply(controlPanelText(fresh), kbMain());
+      return;
+    }
+
+    if (data === "rm:back") {
       const fresh = await getDraft(userId);
       await ctx.reply(controlPanelText(fresh), kbMain());
       return;
@@ -253,7 +274,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
     }
 
     if (data.startsWith("rm:time:")) {
-      // rm:time:09:00 -> ["rm","time","09","00"] (so we reconstruct)
+      // rm:time:09:00 -> ["rm","time","09","00"]
       const parts = data.split(":");
       const t = parts.slice(2).join(":");
 
@@ -412,6 +433,13 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         patch: { text: input, entities },
         awaiting: undefined
       });
+
+      // Show preview with entities rendered
+      if (entities && entities.length > 0) {
+        await ctx.reply(input, { entities } as any);
+      } else {
+        await ctx.reply(input);
+      }
 
       const fresh = await getDraft(userId);
       await ctx.reply(controlPanelText(fresh), kbMain());
