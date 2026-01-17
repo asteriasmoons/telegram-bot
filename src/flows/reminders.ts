@@ -48,7 +48,10 @@ function kbList(reminders: any[], page: number, tz: string) {
 function kbOpen(id: string, page: number) {
   return Markup.inlineKeyboard([
     [Markup.button.callback("Edit message", `re:edit:message:${id}:${page}`)],
-    [Markup.button.callback("Edit date", `re:edit:date:${id}:${page}`), Markup.button.callback("Edit time", `re:edit:time:${id}:${page}`)],
+    [
+      Markup.button.callback("Edit date", `re:edit:date:${id}:${page}`),
+      Markup.button.callback("Edit time", `re:edit:time:${id}:${page}`)
+    ],
     [Markup.button.callback("Edit frequency", `re:edit:frequency:${id}:${page}`)],
     [Markup.button.callback("Delete", `re:delete:${id}:${page}`)],
     [Markup.button.callback("Back", `re:list:${page}`), Markup.button.callback("Close", "re:close")]
@@ -57,7 +60,10 @@ function kbOpen(id: string, page: number) {
 
 function kbPickDate(id: string, page: number) {
   return Markup.inlineKeyboard([
-    [Markup.button.callback("Today", `re:set:date:${id}:${page}:today`), Markup.button.callback("Tomorrow", `re:set:date:${id}:${page}:tomorrow`)],
+    [
+      Markup.button.callback("Today", `re:set:date:${id}:${page}:today`),
+      Markup.button.callback("Tomorrow", `re:set:date:${id}:${page}:tomorrow`)
+    ],
     [Markup.button.callback("Type a date (YYYY-MM-DD)", `re:set:date:${id}:${page}:custom`)],
     [Markup.button.callback("Back", `re:open:${id}:${page}`), Markup.button.callback("Close", "re:close")]
   ]);
@@ -65,8 +71,14 @@ function kbPickDate(id: string, page: number) {
 
 function kbPickTime(id: string, page: number) {
   return Markup.inlineKeyboard([
-    [Markup.button.callback("09:00", `re:set:time:${id}:${page}:09:00`), Markup.button.callback("12:00", `re:set:time:${id}:${page}:12:00`)],
-    [Markup.button.callback("18:00", `re:set:time:${id}:${page}:18:00`), Markup.button.callback("21:00", `re:set:time:${id}:${page}:21:00`)],
+    [
+      Markup.button.callback("09:00", `re:set:time:${id}:${page}:09:00`),
+      Markup.button.callback("12:00", `re:set:time:${id}:${page}:12:00`)
+    ],
+    [
+      Markup.button.callback("18:00", `re:set:time:${id}:${page}:18:00`),
+      Markup.button.callback("21:00", `re:set:time:${id}:${page}:21:00`)
+    ],
     [Markup.button.callback("Type a time (HH:MM)", `re:set:time:${id}:${page}:custom`)],
     [Markup.button.callback("Back", `re:open:${id}:${page}`), Markup.button.callback("Close", "re:close")]
   ]);
@@ -75,7 +87,10 @@ function kbPickTime(id: string, page: number) {
 function kbPickFreq(id: string, page: number) {
   return Markup.inlineKeyboard([
     [Markup.button.callback("Once", `re:set:freq:${id}:${page}:once`)],
-    [Markup.button.callback("Daily", `re:set:freq:${id}:${page}:daily`), Markup.button.callback("Weekly", `re:set:freq:${id}:${page}:weekly`)],
+    [
+      Markup.button.callback("Daily", `re:set:freq:${id}:${page}:daily`),
+      Markup.button.callback("Weekly", `re:set:freq:${id}:${page}:weekly`)
+    ],
     [Markup.button.callback("Every X minutes", `re:set:freq:${id}:${page}:interval`)],
     [Markup.button.callback("Back", `re:open:${id}:${page}`), Markup.button.callback("Close", "re:close")]
   ]);
@@ -136,8 +151,9 @@ async function upsertEditDraft(params: {
   page: number;
   awaiting?: Awaiting;
   stagedText?: string;
+  stagedEntities?: any[];
 }) {
-  const { userId, chatId, tz, reminderId, page, awaiting, stagedText } = params;
+  const { userId, chatId, tz, reminderId, page, awaiting, stagedText, stagedEntities } = params;
 
   await Draft.findOneAndUpdate(
     { userId, kind: "reminder_edit" },
@@ -154,7 +170,8 @@ async function upsertEditDraft(params: {
 
         edit: {
           awaiting: awaiting || undefined,
-          stagedText: stagedText || undefined
+          stagedText: stagedText || undefined,
+          stagedEntities: Array.isArray(stagedEntities) ? stagedEntities : undefined
         },
 
         expiresAt: expiresIn(30)
@@ -257,7 +274,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       }
 
       await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "message" });
-      await ctx.reply("Type the new message (this replaces the old one).");
+      await ctx.reply("Type the new message (custom emojis are supported). This replaces the old one.");
       return;
     }
 
@@ -310,9 +327,10 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       }
 
       const now = DateTime.now().setZone(tz);
-      const dateISO = mode === "tomorrow"
-        ? now.plus({ days: 1 }).toFormat("yyyy-LL-dd")
-        : now.toFormat("yyyy-LL-dd");
+      const dateISO =
+        mode === "tomorrow"
+          ? now.plus({ days: 1 }).toFormat("yyyy-LL-dd")
+          : now.toFormat("yyyy-LL-dd");
 
       const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
       const timeHHMM = current.isValid ? current.toFormat("HH:mm") : "09:00";
@@ -355,7 +373,9 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       }
 
       const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
-      const dateISO = current.isValid ? current.toFormat("yyyy-LL-dd") : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
+      const dateISO = current.isValid
+        ? current.toFormat("yyyy-LL-dd")
+        : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
 
       const next = computeNextRunAt(tz, dateISO, timeHHMM);
       if (!next) {
@@ -421,12 +441,18 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       }
 
       const staged = d.edit?.stagedText;
+      const stagedEntities = Array.isArray(d.edit?.stagedEntities) ? d.edit.stagedEntities : undefined;
+
       if (!staged || !String(staged).trim()) {
         await ctx.reply("Nothing to save. Use Edit message again.");
         return;
       }
 
-      await Reminder.updateOne({ _id: id, userId }, { $set: { text: staged } });
+      await Reminder.updateOne(
+        { _id: id, userId },
+        { $set: { text: staged, entities: stagedEntities } }
+      );
+
       await clearEditDraft(userId);
 
       const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
@@ -468,9 +494,25 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
     }
 
     if (awaiting === "message") {
-      await upsertEditDraft({ userId, chatId, tz, reminderId, page, stagedText: text });
-      await Draft.updateOne({ userId, kind: "reminder_edit" }, { $set: { "edit.awaiting": undefined } });
-      await ctx.reply("Preview (message will be replaced with this):\n\n" + text, kbConfirmSave(reminderId, page));
+      // Capture entities so custom emojis persist.
+      const rawEntities = (ctx.message as any)?.entities;
+      const entities = Array.isArray(rawEntities) ? rawEntities : undefined;
+
+      await upsertEditDraft({
+        userId,
+        chatId,
+        tz,
+        reminderId,
+        page,
+        stagedText: text,
+        stagedEntities: entities,
+        awaiting: undefined
+      });
+
+      await ctx.reply(
+        "Preview (message will be replaced with this):\n\n" + text,
+        kbConfirmSave(reminderId, page)
+      );
       return;
     }
 
@@ -506,7 +548,9 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       }
 
       const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
-      const dateISO = current.isValid ? current.toFormat("yyyy-LL-dd") : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
+      const dateISO = current.isValid
+        ? current.toFormat("yyyy-LL-dd")
+        : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
 
       const next = computeNextRunAt(tz, dateISO, timeHHMM);
       if (!next) {
