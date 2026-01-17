@@ -10,7 +10,6 @@ import { addMinutes } from "./utils/time";
 export function createBot(token: string) {
   const bot = new Telegraf(token);
 
-  // Basic update log (helps debugging without being noisy)
   bot.use(async (ctx, next) => {
     console.log("Update received:", ctx.updateType);
     return next();
@@ -20,7 +19,6 @@ export function createBot(token: string) {
     const userId = ctx.from?.id;
     const chat = ctx.chat;
 
-    // Save DM chat ID for delivery
     if (userId && chat && chat.type === "private") {
       await UserSettings.findOneAndUpdate(
         { userId },
@@ -44,21 +42,13 @@ export function createBot(token: string) {
     await ctx.reply("pong");
   });
 
-  /* ----------------------------
-     Reminder delivery buttons
-     These are pressed on the reminder message that fires in DM.
-  ----------------------------- */
-
+  // Reminder delivery buttons (pressed on the reminder message itself)
   bot.action(/^r:done:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
     const data = (ctx.callbackQuery as any)?.data as string;
     const reminderId = data.split(":")[2];
 
-    await Reminder.updateOne(
-      { _id: reminderId },
-      { $set: { status: "sent" } }
-    );
-
+    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "sent" } });
     await ctx.reply("Marked done.");
   });
 
@@ -89,22 +79,15 @@ export function createBot(token: string) {
     const data = (ctx.callbackQuery as any)?.data as string;
     const reminderId = data.split(":")[2];
 
-    await Reminder.updateOne(
-      { _id: reminderId },
-      { $set: { status: "deleted" } }
-    );
-
+    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "deleted" } });
     await ctx.reply("Deleted.");
   });
 
-  /* ----------------------------
-     Flows
-  ----------------------------- */
-
-  // Create reminders
+  // Create reminder flow
   registerRemindFlow(bot);
 
-  // List/edit scheduled/active reminders
+  // List/edit reminders flow (scheduled/active list in your UX,
+  // but your schema supports scheduled/paused/sent/deleted; the flow should list scheduled only)
   registerRemindersFlow(bot);
 
   bot.catch((err) => {
