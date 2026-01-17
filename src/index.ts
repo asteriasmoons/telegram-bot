@@ -1,75 +1,70 @@
-import { config } from "./config";
-import { connectDb } from "./db";
+import "dotenv/config";
+import mongoose from "mongoose";
+
 import { createBot } from "./bot";
-import { createScheduler, makeInstanceId } from "./scheduler";
 import { startServer } from "./health";
-
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
-}
-
-function getNumberEnv(name: string, fallback: number) {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return fallback;
-  return n;
-}
+import { startScheduler } from "./scheduler";
 
 async function main() {
-  const conn = await connectDb(config.mongoUri);
-  console.log("Connected to MongoDB:", conn.name);
+  const token = process.env.BOT_TOKEN;
+  const mongoUri = process.env.MONGODB_URI;
 
-  const bot = createBot(config.botToken);
-
-  const webhookDomain = requireEnv("WEBHOOK_DOMAIN");
+  // These should be set in Render env vars
+  // Example:
+  // WEBHOOK_DOMAIN = https://telegram-bot-yt3w.onrender.com
+  // WEBHOOK_PATH   = /telegram
+  const webhookDomain = process.env.WEBHOOK_DOMAIN;
   const webhookPath = process.env.WEBHOOK_PATH || "/telegram";
-  const webhookUrl = `${webhookDomain}${webhookPath}`;
 
-  const server = startServer({ bot, webhookPath });
+  if (!token) throw new Error("Missing BOT_TOKEN");
+  if (!mongoUri) throw new Error("Missing MONGODB_URI");
+  if (!webhookDomain) throw new Error("Missing WEBHOOK_DOMAIN");
 
+  const bot = createBot(token);
+
+  // Connect DB first
+  await mongoose.connect(mongoUri);
+  console.log("Connected to MongoDB");
+
+  // Start HTTP server (Render needs an open port)
+  startServer({ bot, webhookPath });
+
+  // Webhook URL
+  const webhookUrl =
+    webhookDomain.endsWith("/")
+      ? `${webhookDomain.slice(0, -1)}${webhookPath}`
+      : `${webhookDomain}${webhookPath}`;
+
+  // IMPORTANT: This is WEBHOOK MODE. No polling.
   console.log("Setting webhook:", webhookUrl);
-  await bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
+  await bot.telegram.setWebhook(webhookUrl);
   console.log("Webhook set.");
 
+  // Log identity (helps verify token is correct)
   const me = await bot.telegram.getMe();
-  console.log("Bot identity:", `@${me.username}`, me.id);
+  console.log(`Bot identity: @${me.username} ${me.id}`);
 
-  const instanceId = process.env.INSTANCE_ID || makeInstanceId();
-  const pollIntervalMs = getNumberEnv("SCHEDULER_INTERVAL_MS", 10_000);
-  const lockTtlMs = getNumberEnv("SCHEDULER_LOCK_TTL_MS", 60_000);
-
-  const scheduler = createScheduler({
-    pollIntervalMs,
-    lockTtlMs,
-    instanceId,
-    sendMessage: (chatId: number, text: string, extra?: any) => bot.telegram.sendMessage(chatId, text, extra)
+  // Start scheduler loop (this is NOT Telegram polling; it's your DB-based scheduler)
+  startScheduler(bot, {
+    pollIntervalMs: 10_000,
+    lockTtlMs: 60_000
   });
 
-  scheduler.start();
+  // Graceful shutdown
+  process.once("SIGTERM", async () => {
+    console.log("SIGTERM received, shutting down...");
+    await mongoose.disconnect().catch(() => {});
+    process.exit(0);
+  });
 
-  function shutdown(signal: string) {
-    console.log(`Shutdown signal received: ${signal}`);
-    scheduler.stop();
-
-    try {
-      server.close(() => {
-        console.log("HTTP server closed.");
-        process.exit(0);
-      });
-    } catch (e) {
-      console.error("Server close error:", e);
-      process.exit(0);
-    }
-  }
-
-  process.once("SIGINT", () => shutdown("SIGINT"));
-  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  process.once("SIGINT", async () => {
+    console.log("SIGINT received, shutting down...");
+    await mongoose.disconnect().catch(() => {});
+    process.exit(0);
+  });
 }
 
-main().catch((e) => {
-  console.error("Fatal startup error:", e);
+main().catch((err) => {
+  console.error("Fatal startup error:", err);
   process.exit(1);
 });
