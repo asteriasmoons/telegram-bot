@@ -122,7 +122,10 @@ function kbMain() {
 
 function kbPickDate() {
   return Markup.inlineKeyboard([
-    [Markup.button.callback("Today", "rm:date:today"), Markup.button.callback("Tomorrow", "rm:date:tomorrow")],
+    [
+      Markup.button.callback("Today", "rm:date:today"),
+      Markup.button.callback("Tomorrow", "rm:date:tomorrow")
+    ],
     [Markup.button.callback("+3 days", "rm:date:plus3"), Markup.button.callback("+7 days", "rm:date:plus7")],
     [Markup.button.callback("Custom (type date)", "rm:date:custom")],
     [Markup.button.callback("Back", "rm:back")]
@@ -317,6 +320,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         await ctx.reply("Message is not set yet. Tap Set message.");
         return;
       }
+
       if (!dateISO || !timeHHMM) {
         await ctx.reply("Date/time is not set yet. Tap Set date and Set time.");
         return;
@@ -334,7 +338,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         schedule = { kind: "daily" as const, timeOfDay: timeHHMM };
       } else if (repeatKind === "weekly") {
         const dt = DateTime.fromISO(`${dateISO}T${timeHHMM}`, { zone: tz });
-        const dow = dt.isValid ? (dt.weekday % 7) : (DateTime.now().setZone(tz).weekday % 7);
+        const dow = dt.isValid ? dt.weekday % 7 : DateTime.now().setZone(tz).weekday % 7;
         schedule = { kind: "weekly" as const, timeOfDay: timeHHMM, daysOfWeek: [dow] };
       } else if (repeatKind === "interval") {
         if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
@@ -363,12 +367,18 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
   });
 
   // Typed input ONLY after a button sets awaiting
-  bot.on("text", async (ctx) => {
+  // IMPORTANT: this MUST NOT swallow slash commands like /reminders
+  bot.on("text", async (ctx, next) => {
+    const text = ctx.message?.text || "";
+
+    // Never swallow slash commands (lets /reminders, /ping, etc. work)
+    if (text.startsWith("/")) return next();
+
     const userId = ctx.from?.id;
-    if (!userId) return;
+    if (!userId) return next();
 
     const d = await getDraft(userId);
-    if (!d) return;
+    if (!d) return next();
 
     const settings = await getSettings(userId);
     if (!settings?.dmChatId) {
@@ -379,9 +389,11 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
 
     const tz = settings.timezone || "America/Chicago";
     const awaiting: Awaiting | undefined = d.reminder?.awaiting;
-    if (!awaiting) return;
 
-    const input = ctx.message?.text || "";
+    // If we're not awaiting typed input, don't consume the message.
+    if (!awaiting) return next();
+
+    const input = text;
 
     if (awaiting === "message") {
       // Capture entities from the incoming Telegram message.
@@ -407,7 +419,15 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         await ctx.reply("Invalid date. Use YYYY-MM-DD (example: 2026-01-16).");
         return;
       }
-      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { dateISO }, awaiting: undefined });
+
+      await upsertDraft({
+        userId,
+        chatId: settings.dmChatId,
+        timezone: tz,
+        patch: { dateISO },
+        awaiting: undefined
+      });
+
       const fresh = await getDraft(userId);
       await ctx.reply(controlPanelText(fresh), kbMain());
       return;
@@ -419,7 +439,15 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         await ctx.reply("Invalid time. Use HH:MM (24-hour), like 13:45.");
         return;
       }
-      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { timeHHMM }, awaiting: undefined });
+
+      await upsertDraft({
+        userId,
+        chatId: settings.dmChatId,
+        timezone: tz,
+        patch: { timeHHMM },
+        awaiting: undefined
+      });
+
       const fresh = await getDraft(userId);
       await ctx.reply(controlPanelText(fresh), kbMain());
       return;
@@ -431,10 +459,21 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         await ctx.reply("Interval must be a positive number of minutes (example: 90).");
         return;
       }
-      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { intervalMinutes: mins }, awaiting: undefined });
+
+      await upsertDraft({
+        userId,
+        chatId: settings.dmChatId,
+        timezone: tz,
+        patch: { intervalMinutes: mins },
+        awaiting: undefined
+      });
+
       const fresh = await getDraft(userId);
       await ctx.reply(controlPanelText(fresh), kbMain());
       return;
     }
+
+    // Unexpected awaiting value: don't swallow messages
+    return next();
   });
 }
