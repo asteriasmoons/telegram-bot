@@ -7,8 +7,7 @@ import { UserSettings } from "../models/UserSettings";
 
 const PAGE_SIZE = 5;
 
-// Your schema supports: scheduled | sent | paused | deleted
-// You requested: ONLY scheduled/active -> in your schema that means ONLY "scheduled".
+// ONLY scheduled/active
 const LIST_STATUSES = ["scheduled"] as const;
 
 type Awaiting = "message" | "date" | "time" | "interval";
@@ -191,46 +190,21 @@ async function clearEditDraft(userId: number) {
 
 export function registerRemindersFlow(bot: Telegraf<any>) {
   bot.command("reminders", async (ctx) => {
-    const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    if (!userId || !chatId) return;
+    try {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
 
-    const tz = await getTimezone(userId);
-    await clearEditDraft(userId);
+      console.log("[/reminders] hit", { userId, chatId, chatType: (ctx.chat as any)?.type });
 
-    const page = 0;
+      if (!userId || !chatId) {
+        // If this ever happens in DM, something is very wrong.
+        return;
+      }
 
-    const reminders = await Reminder.find({ userId, status: { $in: LIST_STATUSES as any } })
-      .sort({ nextRunAt: 1 })
-      .skip(page * PAGE_SIZE)
-      .limit(PAGE_SIZE)
-      .lean();
-
-    if (reminders.length === 0) {
-      await ctx.reply("You have no scheduled reminders right now.");
-      return;
-    }
-
-    await ctx.reply("Your scheduled reminders (tap one):", kbList(reminders, page, tz));
-  });
-
-  bot.action(/^re:/, async (ctx) => {
-    const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    const data = (ctx.callbackQuery as any)?.data as string;
-    if (!userId || !chatId) return;
-
-    await ctx.answerCbQuery().catch(() => {});
-    const tz = await getTimezone(userId);
-
-    if (data === "re:close") {
+      const tz = await getTimezone(userId);
       await clearEditDraft(userId);
-      await ctx.reply("Closed.");
-      return;
-    }
 
-    if (data.startsWith("re:list:")) {
-      const page = Number(data.split(":")[2] || "0");
+      const page = 0;
 
       const reminders = await Reminder.find({ userId, status: { $in: LIST_STATUSES as any } })
         .sort({ nextRunAt: 1 })
@@ -239,350 +213,395 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         .lean();
 
       if (reminders.length === 0) {
-        await ctx.reply("No reminders on that page.");
+        await ctx.reply("You have no scheduled reminders right now.");
         return;
       }
 
       await ctx.reply("Your scheduled reminders (tap one):", kbList(reminders, page, tz));
-      return;
+    } catch (err) {
+      console.error("[/reminders] error:", err);
+      await ctx.reply("Something broke while loading reminders. Check Render logs for the error.");
     }
+  });
 
-    if (data.startsWith("re:open:")) {
-      const [, , id, pageStr] = data.split(":");
-      const page = Number(pageStr || "0");
+  bot.action(/^re:/, async (ctx) => {
+    try {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
+      const data = (ctx.callbackQuery as any)?.data as string;
+      if (!userId || !chatId) return;
 
-      const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      if (!rem) {
-        await ctx.reply("That reminder is no longer scheduled.");
+      await ctx.answerCbQuery().catch(() => {});
+      const tz = await getTimezone(userId);
+
+      if (data === "re:close") {
+        await clearEditDraft(userId);
+        await ctx.reply("Closed.");
         return;
       }
 
-      await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
-      await ctx.reply(formatDetails(rem, tz), kbOpen(id, page));
-      return;
-    }
+      if (data.startsWith("re:list:")) {
+        const page = Number(data.split(":")[2] || "0");
 
-    if (data.startsWith("re:edit:message:")) {
-      const parts = data.split(":");
-      const id = parts[3];
-      const page = Number(parts[4] || "0");
+        const reminders = await Reminder.find({ userId, status: { $in: LIST_STATUSES as any } })
+          .sort({ nextRunAt: 1 })
+          .skip(page * PAGE_SIZE)
+          .limit(PAGE_SIZE)
+          .lean();
 
-      const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      if (!rem) {
-        await ctx.reply("That reminder is no longer scheduled.");
+        if (reminders.length === 0) {
+          await ctx.reply("No reminders on that page.");
+          return;
+        }
+
+        await ctx.reply("Your scheduled reminders (tap one):", kbList(reminders, page, tz));
         return;
       }
 
-      await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "message" });
-      await ctx.reply("Type the new message (custom emojis are supported). This replaces the old one.");
-      return;
-    }
+      if (data.startsWith("re:open:")) {
+        const [, , id, pageStr] = data.split(":");
+        const page = Number(pageStr || "0");
 
-    if (data.startsWith("re:edit:date:")) {
-      const parts = data.split(":");
-      const id = parts[3];
-      const page = Number(parts[4] || "0");
+        const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        if (!rem) {
+          await ctx.reply("That reminder is no longer scheduled.");
+          return;
+        }
 
-      await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
-      await ctx.reply("Pick a date:", kbPickDate(id, page));
-      return;
-    }
-
-    if (data.startsWith("re:edit:time:")) {
-      const parts = data.split(":");
-      const id = parts[3];
-      const page = Number(parts[4] || "0");
-
-      await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
-      await ctx.reply("Pick a time:", kbPickTime(id, page));
-      return;
-    }
-
-    if (data.startsWith("re:edit:frequency:")) {
-      const parts = data.split(":");
-      const id = parts[3];
-      const page = Number(parts[4] || "0");
-
-      await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
-      await ctx.reply("Pick a frequency:", kbPickFreq(id, page));
-      return;
-    }
-
-    if (data.startsWith("re:set:date:")) {
-      const parts = data.split(":");
-      const id = parts[3];
-      const page = Number(parts[4] || "0");
-      const mode = parts[5]; // today|tomorrow|custom
-
-      const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      if (!rem) {
-        await ctx.reply("That reminder is no longer scheduled.");
+        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
+        await ctx.reply(formatDetails(rem, tz), kbOpen(id, page));
         return;
       }
 
-      if (mode === "custom") {
-        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "date" });
-        await ctx.reply("Type the date as YYYY-MM-DD (example: 2026-01-16).");
+      if (data.startsWith("re:edit:message:")) {
+        const parts = data.split(":");
+        const id = parts[3];
+        const page = Number(parts[4] || "0");
+
+        const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        if (!rem) {
+          await ctx.reply("That reminder is no longer scheduled.");
+          return;
+        }
+
+        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "message" });
+        await ctx.reply("Type the new message (custom emojis are supported). This replaces the old one.");
         return;
       }
 
-      const now = DateTime.now().setZone(tz);
-      const dateISO =
-        mode === "tomorrow"
-          ? now.plus({ days: 1 }).toFormat("yyyy-LL-dd")
-          : now.toFormat("yyyy-LL-dd");
+      if (data.startsWith("re:edit:date:")) {
+        const parts = data.split(":");
+        const id = parts[3];
+        const page = Number(parts[4] || "0");
 
-      const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
-      const timeHHMM = current.isValid ? current.toFormat("HH:mm") : "09:00";
-
-      const next = computeNextRunAt(tz, dateISO, timeHHMM);
-      if (!next) {
-        await ctx.reply("Could not compute that date/time. Try again.");
+        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
+        await ctx.reply("Pick a date:", kbPickDate(id, page));
         return;
       }
 
-      await Reminder.updateOne({ _id: id, userId }, { $set: { nextRunAt: next } });
+      if (data.startsWith("re:edit:time:")) {
+        const parts = data.split(":");
+        const id = parts[3];
+        const page = Number(parts[4] || "0");
 
-      const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      await ctx.reply("Date updated.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
-      return;
-    }
-
-    if (data.startsWith("re:set:time:")) {
-      const parts = data.split(":");
-      const id = parts[3];
-      const page = Number(parts[4] || "0");
-      const timeRaw = parts[5]; // HH:MM or custom
-
-      const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      if (!rem) {
-        await ctx.reply("That reminder is no longer scheduled.");
+        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
+        await ctx.reply("Pick a time:", kbPickTime(id, page));
         return;
       }
 
-      if (timeRaw === "custom") {
-        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "time" });
-        await ctx.reply("Type the time as HH:MM (24-hour). Example: 13:45");
+      if (data.startsWith("re:edit:frequency:")) {
+        const parts = data.split(":");
+        const id = parts[3];
+        const page = Number(parts[4] || "0");
+
+        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page });
+        await ctx.reply("Pick a frequency:", kbPickFreq(id, page));
         return;
       }
 
-      const timeHHMM = parseTimeHHMM(timeRaw);
-      if (!timeHHMM) {
-        await ctx.reply("Invalid time format.");
+      if (data.startsWith("re:set:date:")) {
+        const parts = data.split(":");
+        const id = parts[3];
+        const page = Number(parts[4] || "0");
+        const mode = parts[5];
+
+        const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        if (!rem) {
+          await ctx.reply("That reminder is no longer scheduled.");
+          return;
+        }
+
+        if (mode === "custom") {
+          await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "date" });
+          await ctx.reply("Type the date as YYYY-MM-DD (example: 2026-01-16).");
+          return;
+        }
+
+        const now = DateTime.now().setZone(tz);
+        const dateISO =
+          mode === "tomorrow"
+            ? now.plus({ days: 1 }).toFormat("yyyy-LL-dd")
+            : now.toFormat("yyyy-LL-dd");
+
+        const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
+        const timeHHMM = current.isValid ? current.toFormat("HH:mm") : "09:00";
+
+        const next = computeNextRunAt(tz, dateISO, timeHHMM);
+        if (!next) {
+          await ctx.reply("Could not compute that date/time. Try again.");
+          return;
+        }
+
+        await Reminder.updateOne({ _id: id, userId }, { $set: { nextRunAt: next } });
+
+        const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        await ctx.reply("Date updated.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
         return;
       }
 
-      const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
-      const dateISO = current.isValid
-        ? current.toFormat("yyyy-LL-dd")
-        : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
+      if (data.startsWith("re:set:time:")) {
+        const parts = data.split(":");
+        const id = parts[3];
+        const page = Number(parts[4] || "0");
+        const timeRaw = parts[5];
 
-      const next = computeNextRunAt(tz, dateISO, timeHHMM);
-      if (!next) {
-        await ctx.reply("Could not compute that date/time. Try again.");
+        const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        if (!rem) {
+          await ctx.reply("That reminder is no longer scheduled.");
+          return;
+        }
+
+        if (timeRaw === "custom") {
+          await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "time" });
+          await ctx.reply("Type the time as HH:MM (24-hour). Example: 13:45");
+          return;
+        }
+
+        const timeHHMM = parseTimeHHMM(timeRaw);
+        if (!timeHHMM) {
+          await ctx.reply("Invalid time format.");
+          return;
+        }
+
+        const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
+        const dateISO = current.isValid
+          ? current.toFormat("yyyy-LL-dd")
+          : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
+
+        const next = computeNextRunAt(tz, dateISO, timeHHMM);
+        if (!next) {
+          await ctx.reply("Could not compute that date/time. Try again.");
+          return;
+        }
+
+        await Reminder.updateOne({ _id: id, userId }, { $set: { nextRunAt: next } });
+
+        const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        await ctx.reply("Time updated.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
         return;
       }
 
-      await Reminder.updateOne({ _id: id, userId }, { $set: { nextRunAt: next } });
+      if (data.startsWith("re:set:freq:")) {
+        const parts = data.split(":");
+        const id = parts[3];
+        const page = Number(parts[4] || "0");
+        const kind = parts[5];
 
-      const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      await ctx.reply("Time updated.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
-      return;
-    }
+        const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        if (!rem) {
+          await ctx.reply("That reminder is no longer scheduled.");
+          return;
+        }
 
-    if (data.startsWith("re:set:freq:")) {
-      const parts = data.split(":");
-      const id = parts[3];
-      const page = Number(parts[4] || "0");
-      const kind = parts[5]; // once|daily|weekly|interval
+        if (kind === "interval") {
+          await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "interval" });
+          await ctx.reply("Type the interval in minutes (example: 90).");
+          return;
+        }
 
-      const rem = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      if (!rem) {
-        await ctx.reply("That reminder is no longer scheduled.");
+        let schedule: any = { kind: "once" };
+
+        if (kind === "daily") {
+          const t = DateTime.fromJSDate(rem.nextRunAt, { zone: tz }).toFormat("HH:mm");
+          schedule = { kind: "daily", timeOfDay: t };
+        } else if (kind === "weekly") {
+          const dt = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
+          const t = dt.toFormat("HH:mm");
+          const dow = dt.weekday % 7;
+          schedule = { kind: "weekly", timeOfDay: t, daysOfWeek: [dow] };
+        } else {
+          schedule = { kind: "once" };
+        }
+
+        await Reminder.updateOne({ _id: id, userId }, { $set: { schedule } });
+
+        const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        await ctx.reply("Frequency updated.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
         return;
       }
 
-      if (kind === "interval") {
-        await upsertEditDraft({ userId, chatId, tz, reminderId: id, page, awaiting: "interval" });
-        await ctx.reply("Type the interval in minutes (example: 90).");
+      if (data.startsWith("re:save:")) {
+        const parts = data.split(":");
+        const id = parts[2];
+        const page = Number(parts[3] || "0");
+
+        const d = await getEditDraft(userId);
+        if (!d || d.targetReminderId !== id) {
+          await ctx.reply("No active edit session. Use /reminders again.");
+          return;
+        }
+
+        const staged = d.edit?.stagedText;
+        const stagedEntities = Array.isArray(d.edit?.stagedEntities) ? d.edit.stagedEntities : undefined;
+
+        if (!staged || !String(staged).trim()) {
+          await ctx.reply("Nothing to save. Use Edit message again.");
+          return;
+        }
+
+        await Reminder.updateOne(
+          { _id: id, userId },
+          { $set: { text: staged, entities: stagedEntities } }
+        );
+
+        await clearEditDraft(userId);
+
+        const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        await ctx.reply("Saved.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
         return;
       }
 
-      let schedule: any = { kind: "once" };
-
-      if (kind === "daily") {
-        const t = DateTime.fromJSDate(rem.nextRunAt, { zone: tz }).toFormat("HH:mm");
-        schedule = { kind: "daily", timeOfDay: t };
-      } else if (kind === "weekly") {
-        const dt = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
-        const t = dt.toFormat("HH:mm");
-        const dow = dt.weekday % 7; // Sun=0..Sat=6
-        schedule = { kind: "weekly", timeOfDay: t, daysOfWeek: [dow] };
-      } else {
-        schedule = { kind: "once" };
-      }
-
-      await Reminder.updateOne({ _id: id, userId }, { $set: { schedule } });
-
-      const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      await ctx.reply("Frequency updated.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
-      return;
-    }
-
-    if (data.startsWith("re:save:")) {
-      const parts = data.split(":"); // re:save:<id>:<page>
-      const id = parts[2];
-      const page = Number(parts[3] || "0");
-
-      const d = await getEditDraft(userId);
-      if (!d || d.targetReminderId !== id) {
-        await ctx.reply("No active edit session. Use /reminders again.");
+      if (data.startsWith("re:delete:")) {
+        const parts = data.split(":");
+        const id = parts[2];
+        await Reminder.updateOne({ _id: id, userId }, { $set: { status: "deleted" } });
+        await clearEditDraft(userId);
+        await ctx.reply("Deleted. Use /reminders to see what’s left.");
         return;
       }
-
-      const staged = d.edit?.stagedText;
-      const stagedEntities = Array.isArray(d.edit?.stagedEntities) ? d.edit.stagedEntities : undefined;
-
-      if (!staged || !String(staged).trim()) {
-        await ctx.reply("Nothing to save. Use Edit message again.");
-        return;
-      }
-
-      await Reminder.updateOne(
-        { _id: id, userId },
-        { $set: { text: staged, entities: stagedEntities } }
-      );
-
-      await clearEditDraft(userId);
-
-      const updated = await Reminder.findOne({ _id: id, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      await ctx.reply("Saved.\n\n" + formatDetails(updated, tz), kbOpen(id, page));
-      return;
-    }
-
-    if (data.startsWith("re:delete:")) {
-      const parts = data.split(":"); // re:delete:<id>:<page>
-      const id = parts[2];
-      await Reminder.updateOne({ _id: id, userId }, { $set: { status: "deleted" } });
-      await clearEditDraft(userId);
-      await ctx.reply("Deleted. Use /reminders to see what’s left.");
-      return;
+    } catch (err) {
+      console.error("[reminders action] error:", err);
+      await ctx.reply("Something broke while handling that button. Check Render logs for the error.");
     }
   });
 
   bot.on("text", async (ctx) => {
-    const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    const text = ctx.message?.text;
-    if (!userId || !chatId || !text) return;
+    try {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
+      const text = ctx.message?.text;
+      if (!userId || !chatId || !text) return;
 
-    const d = await getEditDraft(userId);
-    if (!d) return;
+      const d = await getEditDraft(userId);
+      if (!d) return;
 
-    const tz = await getTimezone(userId);
-    const reminderId = d.targetReminderId as string | undefined;
-    const page = Number(d.page || 0);
-    const awaiting: Awaiting | undefined = d.edit?.awaiting;
+      const tz = await getTimezone(userId);
+      const reminderId = d.targetReminderId as string | undefined;
+      const page = Number(d.page || 0);
+      const awaiting: Awaiting | undefined = d.edit?.awaiting;
 
-    if (!reminderId || !awaiting) return;
+      if (!reminderId || !awaiting) return;
 
-    const rem = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
-    if (!rem) {
-      await clearEditDraft(userId);
-      await ctx.reply("That reminder is no longer scheduled.");
-      return;
-    }
-
-    if (awaiting === "message") {
-      // Capture entities so custom emojis persist.
-      const rawEntities = (ctx.message as any)?.entities;
-      const entities = Array.isArray(rawEntities) ? rawEntities : undefined;
-
-      await upsertEditDraft({
-        userId,
-        chatId,
-        tz,
-        reminderId,
-        page,
-        stagedText: text,
-        stagedEntities: entities,
-        awaiting: undefined
-      });
-
-      await ctx.reply(
-        "Preview (message will be replaced with this):\n\n" + text,
-        kbConfirmSave(reminderId, page)
-      );
-      return;
-    }
-
-    if (awaiting === "date") {
-      const dateISO = parseISODate(text);
-      if (!dateISO) {
-        await ctx.reply("Invalid date. Use YYYY-MM-DD (example: 2026-01-16).");
+      const rem = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
+      if (!rem) {
+        await clearEditDraft(userId);
+        await ctx.reply("That reminder is no longer scheduled.");
         return;
       }
 
-      const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
-      const timeHHMM = current.isValid ? current.toFormat("HH:mm") : "09:00";
+      if (awaiting === "message") {
+        const rawEntities = (ctx.message as any)?.entities;
+        const entities = Array.isArray(rawEntities) ? rawEntities : undefined;
 
-      const next = computeNextRunAt(tz, dateISO, timeHHMM);
-      if (!next) {
-        await ctx.reply("Could not compute that date/time.");
+        await upsertEditDraft({
+          userId,
+          chatId,
+          tz,
+          reminderId,
+          page,
+          stagedText: text,
+          stagedEntities: entities,
+          awaiting: undefined
+        });
+
+        await ctx.reply(
+          "Preview (message will be replaced with this):\n\n" + text,
+          kbConfirmSave(reminderId, page)
+        );
         return;
       }
 
-      await Reminder.updateOne({ _id: reminderId, userId }, { $set: { nextRunAt: next } });
-      await clearEditDraft(userId);
+      if (awaiting === "date") {
+        const dateISO = parseISODate(text);
+        if (!dateISO) {
+          await ctx.reply("Invalid date. Use YYYY-MM-DD (example: 2026-01-16).");
+          return;
+        }
 
-      const updated = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      await ctx.reply("Date updated.\n\n" + formatDetails(updated, tz), kbOpen(reminderId, page));
-      return;
-    }
+        const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
+        const timeHHMM = current.isValid ? current.toFormat("HH:mm") : "09:00";
 
-    if (awaiting === "time") {
-      const timeHHMM = parseTimeHHMM(text);
-      if (!timeHHMM) {
-        await ctx.reply("Invalid time. Use HH:MM (24-hour), like 13:45.");
+        const next = computeNextRunAt(tz, dateISO, timeHHMM);
+        if (!next) {
+          await ctx.reply("Could not compute that date/time.");
+          return;
+        }
+
+        await Reminder.updateOne({ _id: reminderId, userId }, { $set: { nextRunAt: next } });
+        await clearEditDraft(userId);
+
+        const updated = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        await ctx.reply("Date updated.\n\n" + formatDetails(updated, tz), kbOpen(reminderId, page));
         return;
       }
 
-      const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
-      const dateISO = current.isValid
-        ? current.toFormat("yyyy-LL-dd")
-        : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
+      if (awaiting === "time") {
+        const timeHHMM = parseTimeHHMM(text);
+        if (!timeHHMM) {
+          await ctx.reply("Invalid time. Use HH:MM (24-hour), like 13:45.");
+          return;
+        }
 
-      const next = computeNextRunAt(tz, dateISO, timeHHMM);
-      if (!next) {
-        await ctx.reply("Could not compute that date/time.");
+        const current = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
+        const dateISO = current.isValid
+          ? current.toFormat("yyyy-LL-dd")
+          : DateTime.now().setZone(tz).toFormat("yyyy-LL-dd");
+
+        const next = computeNextRunAt(tz, dateISO, timeHHMM);
+        if (!next) {
+          await ctx.reply("Could not compute that date/time.");
+          return;
+        }
+
+        await Reminder.updateOne({ _id: reminderId, userId }, { $set: { nextRunAt: next } });
+        await clearEditDraft(userId);
+
+        const updated = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        await ctx.reply("Time updated.\n\n" + formatDetails(updated, tz), kbOpen(reminderId, page));
         return;
       }
 
-      await Reminder.updateOne({ _id: reminderId, userId }, { $set: { nextRunAt: next } });
-      await clearEditDraft(userId);
+      if (awaiting === "interval") {
+        const n = Number(text.trim());
+        if (!Number.isFinite(n) || n <= 0) {
+          await ctx.reply("Interval must be a positive number of minutes (example: 90).");
+          return;
+        }
 
-      const updated = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      await ctx.reply("Time updated.\n\n" + formatDetails(updated, tz), kbOpen(reminderId, page));
-      return;
-    }
+        await Reminder.updateOne(
+          { _id: reminderId, userId },
+          { $set: { schedule: { kind: "interval", intervalMinutes: n } } }
+        );
 
-    if (awaiting === "interval") {
-      const n = Number(text.trim());
-      if (!Number.isFinite(n) || n <= 0) {
-        await ctx.reply("Interval must be a positive number of minutes (example: 90).");
+        await clearEditDraft(userId);
+
+        const updated = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
+        await ctx.reply("Frequency updated.\n\n" + formatDetails(updated, tz), kbOpen(reminderId, page));
         return;
       }
-
-      await Reminder.updateOne(
-        { _id: reminderId, userId },
-        { $set: { schedule: { kind: "interval", intervalMinutes: n } } }
-      );
-
-      await clearEditDraft(userId);
-
-      const updated = await Reminder.findOne({ _id: reminderId, userId, status: { $in: LIST_STATUSES as any } }).lean();
-      await ctx.reply("Frequency updated.\n\n" + formatDetails(updated, tz), kbOpen(reminderId, page));
-      return;
+    } catch (err) {
+      console.error("[reminders text] error:", err);
+      await ctx.reply("Something broke while processing your input. Check Render logs for the error.");
     }
   });
 }
