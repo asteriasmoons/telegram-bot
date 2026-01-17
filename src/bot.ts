@@ -1,6 +1,6 @@
 import { Telegraf } from "telegraf";
 
-import { registerRemindFlow } from "./flows/remind";
+import { registerRemindersFlow as registerCreateRemindFlow } from "./flows/remind";
 import { registerRemindersFlow } from "./flows/reminders";
 
 import { UserSettings } from "./models/UserSettings";
@@ -34,7 +34,7 @@ export function createBot(token: string) {
     }
 
     await ctx.reply(
-      "Bot is alive.\n\nCommands:\n/start\n/ping\n/remind\n/reminders\n\nReminders deliver to DM (private chat)."
+      "Bot is alive.\n\nCommands:\n/start\n/ping\n/remind\n/reminders\n\nReminders deliver to DM."
     );
   });
 
@@ -42,33 +42,27 @@ export function createBot(token: string) {
     await ctx.reply("pong");
   });
 
-  // Reminder delivery buttons (pressed on the reminder message itself)
+  // Reminder action buttons
   bot.action(/^r:done:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
-    const data = (ctx.callbackQuery as any)?.data as string;
-    const reminderId = data.split(":")[2];
-
-    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "sent" } });
+    const id = (ctx.callbackQuery as any).data.split(":")[2];
+    await Reminder.updateOne({ _id: id }, { $set: { status: "sent" } });
     await ctx.reply("Marked done.");
   });
 
   bot.action(/^r:snooze:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
-    const data = (ctx.callbackQuery as any)?.data as string;
-    const parts = data.split(":"); // r:snooze:10:<id>
-    const minutes = Number(parts[2]);
-    const reminderId = parts[3];
+    const [, , mins, id] = (ctx.callbackQuery as any).data.split(":");
+    const minutes = Number(mins);
 
     if (!Number.isFinite(minutes) || minutes <= 0) {
       await ctx.reply("Invalid snooze time.");
       return;
     }
 
-    const nextRunAt = addMinutes(new Date(), minutes);
-
     await Reminder.updateOne(
-      { _id: reminderId },
-      { $set: { nextRunAt, status: "scheduled" } }
+      { _id: id },
+      { $set: { nextRunAt: addMinutes(new Date(), minutes), status: "scheduled" } }
     );
 
     await ctx.reply(`Snoozed for ${minutes} minutes.`);
@@ -76,18 +70,15 @@ export function createBot(token: string) {
 
   bot.action(/^r:del:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
-    const data = (ctx.callbackQuery as any)?.data as string;
-    const reminderId = data.split(":")[2];
-
-    await Reminder.updateOne({ _id: reminderId }, { $set: { status: "deleted" } });
+    const id = (ctx.callbackQuery as any).data.split(":")[2];
+    await Reminder.updateOne({ _id: id }, { $set: { status: "deleted" } });
     await ctx.reply("Deleted.");
   });
 
-  // Create reminder flow
-  registerRemindFlow(bot);
+  // 🔹 Create reminder flow (/remind)
+  registerCreateRemindFlow(bot);
 
-  // List/edit reminders flow (scheduled/active list in your UX,
-  // but your schema supports scheduled/paused/sent/deleted; the flow should list scheduled only)
+  // 🔹 List/edit reminders (/reminders)
   registerRemindersFlow(bot);
 
   bot.catch((err) => {
