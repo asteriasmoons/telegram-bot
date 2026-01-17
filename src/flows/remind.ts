@@ -209,7 +209,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
 
     if (data === "rm:msg") {
       await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, awaiting: "message" });
-      await ctx.reply("Send the reminder message now (title + body is fine).");
+      await ctx.reply("Send the reminder message now (custom emojis are supported).");
       return;
     }
 
@@ -306,6 +306,8 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       const fresh = await getDraft(userId);
 
       const text = fresh?.reminder?.text ? String(fresh.reminder.text) : "";
+      const entities = Array.isArray(fresh?.reminder?.entities) ? fresh.reminder.entities : undefined;
+
       const dateISO = fresh?.reminder?.dateISO ? String(fresh.reminder.dateISO) : "";
       const timeHHMM = fresh?.reminder?.timeHHMM ? String(fresh.reminder.timeHHMM) : "";
       const repeatKind = normalizeRepeatKind(fresh?.reminder?.repeatKind);
@@ -336,7 +338,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         schedule = { kind: "weekly" as const, timeOfDay: timeHHMM, daysOfWeek: [dow] };
       } else if (repeatKind === "interval") {
         if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
-          await ctx.reply("Interval minutes are not set/invalid. Tap Set frequency and choose Interval.");
+          await ctx.reply("Interval minutes are not set/invalid. Choose Interval again.");
           return;
         }
         schedule = { kind: "interval" as const, intervalMinutes };
@@ -346,6 +348,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
         userId,
         chatId: settings.dmChatId,
         text,
+        entities,
         status: "scheduled",
         nextRunAt,
         schedule,
@@ -359,6 +362,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
     }
   });
 
+  // Typed input ONLY after a button sets awaiting
   bot.on("text", async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
@@ -380,7 +384,18 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
     const input = ctx.message?.text || "";
 
     if (awaiting === "message") {
-      await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { text: input }, awaiting: undefined });
+      // Capture entities from the incoming Telegram message.
+      const rawEntities = (ctx.message as any)?.entities;
+      const entities = Array.isArray(rawEntities) ? rawEntities : undefined;
+
+      await upsertDraft({
+        userId,
+        chatId: settings.dmChatId,
+        timezone: tz,
+        patch: { text: input, entities },
+        awaiting: undefined
+      });
+
       const fresh = await getDraft(userId);
       await ctx.reply(controlPanelText(fresh), kbMain());
       return;

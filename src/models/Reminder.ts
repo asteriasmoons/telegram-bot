@@ -21,6 +21,20 @@ export type ReminderLock = {
   lockedBy?: string;
 };
 
+/**
+ * Telegram message entities (minimal shape).
+ * We store them as plain objects so Telegraf/Telegram can re-use them on send.
+ */
+export type TgEntity = {
+  type: string;
+  offset: number;
+  length: number;
+  url?: string;
+  user?: any;
+  language?: string;
+  custom_emoji_id?: string;
+};
+
 export type ReminderDoc = {
   _id: Types.ObjectId;
 
@@ -28,6 +42,9 @@ export type ReminderDoc = {
   chatId: number; // Telegram chat id where reminder is sent
 
   text: string;
+
+  // NEW: preserve Telegram entities so custom emojis survive DB storage.
+  entities?: TgEntity[];
 
   status: ReminderStatus;
 
@@ -73,7 +90,15 @@ const ReminderSchema = new Schema<ReminderDoc>(
     chatId: { type: Number, required: true, index: true },
     text: { type: String, required: true },
 
-    status: { type: String, required: true, enum: ["scheduled", "sent", "paused", "deleted"], default: "scheduled" },
+    // NEW: store entities as plain objects (Mixed) so we don't fight Telegram typing.
+    entities: { type: [Schema.Types.Mixed], required: false },
+
+    status: {
+      type: String,
+      required: true,
+      enum: ["scheduled", "sent", "paused", "deleted"],
+      default: "scheduled"
+    },
 
     nextRunAt: { type: Date, required: true, index: true },
 
