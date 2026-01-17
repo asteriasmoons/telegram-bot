@@ -216,7 +216,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
 
       if (text) {
         if (entities && entities.length > 0) {
-          await ctx.reply(text, { entities } as any);
+await ctx.reply(text, { entities, parse_mode: undefined } as any);
         } else {
           await ctx.reply(text);
         }
@@ -425,6 +425,10 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       // Capture entities from the incoming Telegram message.
       const rawEntities = (ctx.message as any)?.entities;
       const entities = Array.isArray(rawEntities) ? rawEntities : undefined;
+      
+      // DEBUG ENTITIES STUFF
+      console.log("RAW TEXT:", JSON.stringify(input));
+      console.log("ENTITIES:", JSON.stringify(rawEntities, null, 2));
 
       await upsertDraft({
         userId,
@@ -436,7 +440,7 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
 
       // Show preview with entities rendered
       if (entities && entities.length > 0) {
-        await ctx.reply(input, { entities } as any);
+await ctx.reply(input, { entities, parse_mode: undefined } as any);
       } else {
         await ctx.reply(input);
       }
