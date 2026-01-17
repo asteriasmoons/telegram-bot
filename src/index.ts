@@ -3,14 +3,13 @@ import mongoose from "mongoose";
 
 import { createBot } from "./bot";
 import { startServer } from "./health";
-import { startScheduler } from "./scheduler";
+import { startScheduler, makeInstanceId } from "./scheduler";
 
 async function main() {
   const token = process.env.BOT_TOKEN;
   const mongoUri = process.env.MONGODB_URI;
 
-  // These should be set in Render env vars
-  // Example:
+  // Render env vars:
   // WEBHOOK_DOMAIN = https://telegram-bot-yt3w.onrender.com
   // WEBHOOK_PATH   = /telegram
   const webhookDomain = process.env.WEBHOOK_DOMAIN;
@@ -35,19 +34,19 @@ async function main() {
       ? `${webhookDomain.slice(0, -1)}${webhookPath}`
       : `${webhookDomain}${webhookPath}`;
 
-  // IMPORTANT: This is WEBHOOK MODE. No polling.
+  // IMPORTANT: WEBHOOK MODE. No Telegram polling.
   console.log("Setting webhook:", webhookUrl);
   await bot.telegram.setWebhook(webhookUrl);
   console.log("Webhook set.");
 
-  // Log identity (helps verify token is correct)
+  // Log identity
   const me = await bot.telegram.getMe();
   console.log(`Bot identity: @${me.username} ${me.id}`);
 
-  // Start scheduler loop (this is NOT Telegram polling; it's your DB-based scheduler)
+  // Start DB scheduler loop (checks Mongo for due reminders)
   startScheduler(bot, {
-    pollIntervalMs: 10_000,
-    lockTtlMs: 60_000
+    pollEveryMs: 10_000,
+    instanceId: makeInstanceId()
   });
 
   // Graceful shutdown
