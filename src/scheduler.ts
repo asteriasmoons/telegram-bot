@@ -8,7 +8,18 @@ export function makeInstanceId(prefix = "sched") {
 }
 
 type SchedulerOptions = {
+  // Preferred name
   pollEveryMs?: number;
+
+  // Backwards-compatible alias (in case some other file still uses it)
+  pollIntervalMs?: number;
+
+  // Lock TTL (preferred)
+  lockTtlMs?: number;
+
+  // Backwards-compatible/alternate lock settings
+  lockSeconds?: number;
+
   instanceId?: string;
 };
 
@@ -20,7 +31,11 @@ function addSeconds(d: Date, seconds: number) {
   return new Date(d.getTime() + seconds * 1000);
 }
 
-async function acquireLock(reminderId: any, instanceId: string, lockSeconds = 30) {
+/**
+ * Acquire a lock on a reminder so only one instance processes it.
+ * Works across multiple Render deploys/instances.
+ */
+async function acquireLock(reminderId: any, instanceId: string, lockSeconds: number) {
   const lockedAt = now();
   const lockExpiresAt = addSeconds(lockedAt, lockSeconds);
 
@@ -45,19 +60,28 @@ async function acquireLock(reminderId: any, instanceId: string, lockSeconds = 30
   return res.modifiedCount === 1;
 }
 
+/**
+ * Release lock safely using $unset (cleaner than setting undefined).
+ */
 async function releaseLock(reminderId: any, instanceId: string) {
   await Reminder.updateOne(
     { _id: reminderId, "lock.lockedBy": instanceId },
     {
-      $set: {
-        "lock.lockedAt": undefined,
-        "lock.lockExpiresAt": undefined,
-        "lock.lockedBy": undefined
+      $unset: {
+        "lock.lockedAt": 1,
+        "lock.lockExpiresAt": 1,
+        "lock.lockedBy": 1
       }
     }
   );
 }
 
+/**
+ * Compute next run time for repeating reminders.
+ * Note: interval uses "now + intervalMinutes".
+ * daily/weekly just add a fixed amount of minutes from last scheduled run.
+ * (We can upgrade to timezone-accurate recurrence later if you want.)
+ */
 function computeNextForRepeat(rem: ReminderDoc): Date | null {
   const sched = rem.schedule;
   if (!sched) return null;
@@ -68,25 +92,53 @@ function computeNextForRepeat(rem: ReminderDoc): Date | null {
     return addMinutes(now(), mins);
   }
 
-  // For daily/weekly we rely on nextRunAt being set by your creation flow.
-  // After sending, we compute the next occurrence in the user's timezone.
-  // Minimal approach: add 1 day or 7 days from last run, keeping local time.
-  // If you want stricter TZ handling later, we can upgrade it.
   if (sched.kind === "daily") return addMinutes(rem.nextRunAt, 24 * 60);
   if (sched.kind === "weekly") return addMinutes(rem.nextRunAt, 7 * 24 * 60);
 
   return null;
 }
 
+/**
+ * SEND: important part for custom emojis + bold/italics/etc
+ * Telegram renders formatting ONLY if it has message entities.
+ * We store entities on the reminder document and replay them here.
+ */
+async function sendReminder(bot: Telegraf<any>, rem: any) {
+  const text = String(rem.text ?? "");
+
+  const entities =
+    Array.isArray(rem.entities) && rem.entities.length > 0 ? rem.entities : undefined;
+
+  // If entities exist, send them. This preserves:
+  // - custom emojis (type: "custom_emoji", with custom_emoji_id)
+  // - bold/italic/underline/spoiler/etc (entity types)
+  // - links (text_link, url)
+  const sendOpts: any = {};
+  if (entities) sendOpts.entities = entities;
+
+  await bot.telegram.sendMessage(rem.chatId, text, sendOpts);
+}
+
 export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) {
-  const pollEveryMs = opts.pollEveryMs ?? 10_000;
+  const pollEveryMs = opts.pollEveryMs ?? opts.pollIntervalMs ?? 10_000;
+
+  // lockSeconds priority:
+  // 1) explicit lockSeconds
+  // 2) lockTtlMs converted to seconds
+  // 3) default 60s
+  const lockSeconds =
+    typeof opts.lockSeconds === "number" && opts.lockSeconds > 0
+      ? Math.floor(opts.lockSeconds)
+      : typeof opts.lockTtlMs === "number" && opts.lockTtlMs > 0
+        ? Math.max(5, Math.floor(opts.lockTtlMs / 1000))
+        : 60;
+
   const instanceId = opts.instanceId ?? makeInstanceId();
 
   console.log(`Scheduler started (${instanceId}). Poll every ${pollEveryMs}ms`);
 
   const tick = async () => {
     try {
-      // If Mongo is disconnected, don't spam errors
       if (mongoose.connection.readyState !== 1) return;
 
       const due = await Reminder.find({
@@ -97,17 +149,11 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
         .limit(25);
 
       for (const rem of due) {
-        const got = await acquireLock(rem._id, instanceId);
+        const got = await acquireLock(rem._id, instanceId, lockSeconds);
         if (!got) continue;
 
         try {
-          // SEND with entities (this is the custom emoji preservation)
-          const sendOpts: any = {};
-          if (Array.isArray((rem as any).entities) && (rem as any).entities.length > 0) {
-            sendOpts.entities = (rem as any).entities;
-          }
-
-          await bot.telegram.sendMessage(rem.chatId, rem.text, sendOpts);
+          await sendReminder(bot, rem);
 
           const nextForRepeat = computeNextForRepeat(rem);
 
@@ -115,7 +161,11 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
             await Reminder.updateOne(
               { _id: rem._id },
               {
-                $set: { nextRunAt: nextForRepeat, lastRunAt: now(), status: "scheduled" }
+                $set: {
+                  nextRunAt: nextForRepeat,
+                  lastRunAt: now(),
+                  status: "scheduled"
+                }
               }
             );
           } else {
@@ -128,7 +178,8 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
           }
         } catch (err) {
           console.error("Scheduler send error:", err);
-          // If send fails, reschedule 5 minutes later so it doesn't hammer
+
+          // If send fails, push it out 5 minutes so it doesn't hammer.
           await Reminder.updateOne(
             { _id: rem._id },
             { $set: { nextRunAt: addMinutes(now(), 5) } }
