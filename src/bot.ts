@@ -46,6 +46,21 @@ bot.command("ping", async (ctx) => {
 await ctx.reply("pong");
 });
 
+bot.command("reminders_app", async (ctx) => {
+  const url = process.env.WEBAPP_URL;
+  if (!url) {
+    await ctx.reply("Mini app URL is not configured yet.");
+    return;
+  }
+
+  await ctx.reply(
+    "Open your Reminder Manager:",
+    Markup.inlineKeyboard([
+      Markup.button.webApp("Open Reminder Manager", url)
+    ])
+  );
+});
+
 // Reminder action buttons
 bot.action(/^r:done:/, async (ctx) => {
 await ctx.answerCbQuery().catch(() => {});
