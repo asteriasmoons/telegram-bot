@@ -1,28 +1,26 @@
 import { Telegraf, Context } from "telegraf";
 
-type MyContext = Context; // extend later if you add session, etc.
-
-export function registerChatIdCommand(bot: Telegraf<MyContext>) {
+export function registerChatIdCommand(bot: Telegraf<Context>) {
+  // 🔹 Normal messages (DMs, groups)
   bot.command("chatid", async (ctx) => {
-    const chat = ctx.chat;
-    if (!chat) return;
-
-    const chatId = chat.id;
-    const chatType = chat.type;
-
-    // title exists for groups/channels, username may exist for public chats/channels
-    const title =
-      (chat as any).title ??
-      (chat as any).username ??
-      (ctx.from?.username ? `@${ctx.from.username}` : "Private Chat");
+    if (!ctx.chat) return;
 
     await ctx.reply(
-      [
-        "Chat Info",
-        `ID: ${chatId}`,
-        `Type: ${chatType}`,
-        `Title/Name: ${title}`,
-      ].join("\n")
+      `Chat ID: ${ctx.chat.id}\nType: ${ctx.chat.type}`
+    );
+  });
+
+  // 🔹 Channel posts (channels use channel_post updates)
+  bot.on("channel_post", async (ctx) => {
+    const text = ctx.channelPost?.text?.trim();
+    if (!text) return;
+
+    // Matches /chatid or /chatid@YourBotName
+    if (!/^\/chatid(@\w+)?$/.test(text)) return;
+
+    await ctx.telegram.sendMessage(
+      ctx.chat.id,
+      `Chat ID: ${ctx.chat.id}\nType: ${ctx.chat.type}`
     );
   });
 }
