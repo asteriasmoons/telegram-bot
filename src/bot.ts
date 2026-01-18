@@ -40,13 +40,15 @@ export function createBot(token: string) {
 
     const webAppUrl = process.env.WEBAPP_URL;
     if (webAppUrl) {
-      await ctx.telegram.setChatMenuButton({
-        menu_button: {
-          type: "web_app",
-          text: "Open Reminder Manager",
-          web_app: { url: webAppUrl }
-        }
-      });
+await ctx.telegram.setChatMenuButton({
+  menuButton: {
+    type: "web_app",
+    text: "Open Reminder Manager",
+    web_app: {
+      url: webAppUrl
+    }
+  }
+});
     } else {
       console.warn("WEBAPP_URL not set -- menu button not registered");
     }
