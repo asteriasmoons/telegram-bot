@@ -39,17 +39,17 @@ export function createBot(token: string) {
     );
 
     // ✅ Set the persistent "Open App" button in the chat (menu button)
-    const url = process.env.WEBAPP_URL;
-    if (url && chat?.id) {
-      await ctx.telegram.setChatMenuButton({
-        chatId: chat.id,
-        menuButton: {
-          type: "web_app",
-          text: "Open App",
-          webApp: { url },
-        },
-      });
+const url = process.env.WEBAPP_URL;
+if (url && chat?.id) {
+  await ctx.telegram.setChatMenuButton({
+    chatId: chat.id,
+    menuButton: {
+      type: "web_app",
+      text: "Open App",
+      web_app: { url }
     }
+  });
+}
   });
 
   bot.command("ping", async (ctx) => {
