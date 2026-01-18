@@ -38,17 +38,16 @@ export function createBot(token: string) {
       "Bot is alive.\n\nCommands:\n/start\n/ping\n/remind\n/reminders\n\nReminders deliver to DM."
     );
 
-    const webAppUrl = process.env.WEBAPP_URL;
-    if (webAppUrl) {
-await ctx.telegram.setChatMenuButton({
-  menuButton: {
-    type: "web_app",
-    text: "Open Reminder Manager",
-    web_app: {
-      url: webAppUrl
+const webAppUrl = process.env.WEBAPP_URL;
+if (webAppUrl && ctx.chat?.id) {
+  await ctx.telegram.setChatMenuButton({
+    chatId: ctx.chat.id,
+    menuButton: {
+      type: "web_app",
+      text: "Open App",
+      webApp: { url: webAppUrl }
     }
-  }
-});
+  }); 
     } else {
       console.warn("WEBAPP_URL not set -- menu button not registered");
     }
