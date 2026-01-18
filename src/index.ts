@@ -36,7 +36,9 @@ webhookDomain.endsWith("/")
 
 // IMPORTANT: WEBHOOK MODE. No Telegram polling.
 console.log("Setting webhook:", webhookUrl);
-await bot.telegram.setWebhook(webhookUrl);
+await bot.telegram.setWebhook(webhookUrl, {
+  allowed_updates: ["message", "channel_post", "callback_query"],
+});
 console.log("Webhook set.");
 const info = await bot.telegram.getWebhookInfo();
 console.log("Webhook info:", JSON.stringify(info, null, 2));
