@@ -1,11 +1,7 @@
 import http from "http";
-import crypto from "crypto";
-import jwt from "jsonwebtoken";
+import { Telegraf } from "telegraf";
 import fs from "fs";
 import path from "path";
-import { Telegraf } from "telegraf";
-
-import { Reminder } from "./models/Reminder";
 
 type ServerOptions = {
   bot: Telegraf<any>;
@@ -18,110 +14,30 @@ function normalizePath(rawUrl: string) {
   return pathOnly;
 }
 
-function readJson(req: http.IncomingMessage): Promise<any> {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => (data += chunk));
-    req.on("end", () => {
-      if (!data) return resolve({});
-      try {
-        resolve(JSON.parse(data));
-      } catch {
-        reject(new Error("Invalid JSON"));
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-function sendText(res: http.ServerResponse, status: number, text: string) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "text/plain; charset=utf-8");
-  res.end(text);
-}
-
-function sendJson(res: http.ServerResponse, status: number, body: any) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(body));
-}
-
-function sendHtml(res: http.ServerResponse, status: number, html: string) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.end(html);
-}
-
-/**
- * Telegram Mini App initData validation
- */
-function validateInitData(initData: string, botToken: string): Record<string, string> | null {
-  const params = new URLSearchParams(initData);
-
-  const hash = params.get("hash");
-  if (!hash) return null;
-
-  params.delete("hash");
-
-  const pairs: string[] = [];
-  for (const [key, value] of Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-    pairs.push(`${key}=${value}`);
+function contentTypeFor(filePath: string) {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case ".html": return "text/html; charset=utf-8";
+    case ".css": return "text/css; charset=utf-8";
+    case ".js": return "application/javascript; charset=utf-8";
+    case ".json": return "application/json; charset=utf-8";
+    case ".png": return "image/png";
+    case ".jpg":
+    case ".jpeg": return "image/jpeg";
+    case ".svg": return "image/svg+xml";
+    case ".ico": return "image/x-icon";
+    case ".woff": return "font/woff";
+    case ".woff2": return "font/woff2";
+    default: return "application/octet-stream";
   }
-  const dataCheckString = pairs.join("\n");
-
-  const secretKey = crypto.createHmac("sha256", "WebAppData").update(botToken).digest();
-  const computed = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
-
-  if (computed !== hash) return null;
-
-  const out: Record<string, string> = {};
-  for (const [k, v] of params.entries()) out[k] = v;
-  return out;
 }
 
-function issueMiniAppToken(userId: number) {
-  const secret = process.env.MINIAPP_JWT_SECRET;
-  if (!secret) throw new Error("Missing MINIAPP_JWT_SECRET");
-
-  const ttlSeconds = Number(process.env.MINIAPP_JWT_TTL_SECONDS || "900");
-  return jwt.sign({ userId }, secret, { expiresIn: ttlSeconds });
-}
-
-function getBearerToken(req: http.IncomingMessage) {
-  const h = String(req.headers.authorization || "");
-  if (h.startsWith("Bearer ")) return h.slice(7);
-  return null;
-}
-
-function verifyMiniAppToken(token: string) {
-  const secret = process.env.MINIAPP_JWT_SECRET;
-  if (!secret) throw new Error("Missing MINIAPP_JWT_SECRET");
-  return jwt.verify(token, secret) as any;
-}
-
-function addMinutes(d: Date, minutes: number) {
-  return new Date(d.getTime() + minutes * 60_000);
-}
-
-async function requireUserId(req: http.IncomingMessage, res: http.ServerResponse): Promise<number | null> {
-  const tok = getBearerToken(req);
-  if (!tok) {
-    sendJson(res, 401, { ok: false, error: "Missing token" });
-    return null;
-  }
-
-  try {
-    const payload: any = verifyMiniAppToken(tok);
-    const userId = Number(payload?.userId);
-    if (!Number.isFinite(userId)) {
-      sendJson(res, 401, { ok: false, error: "Invalid token payload" });
-      return null;
-    }
-    return userId;
-  } catch {
-    sendJson(res, 401, { ok: false, error: "Invalid token" });
-    return null;
-  }
+function safeJoin(base: string, target: string) {
+  // Prevent path traversal: /miniapp/../../etc/passwd
+  const targetPath = path.posix.normalize("/" + target).replace(/^\/+/, "");
+  const joined = path.join(base, targetPath);
+  if (!joined.startsWith(base)) return null;
+  return joined;
 }
 
 export function startServer(opts: ServerOptions) {
@@ -130,183 +46,98 @@ export function startServer(opts: ServerOptions) {
 
   const webhookCallback = opts.bot.webhookCallback(opts.webhookPath);
 
-  const miniAppIndex = path.join(process.cwd(), "miniapp", "index.html");
+  // IMPORTANT: miniapp folder lives at project root: ./miniapp
+  // Use process.cwd() so it works after TS build (dist/) on Render.
+  const MINIAPP_DIR = path.join(process.cwd(), "miniapp");
+  const MINIAPP_INDEX = path.join(MINIAPP_DIR, "index.html");
 
-  const server = http.createServer(async (req, res) => {
+  const server = http.createServer((req, res) => {
     const rawUrl = req.url || "/";
     const url = normalizePath(rawUrl);
     const method = (req.method || "GET").toUpperCase();
 
     console.log(`[HTTP] ${method} ${rawUrl}`);
 
+    // Health
     if (url === "/health") {
-      sendText(res, 200, "OK");
-      return;
-    }
-
-    // Mini App page
-    if (url === "/app" && method === "GET") {
-      if (!fs.existsSync(miniAppIndex)) {
-        sendText(res, 500, `Missing file: ${miniAppIndex}`);
-        return;
-      }
       res.statusCode = 200;
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      fs.createReadStream(miniAppIndex).pipe(res);
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.end("OK");
       return;
     }
 
-    // Mini App auth
-    if (url === "/miniapp/auth" && method === "POST") {
-      try {
-        const body = await readJson(req);
-        const initData = String(body?.initData || "");
-
-        const botToken = process.env.BOT_TOKEN;
-        if (!botToken) return sendJson(res, 500, { ok: false, error: "Missing BOT_TOKEN" });
-        if (!process.env.MINIAPP_JWT_SECRET) return sendJson(res, 500, { ok: false, error: "Missing MINIAPP_JWT_SECRET" });
-        if (!initData) return sendJson(res, 400, { ok: false, error: "Missing initData" });
-
-        const parsed = validateInitData(initData, botToken);
-        if (!parsed) return sendJson(res, 401, { ok: false, error: "Invalid initData" });
-
-        const userJson = parsed.user;
-        if (!userJson) return sendJson(res, 400, { ok: false, error: "Missing user in initData" });
-
-        let user: any;
-        try {
-          user = JSON.parse(userJson);
-        } catch {
-          return sendJson(res, 400, { ok: false, error: "Bad user payload" });
-        }
-
-        const userId = Number(user?.id);
-        if (!Number.isFinite(userId)) return sendJson(res, 400, { ok: false, error: "Bad user id" });
-
-        const token = issueMiniAppToken(userId);
-
-        return sendJson(res, 200, {
-          ok: true,
-          token,
-          user: { id: userId, first_name: user?.first_name, username: user?.username }
-        });
-      } catch (e: any) {
-        return sendJson(res, 400, { ok: false, error: e?.message || "Bad request" });
-      }
-    }
-
-    // List reminders
-    if (url === "/api/reminders" && method === "GET") {
-      const userId = await requireUserId(req, res);
-      if (!userId) return;
-
-      const reminders = await Reminder.find({
-        userId,
-        status: { $in: ["scheduled", "paused"] }
-      })
-        .sort({ nextRunAt: 1 })
-        .limit(200)
-        .lean();
-
-      sendJson(res, 200, { ok: true, reminders });
-      return;
-    }
-
-    // Mark done
-    if (url === "/api/reminders/done" && method === "POST") {
-      const userId = await requireUserId(req, res);
-      if (!userId) return;
-
-      let body: any = {};
-      try {
-        body = await readJson(req);
-      } catch (e: any) {
-        sendJson(res, 400, { ok: false, error: e?.message || "Invalid JSON" });
-        return;
-      }
-
-      const id = String(body?.id || "");
-      if (!id) {
-        sendJson(res, 400, { ok: false, error: "Missing id" });
-        return;
-      }
-
-      const result = await Reminder.updateOne(
-        { _id: id, userId },
-        { $set: { status: "sent", lastRunAt: new Date() } }
-      );
-
-      if (result.matchedCount === 0) {
-        sendJson(res, 404, { ok: false, error: "Not found" });
-        return;
-      }
-
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    // Snooze
-    if (url === "/api/reminders/snooze" && method === "POST") {
-      const userId = await requireUserId(req, res);
-      if (!userId) return;
-
-      let body: any = {};
-      try {
-        body = await readJson(req);
-      } catch (e: any) {
-        sendJson(res, 400, { ok: false, error: e?.message || "Invalid JSON" });
-        return;
-      }
-
-      const id = String(body?.id || "");
-      const minutes = Number(body?.minutes ?? 10);
-
-      if (!id) {
-        sendJson(res, 400, { ok: false, error: "Missing id" });
-        return;
-      }
-      if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) {
-        sendJson(res, 400, { ok: false, error: "Invalid minutes" });
-        return;
-      }
-
-      const result = await Reminder.updateOne(
-        { _id: id, userId },
-        { $set: { nextRunAt: addMinutes(new Date(), minutes), status: "scheduled" } }
-      );
-
-      if (result.matchedCount === 0) {
-        sendJson(res, 404, { ok: false, error: "Not found" });
-        return;
-      }
-
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    // Webhook endpoint
+    // Telegram webhook
     if (url === normalizePath(opts.webhookPath) && method === "POST") {
       webhookCallback(req, res);
       return;
     }
 
+    // Helpful GET on the webhook path
     if (url === normalizePath(opts.webhookPath) && method === "GET") {
-      sendText(res, 200, "Webhook endpoint is up. Telegram must POST here.");
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.end("Webhook endpoint is up. Telegram must POST here.");
       return;
     }
 
-    sendText(res, 200, "Bot is running. Use /health for status.");
+    // ✅ Mini App hosting
+    // Serve /miniapp and /miniapp/ as the index.html
+    if ((url === "/miniapp" || url === "/miniapp/") && method === "GET") {
+      if (!fs.existsSync(MINIAPP_INDEX)) {
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.end("Mini app index.html not found on server.");
+        return;
+      }
+
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      fs.createReadStream(MINIAPP_INDEX).pipe(res);
+      return;
+    }
+
+    // Serve static miniapp assets: /miniapp/<file>
+    if (url.startsWith("/miniapp") && method === "GET") {
+      // map "/miniapp/anything" -> "./miniapp/anything"
+      const rel = url.replace(/^\/miniapp\/?/, ""); // "" or "file.ext"
+      const filePath = rel ? safeJoin(MINIAPP_DIR, rel) : MINIAPP_INDEX;
+
+      if (!filePath) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.end("Bad path.");
+        return;
+      }
+
+      // If requesting folder-ish path, serve index.html
+      const resolvedPath = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()
+        ? path.join(filePath, "index.html")
+        : filePath;
+
+      if (!fs.existsSync(resolvedPath)) {
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.end("Not found.");
+        return;
+      }
+
+      res.statusCode = 200;
+      res.setHeader("Content-Type", contentTypeFor(resolvedPath));
+      fs.createReadStream(resolvedPath).pipe(res);
+      return;
+    }
+
+    // Default
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.end("Bot is running. Use /health for status.");
   });
 
   server.listen(port, "0.0.0.0", () => {
     console.log(`Web server listening on port ${port}`);
     console.log(`Health endpoint: /health`);
-    console.log(`Mini App page: /app`);
-    console.log(`Mini App auth: POST /miniapp/auth`);
-    console.log(`Mini App reminders: GET /api/reminders`);
-    console.log(`Mini App done: POST /api/reminders/done`);
-    console.log(`Mini App snooze: POST /api/reminders/snooze`);
     console.log(`Webhook endpoint: ${opts.webhookPath}`);
+    console.log(`Mini app endpoint: /miniapp`);
   });
 
   return server;
