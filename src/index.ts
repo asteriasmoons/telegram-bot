@@ -2,7 +2,7 @@ import "dotenv/config";
 import mongoose from "mongoose";
 
 import { createBot } from "./bot";
-import { startServer } from "./health";
+import { startServer } from "./server/startServer";
 import { startScheduler, makeInstanceId } from "./scheduler";
 
 async function main() {
