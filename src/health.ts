@@ -5,6 +5,8 @@ import fs from "fs";
 import path from "path";
 import { Telegraf } from "telegraf";
 
+import { Reminder } from "./models/Reminder";
+
 type ServerOptions = {
   bot: Telegraf<any>;
   webhookPath: string; // e.g. "/telegram"
@@ -89,13 +91,25 @@ function issueMiniAppToken(userId: number) {
   return jwt.sign({ userId }, secret, { expiresIn: ttlSeconds });
 }
 
+function getBearerToken(req: http.IncomingMessage) {
+  const h = String(req.headers.authorization || "");
+  if (h.startsWith("Bearer ")) return h.slice(7);
+  return null;
+}
+
+function verifyMiniAppToken(token: string) {
+  const secret = process.env.MINIAPP_JWT_SECRET;
+  if (!secret) throw new Error("Missing MINIAPP_JWT_SECRET");
+  return jwt.verify(token, secret) as any;
+}
+
 export function startServer(opts: ServerOptions) {
   const portRaw = process.env.PORT;
   const port = portRaw ? Number(portRaw) : 3000;
 
   const webhookCallback = opts.bot.webhookCallback(opts.webhookPath);
 
-  // Mini app file location (clean separation)
+  // Mini app file location
   const miniAppIndex = path.join(process.cwd(), "miniapp", "index.html");
 
   const server = http.createServer(async (req, res) => {
@@ -111,13 +125,13 @@ export function startServer(opts: ServerOptions) {
       return;
     }
 
-    // Mini App page (served from /miniapp/index.html)
+    // Mini App page
     if (url === "/app" && method === "GET") {
       sendFile(res, miniAppIndex);
       return;
     }
 
-    // Mini App auth (Phase 1)
+    // Mini App auth
     if (url === "/miniapp/auth" && method === "POST") {
       try {
         const body = await readJson(req);
@@ -125,9 +139,7 @@ export function startServer(opts: ServerOptions) {
 
         const botToken = process.env.BOT_TOKEN;
         if (!botToken) return sendJson(res, 500, { error: "Missing BOT_TOKEN" });
-
         if (!process.env.MINIAPP_JWT_SECRET) return sendJson(res, 500, { error: "Missing MINIAPP_JWT_SECRET" });
-
         if (!initData) return sendJson(res, 400, { error: "Missing initData" });
 
         const parsed = validateInitData(initData, botToken);
@@ -158,6 +170,32 @@ export function startServer(opts: ServerOptions) {
       }
     }
 
+    // ✅ Phase 2: List reminders for the authed user
+    if (url === "/api/reminders" && method === "GET") {
+      const tok = getBearerToken(req);
+      if (!tok) return sendJson(res, 401, { error: "Missing token" });
+
+      let payload: any;
+      try {
+        payload = verifyMiniAppToken(tok);
+      } catch {
+        return sendJson(res, 401, { error: "Invalid token" });
+      }
+
+      const userId = Number(payload?.userId);
+      if (!Number.isFinite(userId)) return sendJson(res, 401, { error: "Invalid token payload" });
+
+      const reminders = await Reminder.find({
+        userId,
+        status: { $in: ["scheduled", "paused"] }
+      })
+        .sort({ nextRunAt: 1 })
+        .limit(200)
+        .lean();
+
+      return sendJson(res, 200, { ok: true, reminders });
+    }
+
     // Webhook endpoint
     if (url === normalizePath(opts.webhookPath) && method === "POST") {
       webhookCallback(req, res);
@@ -177,8 +215,9 @@ export function startServer(opts: ServerOptions) {
   server.listen(port, "0.0.0.0", () => {
     console.log(`Web server listening on port ${port}`);
     console.log(`Health endpoint: /health`);
-    console.log(`Mini App page: /app (serves miniapp/index.html)`);
+    console.log(`Mini App page: /app`);
     console.log(`Mini App auth: POST /miniapp/auth`);
+    console.log(`Mini App reminders: GET /api/reminders`);
     console.log(`Webhook endpoint: ${opts.webhookPath}`);
   });
 

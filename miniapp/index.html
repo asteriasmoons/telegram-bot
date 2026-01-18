@@ -72,6 +72,15 @@
     setStatus("Inside Telegram WebApp. initData length: " + (tg.initData ? tg.initData.length : 0));
   }
 
+  async function loadReminders(token) {
+    const resp = await fetch('/api/reminders', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await resp.json().catch(() => ({}));
+    return { status: resp.status, data };
+  }
+
   authBtn.addEventListener('click', async () => {
     if (!tg || !tg.initData) {
       resultEl.textContent = "No Telegram initData found. Open this from Telegram.";
@@ -85,8 +94,21 @@
         body: JSON.stringify({ initData: tg.initData })
       });
 
-      const data = await resp.json().catch(() => ({}));
-      resultEl.textContent = JSON.stringify({ status: resp.status, data }, null, 2);
+      const auth = await resp.json().catch(() => ({}));
+
+      if (resp.status !== 200 || !auth?.token) {
+        resultEl.textContent = JSON.stringify({ status: resp.status, auth }, null, 2);
+        return;
+      }
+
+      // Now fetch reminders
+      const remindersRes = await loadReminders(auth.token);
+
+      resultEl.textContent = JSON.stringify({
+        auth: { ok: true, user: auth.user }, // we are NOT showing token here
+        reminders: remindersRes
+      }, null, 2);
+
     } catch (e) {
       resultEl.textContent = "Request failed: " + (e && e.message ? e.message : String(e));
     }
