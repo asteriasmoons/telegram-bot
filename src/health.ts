@@ -46,14 +46,10 @@ function sendJson(res: http.ServerResponse, status: number, body: any) {
   res.end(JSON.stringify(body));
 }
 
-function sendFile(res: http.ServerResponse, filePath: string) {
-  if (!fs.existsSync(filePath)) {
-    sendText(res, 500, `Missing file: ${filePath}`);
-    return;
-  }
-  res.statusCode = 200;
+function sendHtml(res: http.ServerResponse, status: number, html: string) {
+  res.statusCode = status;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  fs.createReadStream(filePath).pipe(res);
+  res.end(html);
 }
 
 /**
@@ -103,13 +99,37 @@ function verifyMiniAppToken(token: string) {
   return jwt.verify(token, secret) as any;
 }
 
+function addMinutes(d: Date, minutes: number) {
+  return new Date(d.getTime() + minutes * 60_000);
+}
+
+async function requireUserId(req: http.IncomingMessage, res: http.ServerResponse): Promise<number | null> {
+  const tok = getBearerToken(req);
+  if (!tok) {
+    sendJson(res, 401, { ok: false, error: "Missing token" });
+    return null;
+  }
+
+  try {
+    const payload: any = verifyMiniAppToken(tok);
+    const userId = Number(payload?.userId);
+    if (!Number.isFinite(userId)) {
+      sendJson(res, 401, { ok: false, error: "Invalid token payload" });
+      return null;
+    }
+    return userId;
+  } catch {
+    sendJson(res, 401, { ok: false, error: "Invalid token" });
+    return null;
+  }
+}
+
 export function startServer(opts: ServerOptions) {
   const portRaw = process.env.PORT;
   const port = portRaw ? Number(portRaw) : 3000;
 
   const webhookCallback = opts.bot.webhookCallback(opts.webhookPath);
 
-  // Mini app file location
   const miniAppIndex = path.join(process.cwd(), "miniapp", "index.html");
 
   const server = http.createServer(async (req, res) => {
@@ -119,7 +139,6 @@ export function startServer(opts: ServerOptions) {
 
     console.log(`[HTTP] ${method} ${rawUrl}`);
 
-    // Health
     if (url === "/health") {
       sendText(res, 200, "OK");
       return;
@@ -127,7 +146,13 @@ export function startServer(opts: ServerOptions) {
 
     // Mini App page
     if (url === "/app" && method === "GET") {
-      sendFile(res, miniAppIndex);
+      if (!fs.existsSync(miniAppIndex)) {
+        sendText(res, 500, `Missing file: ${miniAppIndex}`);
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      fs.createReadStream(miniAppIndex).pipe(res);
       return;
     }
 
@@ -138,25 +163,25 @@ export function startServer(opts: ServerOptions) {
         const initData = String(body?.initData || "");
 
         const botToken = process.env.BOT_TOKEN;
-        if (!botToken) return sendJson(res, 500, { error: "Missing BOT_TOKEN" });
-        if (!process.env.MINIAPP_JWT_SECRET) return sendJson(res, 500, { error: "Missing MINIAPP_JWT_SECRET" });
-        if (!initData) return sendJson(res, 400, { error: "Missing initData" });
+        if (!botToken) return sendJson(res, 500, { ok: false, error: "Missing BOT_TOKEN" });
+        if (!process.env.MINIAPP_JWT_SECRET) return sendJson(res, 500, { ok: false, error: "Missing MINIAPP_JWT_SECRET" });
+        if (!initData) return sendJson(res, 400, { ok: false, error: "Missing initData" });
 
         const parsed = validateInitData(initData, botToken);
-        if (!parsed) return sendJson(res, 401, { error: "Invalid initData" });
+        if (!parsed) return sendJson(res, 401, { ok: false, error: "Invalid initData" });
 
         const userJson = parsed.user;
-        if (!userJson) return sendJson(res, 400, { error: "Missing user in initData" });
+        if (!userJson) return sendJson(res, 400, { ok: false, error: "Missing user in initData" });
 
         let user: any;
         try {
           user = JSON.parse(userJson);
         } catch {
-          return sendJson(res, 400, { error: "Bad user payload" });
+          return sendJson(res, 400, { ok: false, error: "Bad user payload" });
         }
 
         const userId = Number(user?.id);
-        if (!Number.isFinite(userId)) return sendJson(res, 400, { error: "Bad user id" });
+        if (!Number.isFinite(userId)) return sendJson(res, 400, { ok: false, error: "Bad user id" });
 
         const token = issueMiniAppToken(userId);
 
@@ -166,24 +191,14 @@ export function startServer(opts: ServerOptions) {
           user: { id: userId, first_name: user?.first_name, username: user?.username }
         });
       } catch (e: any) {
-        return sendJson(res, 400, { error: e?.message || "Bad request" });
+        return sendJson(res, 400, { ok: false, error: e?.message || "Bad request" });
       }
     }
 
-    // ✅ Phase 2: List reminders for the authed user
+    // List reminders
     if (url === "/api/reminders" && method === "GET") {
-      const tok = getBearerToken(req);
-      if (!tok) return sendJson(res, 401, { error: "Missing token" });
-
-      let payload: any;
-      try {
-        payload = verifyMiniAppToken(tok);
-      } catch {
-        return sendJson(res, 401, { error: "Invalid token" });
-      }
-
-      const userId = Number(payload?.userId);
-      if (!Number.isFinite(userId)) return sendJson(res, 401, { error: "Invalid token payload" });
+      const userId = await requireUserId(req, res);
+      if (!userId) return;
 
       const reminders = await Reminder.find({
         userId,
@@ -193,7 +208,80 @@ export function startServer(opts: ServerOptions) {
         .limit(200)
         .lean();
 
-      return sendJson(res, 200, { ok: true, reminders });
+      sendJson(res, 200, { ok: true, reminders });
+      return;
+    }
+
+    // Mark done
+    if (url === "/api/reminders/done" && method === "POST") {
+      const userId = await requireUserId(req, res);
+      if (!userId) return;
+
+      let body: any = {};
+      try {
+        body = await readJson(req);
+      } catch (e: any) {
+        sendJson(res, 400, { ok: false, error: e?.message || "Invalid JSON" });
+        return;
+      }
+
+      const id = String(body?.id || "");
+      if (!id) {
+        sendJson(res, 400, { ok: false, error: "Missing id" });
+        return;
+      }
+
+      const result = await Reminder.updateOne(
+        { _id: id, userId },
+        { $set: { status: "sent", lastRunAt: new Date() } }
+      );
+
+      if (result.matchedCount === 0) {
+        sendJson(res, 404, { ok: false, error: "Not found" });
+        return;
+      }
+
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    // Snooze
+    if (url === "/api/reminders/snooze" && method === "POST") {
+      const userId = await requireUserId(req, res);
+      if (!userId) return;
+
+      let body: any = {};
+      try {
+        body = await readJson(req);
+      } catch (e: any) {
+        sendJson(res, 400, { ok: false, error: e?.message || "Invalid JSON" });
+        return;
+      }
+
+      const id = String(body?.id || "");
+      const minutes = Number(body?.minutes ?? 10);
+
+      if (!id) {
+        sendJson(res, 400, { ok: false, error: "Missing id" });
+        return;
+      }
+      if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) {
+        sendJson(res, 400, { ok: false, error: "Invalid minutes" });
+        return;
+      }
+
+      const result = await Reminder.updateOne(
+        { _id: id, userId },
+        { $set: { nextRunAt: addMinutes(new Date(), minutes), status: "scheduled" } }
+      );
+
+      if (result.matchedCount === 0) {
+        sendJson(res, 404, { ok: false, error: "Not found" });
+        return;
+      }
+
+      sendJson(res, 200, { ok: true });
+      return;
     }
 
     // Webhook endpoint
@@ -202,13 +290,11 @@ export function startServer(opts: ServerOptions) {
       return;
     }
 
-    // Helpful GET on the webhook path
     if (url === normalizePath(opts.webhookPath) && method === "GET") {
       sendText(res, 200, "Webhook endpoint is up. Telegram must POST here.");
       return;
     }
 
-    // Default
     sendText(res, 200, "Bot is running. Use /health for status.");
   });
 
@@ -218,6 +304,8 @@ export function startServer(opts: ServerOptions) {
     console.log(`Mini App page: /app`);
     console.log(`Mini App auth: POST /miniapp/auth`);
     console.log(`Mini App reminders: GET /api/reminders`);
+    console.log(`Mini App done: POST /api/reminders/done`);
+    console.log(`Mini App snooze: POST /api/reminders/snooze`);
     console.log(`Webhook endpoint: ${opts.webhookPath}`);
   });
 
