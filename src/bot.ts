@@ -2,6 +2,7 @@ import { Telegraf } from "telegraf";
 
 import { registerRemindersFlow as registerCreateRemindFlow } from "./flows/remind";
 import { registerRemindersListFlow } from "./flows/reminders";
+import { registerChatIdCommand } from "./commands/chatId";
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -86,6 +87,9 @@ registerCreateRemindFlow(bot);
 
 // 🔹 List/edit reminders (/reminders)
 registerRemindersListFlow(bot);
+
+// 🔌 Get Chat ID
+registerChatIdCommand(bot);
 
 bot.catch((err) => {
 console.error("Bot error:", err);
