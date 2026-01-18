@@ -13,6 +13,17 @@
       background: #0b0b0f;
       color: #f3f3f7;
     }
+
+    h1 {
+      margin: 0 0 6px 0;
+      font-size: 26px;
+    }
+
+    .muted {
+      color: #a8a8bf;
+      font-size: 13px;
+    }
+
     .card {
       border: 1px solid #2a2a34;
       background: #12121a;
@@ -20,8 +31,14 @@
       padding: 14px;
       margin: 12px 0;
     }
-    .muted { color: #a8a8bf; font-size: 13px; }
-    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
     .btn {
       padding: 10px 12px;
       border-radius: 12px;
@@ -30,7 +47,10 @@
       color: #f3f3f7;
       font-size: 14px;
     }
-    .btn:disabled { opacity: 0.6; }
+
+    .btn:disabled {
+      opacity: 0.6;
+    }
 
     .pill {
       display: inline-block;
@@ -41,21 +61,36 @@
       font-size: 12px;
     }
 
-    .list { margin-top: 10px; }
-    .rem-card { padding: 12px; }
-    .rem-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
-    .rem-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .list {
+      margin-top: 10px;
+    }
+
+    .rem-card {
+      padding: 12px;
+    }
+
+    .rem-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .rem-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
     .rem-text {
       white-space: pre-wrap;
       word-break: break-word;
       line-height: 1.35;
-      color: #f3f3f7;
       font-size: 14px;
     }
 
     .empty {
       border: 1px dashed #2a2a34;
-      background: transparent;
       color: #a8a8bf;
       border-radius: 14px;
       padding: 14px;
@@ -65,24 +100,26 @@
 </head>
 
 <body>
-  <h1 style="margin:0 0 6px 0;">Reminder Manager</h1>
-  <div class="muted">Phase 3: show reminders as cards.</div>
+  <h1>Reminder Manager</h1>
+  <div class="muted">Your scheduled reminders.</div>
 
+  <!-- Status -->
   <div class="card">
     <div class="row">
       <div>
         <div style="font-weight:700;">Status</div>
-        <div id="status" class="muted">Loading…</div>
+        <div id="status" class="muted">Connecting…</div>
       </div>
       <button id="authBtn" class="btn">Authenticate</button>
     </div>
   </div>
 
+  <!-- Reminders -->
   <div class="card">
     <div class="row" style="align-items:flex-start;">
       <div>
         <div style="font-weight:700;">Your reminders</div>
-        <div id="sub" class="muted">Authenticate to load your scheduled reminders.</div>
+        <div id="sub" class="muted">Authenticate to load your reminders.</div>
       </div>
       <button id="reloadBtn" class="btn" disabled>Reload</button>
     </div>
@@ -90,196 +127,141 @@
     <div id="list" class="list"></div>
   </div>
 
-  <div id="debugWrap" class="card" style="display:none;">
-    <div style="font-weight:700;">Debug</div>
-    <pre id="debug" class="muted" style="white-space:pre-wrap;word-break:break-word;margin:8px 0 0 0;"></pre>
-  </div>
-
 <script>
-  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  const tg = window.Telegram?.WebApp ?? null;
 
-  const statusEl = document.getElementById('status');
-  const subEl = document.getElementById('sub');
-  const listEl = document.getElementById('list');
-  const authBtn = document.getElementById('authBtn');
-  const reloadBtn = document.getElementById('reloadBtn');
-
-  const debugWrap = document.getElementById('debugWrap');
-  const debugEl = document.getElementById('debug');
+  const statusEl = document.getElementById("status");
+  const subEl = document.getElementById("sub");
+  const listEl = document.getElementById("list");
+  const authBtn = document.getElementById("authBtn");
+  const reloadBtn = document.getElementById("reloadBtn");
 
   let jwtToken = null;
 
-  function setStatus(msg) { statusEl.textContent = msg; }
-
-  function showDebug(obj) {
-    // hidden by default. Turn on if needed.
-    debugWrap.style.display = 'none';
-    debugEl.textContent = JSON.stringify(obj, null, 2);
+  function setStatus(text) {
+    statusEl.textContent = text;
   }
 
   function escapeHtml(str) {
     return String(str)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
-  function fmtWhen(isoString) {
-    if (!isoString) return "No time set";
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return "Invalid date";
-    // keep it simple; Telegram users are fine with local formatting
+  function fmtWhen(iso) {
+    if (!iso) return "No time set";
+    const d = new Date(iso);
     return d.toLocaleString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
     });
   }
 
   function fmtFrequency(schedule) {
-    const kind = schedule && schedule.kind ? schedule.kind : "once";
-    if (kind === "interval") return `Every ${schedule.intervalMinutes} min`;
-    if (kind === "daily") return "Daily";
-    if (kind === "weekly") return "Weekly";
+    if (!schedule) return "Once";
+    if (schedule.kind === "daily") return "Daily";
+    if (schedule.kind === "weekly") return "Weekly";
+    if (schedule.kind === "interval") return `Every ${schedule.intervalMinutes} min`;
     return "Once";
   }
 
-  function clearList() {
-    listEl.innerHTML = "";
-  }
-
-  function renderEmpty(message) {
-    clearList();
-    listEl.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  function renderEmpty(text) {
+    listEl.innerHTML = `<div class="empty">${escapeHtml(text)}</div>`;
   }
 
   function renderReminders(reminders) {
-    clearList();
-
-    if (!Array.isArray(reminders) || reminders.length === 0) {
+    if (!reminders.length) {
       renderEmpty("No scheduled reminders found.");
       return;
     }
 
-    const html = reminders.map(rem => {
-      const when = fmtWhen(rem.nextRunAt);
-      const freq = fmtFrequency(rem.schedule);
-      const status = rem.status || "scheduled";
-      const tz = rem.timezone || "";
-      const msg = rem.text || "";
-
-      // Title: first line if available, else fallback
-      const firstLine = String(msg).split('\n')[0].trim();
-      const title = firstLine ? firstLine : "Reminder";
-
+    listEl.innerHTML = reminders.map(r => {
+      const title = r.text?.split("\n")[0] || "Reminder";
       return `
         <div class="card rem-card">
           <div class="rem-title">${escapeHtml(title)}</div>
           <div class="rem-meta">
-            <span class="pill">${escapeHtml(when)}</span>
-            <span class="pill">${escapeHtml(freq)}</span>
-            <span class="pill">${escapeHtml(status)}</span>
-            ${tz ? `<span class="pill">${escapeHtml(tz)}</span>` : ""}
+            <span class="pill">${fmtWhen(r.nextRunAt)}</span>
+            <span class="pill">${fmtFrequency(r.schedule)}</span>
+            <span class="pill">${escapeHtml(r.status)}</span>
+            <span class="pill">${escapeHtml(r.timezone)}</span>
           </div>
-          <div class="rem-text">${escapeHtml(msg)}</div>
+          <div class="rem-text">${escapeHtml(r.text)}</div>
         </div>
       `;
     }).join("");
-
-    listEl.innerHTML = html;
   }
 
-  async function auth() {
-    if (!tg || !tg.initData) {
-      setStatus("Not inside Telegram WebApp. Open from /reminders_app.");
-      return null;
-    }
-
-    const resp = await fetch('/miniapp/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  async function authenticate() {
+    const res = await fetch("/miniapp/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ initData: tg.initData })
     });
 
-    const data = await resp.json().catch(() => ({}));
-    if (resp.status !== 200 || !data.token) {
-      showDebug({ status: resp.status, data });
-      throw new Error(data?.error || "Auth failed");
-    }
-
+    const data = await res.json();
+    if (!res.ok || !data.token) throw new Error("Auth failed");
     return data.token;
   }
 
-  async function fetchReminders(token) {
-    const resp = await fetch('/api/reminders', {
-      method: 'GET',
-      headers: { 'Authorization': 'Bearer ' + token }
+  async function loadReminders() {
+    const res = await fetch("/api/reminders", {
+      headers: { Authorization: "Bearer " + jwtToken }
     });
-    const data = await resp.json().catch(() => ({}));
-    if (resp.status !== 200 || !data.ok) {
-      showDebug({ status: resp.status, data });
-      throw new Error(data?.error || "Failed to load reminders");
-    }
-    return data.reminders || [];
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error("Load failed");
+    return data.reminders;
   }
 
   async function load() {
-    if (!jwtToken) {
-      renderEmpty("Authenticate to load your scheduled reminders.");
-      return;
-    }
-
     subEl.textContent = "Loading…";
     reloadBtn.disabled = true;
 
     try {
-      const reminders = await fetchReminders(jwtToken);
+      const reminders = await loadReminders();
       renderReminders(reminders);
       subEl.textContent = `Loaded ${reminders.length} reminder(s).`;
-    } catch (e) {
-      renderEmpty("Could not load reminders. Try Authenticate again.");
+    } catch {
+      renderEmpty("Could not load reminders.");
       subEl.textContent = "Load failed.";
     } finally {
       reloadBtn.disabled = false;
     }
   }
 
-  // Initial status
+  // Initial state
   if (!tg) {
-    setStatus("Not inside Telegram WebApp.");
+    setStatus("Open this from Telegram.");
   } else {
     tg.ready();
-    setStatus("Inside Telegram WebApp. initData length: " + (tg.initData ? tg.initData.length : 0));
+    setStatus("Connected to Telegram.");
   }
 
-  authBtn.addEventListener('click', async () => {
+  authBtn.addEventListener("click", async () => {
     authBtn.disabled = true;
-    subEl.textContent = "Authenticating…";
     try {
-      jwtToken = await auth();
+      jwtToken = await authenticate();
+      setStatus("Authenticated.");
       reloadBtn.disabled = false;
-      subEl.textContent = "Authenticated. Loading reminders…";
       await load();
-    } catch (e) {
-      jwtToken = null;
-      reloadBtn.disabled = true;
+    } catch {
+      setStatus("Connected to Telegram.");
       renderEmpty("Authentication failed. Try again.");
-      subEl.textContent = "Authenticate to load your scheduled reminders.";
     } finally {
       authBtn.disabled = false;
     }
   });
 
-  reloadBtn.addEventListener('click', async () => {
-    await load();
-  });
+  reloadBtn.addEventListener("click", load);
 
-  // Start with empty state
-  renderEmpty("Authenticate to load your scheduled reminders.");
+  renderEmpty("Authenticate to load your reminders.");
 </script>
 </body>
 </html>
