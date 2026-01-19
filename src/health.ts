@@ -2,7 +2,6 @@ import http from "http";
 import { Telegraf } from "telegraf";
 import fs from "fs";
 import path from "path";
-import { handleMiniappApi } from "./miniappApi";
 
 type ServerOptions = {
   bot: Telegraf<any>;
@@ -34,24 +33,28 @@ function contentTypeFor(filePath: string) {
 }
 
 function safeJoin(base: string, target: string) {
+  // Prevent path traversal
   const targetPath = path.posix.normalize("/" + target).replace(/^\/+/, "");
   const joined = path.join(base, targetPath);
   if (!joined.startsWith(base)) return null;
   return joined;
 }
 
-function serveFile(res: http.ServerResponse, filePath: string) {
+function sendRedirect(res: http.ServerResponse, location: string) {
+  res.statusCode = 302;
+  res.setHeader("Location", location);
+  res.end();
+}
+
+function sendFile(res: http.ServerResponse, filePath: string) {
   if (!fs.existsSync(filePath)) {
     res.statusCode = 404;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.end("Not found.");
     return;
   }
-
   res.statusCode = 200;
   res.setHeader("Content-Type", contentTypeFor(filePath));
-  // prevent weird caching while you're iterating
-  res.setHeader("Cache-Control", "no-store");
   fs.createReadStream(filePath).pipe(res);
 }
 
@@ -61,10 +64,9 @@ export function startServer(opts: ServerOptions) {
 
   const webhookCallback = opts.bot.webhookCallback(opts.webhookPath);
 
-  // IMPORTANT: miniapp folder lives at project root: ./miniapp
-  // Use process.cwd() so it still works from dist/ on Render.
+  // miniapp folder at repo root: ./miniapp
   const MINIAPP_DIR = path.join(process.cwd(), "miniapp");
-  const MINIAPP_INDEX = path.join(MINIAPP_DIR, "index.html");
+  const INDEX_HTML = path.join(MINIAPP_DIR, "index.html");
 
   const server = http.createServer((req, res) => {
     const rawUrl = req.url || "/";
@@ -87,7 +89,7 @@ export function startServer(opts: ServerOptions) {
       return;
     }
 
-    // Helpful GET on the webhook path
+    // Helpful GET on webhook path
     if (url === normalizePath(opts.webhookPath) && method === "GET") {
       res.statusCode = 200;
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -95,38 +97,16 @@ export function startServer(opts: ServerOptions) {
       return;
     }
 
-    // Redirect old /miniapp links to /app so you don't accidentally open the wrong thing
-    if ((url === "/miniapp" || url.startsWith("/miniapp/")) && method === "GET") {
-      res.statusCode = 302;
-      res.setHeader("Location", "/app");
-      res.end();
-      return;
+    // --- CANONICAL MINIAPP ROUTE: /app ---
+    // Serve the app shell
+    if ((url === "/app" || url === "/app/") && method === "GET") {
+      return sendFile(res, INDEX_HTML);
     }
 
-    // ✅ API for the miniapp
-    // All miniapp backend endpoints should live under /app/api/*
-    if (url.startsWith("/app/api")) {
-      const botToken = process.env.BOT_TOKEN;
-      if (!botToken) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json; charset=utf-8");
-        res.end(JSON.stringify({ ok: false, error: "Missing BOT_TOKEN" }));
-        return;
-      }
-      handleMiniappApi(req, res, botToken);
-      return;
-    }
-
-    // ✅ Serve the miniapp at /app
-    if (url === "/app" && method === "GET") {
-      serveFile(res, MINIAPP_INDEX);
-      return;
-    }
-
-    // ✅ Serve miniapp static assets at /app/<file>
+    // Serve static assets under /app/*
     if (url.startsWith("/app/") && method === "GET") {
-      const rel = url.replace(/^\/app\/?/, "");
-      const filePath = rel ? safeJoin(MINIAPP_DIR, rel) : MINIAPP_INDEX;
+      const rel = url.replace(/^\/app\/+/, ""); // e.g. "app.css"
+      const filePath = safeJoin(MINIAPP_DIR, rel);
 
       if (!filePath) {
         res.statusCode = 400;
@@ -135,16 +115,24 @@ export function startServer(opts: ServerOptions) {
         return;
       }
 
-      const resolvedPath =
-        fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()
-          ? path.join(filePath, "index.html")
-          : filePath;
-
-      serveFile(res, resolvedPath);
-      return;
+      return sendFile(res, filePath);
     }
 
-    // Default (this should NOT be what the miniapp hits)
+    // --- COMPAT REDIRECTS (because humans will try these) ---
+    // If you hit /miniapp, force you onto /app
+    if ((url === "/miniapp" || url === "/miniapp/") && method === "GET") {
+      return sendRedirect(res, "/app");
+    }
+    if (url.startsWith("/miniapp/") && method === "GET") {
+      const rel = url.replace(/^\/miniapp\/+/, "");
+      return sendRedirect(res, `/app/${rel}`);
+    }
+
+    // If you hit /app.css or /app.js by accident, route it properly
+    if (url === "/app.css" && method === "GET") return sendRedirect(res, "/app/app.css");
+    if (url === "/app.js" && method === "GET") return sendRedirect(res, "/app/app.js");
+
+    // Default
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.end("Bot is running. Use /health for status.");
@@ -155,7 +143,7 @@ export function startServer(opts: ServerOptions) {
     console.log(`Health endpoint: /health`);
     console.log(`Webhook endpoint: ${opts.webhookPath}`);
     console.log(`Mini app endpoint: /app`);
-    console.log(`Mini app API base: /app/api`);
+    console.log(`Mini app dir: ${MINIAPP_DIR}`);
   });
 
   return server;
