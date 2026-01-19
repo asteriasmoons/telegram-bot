@@ -544,8 +544,8 @@
         <div className="card" onClick={() => setExpanded(!expanded)}>
           <div className="card-header">
             <div className="card-time">
-              <span>⏰</span>
-              <span>{formatDateTime(reminder.nextRunAt)}</span>
+
+<span>{formatDateTime(reminder.nextRunAt)}</span>
             </div>
             <span className={getBadgeClass()}>
               {reminder.schedule?.kind || 'once'}
