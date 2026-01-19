@@ -2,340 +2,38 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Reminder Manager</title>
 
-  <style>
-    :root {
-      --bg: #0b0c10;
-      --card: rgba(255,255,255,0.06);
-      --border: rgba(255,255,255,0.12);
-      --text: rgba(255,255,255,0.92);
-      --muted: rgba(255,255,255,0.6);
-      --btn: rgba(255,255,255,0.08);
-      --radius: 18px;
-      --shadow: 0 20px 40px rgba(0,0,0,0.45);
-    }
-
-    * { box-sizing: border-box; }
-
-    html, body {
-      margin: 0;
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, system-ui, sans-serif;
-    }
-
-    body {
-      padding: 18px;
-    }
-
-    h1 {
-      font-size: 40px;
-      margin: 6px 0 4px;
-      letter-spacing: -0.02em;
-    }
-
-    .sub {
-      color: var(--muted);
-      font-size: 14px;
-      margin-bottom: 18px;
-    }
-
-    .stack {
-      display: grid;
-      gap: 14px;
-    }
-
-    .card {
-      background: linear-gradient(
-        180deg,
-        rgba(255,255,255,0.08),
-        rgba(255,255,255,0.04)
-      );
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 14px;
-    }
-
-    .row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .label {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .value {
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .btn {
-      background: var(--btn);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 10px 14px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    .btn:active {
-      transform: translateY(1px);
-    }
-
-    .pillRow {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 10px 0;
-    }
-
-    .pill {
-      font-size: 13px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: rgba(0,0,0,0.2);
-      color: var(--muted);
-    }
-
-    .remTitle {
-      font-size: 18px;
-      font-weight: 800;
-      margin-bottom: 6px;
-    }
-
-    .remText {
-      white-space: pre-wrap;
-      line-height: 1.35;
-      margin-bottom: 12px;
-    }
-
-    .btnRow {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .editPanel {
-      display: none;
-      margin-top: 12px;
-      padding: 12px;
-      border-radius: 14px;
-      background: rgba(0,0,0,0.25);
-      border: 1px solid var(--border);
-    }
-
-    textarea, input, select {
-      width: 100%;
-      margin-top: 6px;
-      padding: 10px;
-      border-radius: 12px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-size: 14px;
-    }
-
-    textarea {
-      min-height: 90px;
-      resize: vertical;
-    }
-
-    .note {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-
-    .toast {
-      font-size: 13px;
-      margin-top: 8px;
-    }
-
-    .ok { color: #b9ffcc; }
-    .err { color: #ffb4b4; }
-  </style>
+  <link rel="stylesheet" href="/app/app.css" />
 </head>
-
 <body>
   <h1>Reminder Manager</h1>
   <div class="sub">Your scheduled reminders.</div>
 
-  <div class="stack">
-    <div class="card">
-      <div class="row">
-        <div>
-          <div class="value">Status</div>
-          <div class="label" id="statusText">Detecting Telegram…</div>
-        </div>
-        <button class="btn" id="authBtn">Authenticate</button>
+  <div class="card">
+    <div class="row">
+      <div>
+        <div class="title">Status</div>
+        <div id="statusLine" class="muted">Checking Telegram WebApp…</div>
+        <div id="warnLine" class="warn" style="display:none"></div>
       </div>
-      <div class="toast" id="authMsg"></div>
+      <button class="btn" id="authBtn">Authenticate</button>
     </div>
-
-    <div class="card">
-      <div class="row">
-        <div>
-          <div class="value">Your reminders</div>
-          <div class="label" id="remCount">Authenticate first.</div>
-        </div>
-        <button class="btn" id="reloadBtn">Reload</button>
-      </div>
-      <div id="reminders"></div>
-    </div>
+    <pre id="debug"></pre>
   </div>
 
-  <script>
-    let tg = null;
-    let token = null;
+  <div class="card">
+    <div class="row">
+      <div>
+        <div class="title">Your reminders</div>
+        <div class="muted" id="remLine">Authenticate first.</div>
+      </div>
+      <button class="btn" id="reloadBtn">Reload</button>
+    </div>
+    <div id="reminders"></div>
+  </div>
 
-    function waitForTelegram(retries = 15) {
-      return new Promise(resolve => {
-        let i = 0;
-        const t = setInterval(() => {
-          if (window.Telegram && window.Telegram.WebApp) {
-            clearInterval(t);
-            resolve(window.Telegram.WebApp);
-          }
-          if (++i >= retries) {
-            clearInterval(t);
-            resolve(null);
-          }
-        }, 100);
-      });
-    }
-
-    function msg(text, cls) {
-      const el = document.getElementById("authMsg");
-      el.className = "toast " + (cls || "");
-      el.textContent = text || "";
-    }
-
-    async function authenticate() {
-      if (!tg) {
-        msg("Not inside Telegram. Close and reopen from the bot button.", "err");
-        return;
-      }
-
-      const initData = tg.initData || "";
-      document.getElementById("statusText").textContent = "Authenticating…";
-
-      const r = await fetch("/miniapp/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData })
-      });
-
-      const j = await r.json().catch(() => ({}));
-
-      if (!j.ok) {
-        msg(j.error || "Authentication failed", "err");
-        document.getElementById("statusText").textContent = "Auth failed.";
-        return;
-      }
-
-      token = j.token;
-      document.getElementById("statusText").textContent = "Authenticated.";
-      msg("Authenticated successfully.", "ok");
-      loadReminders();
-    }
-
-    async function api(path, opts = {}) {
-      const headers = opts.headers || {};
-      if (token) headers.Authorization = "Bearer " + token;
-      if (opts.json) {
-        headers["Content-Type"] = "application/json";
-        opts.body = JSON.stringify(opts.json);
-      }
-      return fetch(path, { ...opts, headers });
-    }
-
-    async function loadReminders() {
-      if (!token) return;
-
-      const r = await api("/api/reminders");
-      const j = await r.json().catch(() => ({}));
-
-      const root = document.getElementById("reminders");
-      root.innerHTML = "";
-
-      if (!j.ok || !j.reminders?.length) {
-        document.getElementById("remCount").textContent = "No scheduled reminders.";
-        return;
-      }
-
-      document.getElementById("remCount").textContent =
-        `Loaded ${j.reminders.length} reminder(s).`;
-
-      for (const rem of j.reminders) {
-        const c = document.createElement("div");
-        c.className = "card";
-
-        c.innerHTML = `
-          <div class="remTitle">${(rem.text || "").split("\n")[0]}</div>
-          <div class="pillRow">
-            <span class="pill">${new Date(rem.nextRunAt).toLocaleString()}</span>
-            <span class="pill">${rem.schedule?.kind}</span>
-            <span class="pill">${rem.status}</span>
-          </div>
-          <div class="remText">${rem.text || ""}</div>
-          <div class="btnRow">
-            <button class="btn" data-act="done">Mark done</button>
-            <button class="btn" data-act="snooze">Snooze 10m</button>
-            <button class="btn" data-act="pause">Pause</button>
-            <button class="btn" data-act="resume">Resume</button>
-            <button class="btn" data-act="delete">Delete</button>
-          </div>
-        `;
-
-        c.querySelector('[data-act="done"]').onclick =
-          () => api(`/api/reminders/${rem._id}/done`, { method: "POST" }).then(loadReminders);
-
-        c.querySelector('[data-act="snooze"]').onclick =
-          () => api(`/api/reminders/${rem._id}/snooze`,
-            { method: "POST", json: { minutes: 10 } }).then(loadReminders);
-
-        c.querySelector('[data-act="pause"]').onclick =
-          () => api(`/api/reminders/${rem._id}/pause`, { method: "POST" }).then(loadReminders);
-
-        c.querySelector('[data-act="resume"]').onclick =
-          () => api(`/api/reminders/${rem._id}/resume`, { method: "POST" }).then(loadReminders);
-
-        c.querySelector('[data-act="delete"]').onclick =
-          () => confirm("Delete this reminder?")
-            && api(`/api/reminders/${rem._id}/delete`, { method: "POST" }).then(loadReminders);
-
-        root.appendChild(c);
-      }
-    }
-
-    document.getElementById("authBtn").onclick = authenticate;
-    document.getElementById("reloadBtn").onclick = loadReminders;
-
-    (async () => {
-      tg = await waitForTelegram();
-      if (tg) {
-        tg.ready();
-        tg.expand();
-        document.getElementById("statusText").textContent =
-          "Open inside Telegram. Tap Authenticate.";
-      } else {
-        document.getElementById("statusText").textContent =
-          "Not inside Telegram WebApp.";
-      }
-    })();
-  </script>
+  <script src="/app/app.js"></script>
 </body>
 </html>
