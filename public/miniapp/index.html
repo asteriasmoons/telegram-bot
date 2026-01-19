@@ -150,6 +150,7 @@
       line-height: 1.5;
       margin-bottom: 16px;
       color: var(--text-primary);
+      white-space: pre-wrap;
     }
 
     .card-actions {
@@ -396,6 +397,7 @@
     .empty-state-text {
       font-size: 16px;
       line-height: 1.6;
+      white-space: pre-line;
     }
 
     /* Loading */
@@ -484,6 +486,26 @@
 
       return response.json();
     }
+    
+    // Format Text
+    function formatReminderText(raw) {
+  if (!raw) return "";
+
+  // Normalize newlines
+  let text = String(raw).replace(/\r\n/g, "\n");
+
+  // If it already has line breaks, keep it as-is
+  if (text.includes("\n")) return text;
+
+  // Heuristic: if it contains multiple " - " segments, treat as a list
+  const dashCount = (text.match(/\s-\s/g) || []).length;
+  if (dashCount >= 2) {
+    // Convert " - Item" into "\n• Item"
+    text = text.replace(/\s-\s/g, "\n• ");
+  }
+
+  return text;
+}
 
     // Format date/time
     function formatDateTime(date) {
@@ -530,7 +552,7 @@
             </span>
           </div>
           
-          <div className="card-text">{reminder.text}</div>
+          <div className="card-text">{formatReminderText(reminder.text)}</div>
           
           {expanded && (
             <div className="card-actions" onClick={e => e.stopPropagation()}>
