@@ -6,7 +6,7 @@ import { Telegraf } from "telegraf";
 import path from "path";
 import miniappRouter from "./miniapp/api";
 
-export function startServer(opts: { bot: Telegraf<any>; webhookPath: string }) {
+export async function startServer(opts: { bot: Telegraf<any>; webhookPath: string }) {
   const app = express();
   const port = process.env.PORT || 3000;
 
@@ -52,8 +52,8 @@ export function startServer(opts: { bot: Telegraf<any>; webhookPath: string }) {
   });
 
   app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-    console.log(`Mini App: http://localhost:${port}/miniapp`);
-    console.log(`Webhook: ${opts.webhookPath}`);
+    console.log(`✅ Server running on port ${port}`);
+    console.log(`📱 Mini App: http://localhost:${port}/miniapp`);
+    console.log(`🔗 Webhook: ${opts.webhookPath}`);
   });
 }

@@ -2,7 +2,7 @@ import "dotenv/config";
 import mongoose from "mongoose";
 
 import { createBot } from "./bot";
-import { startServer } from "./health";  // Changed from "./server/startServer" to "./health"
+import { startServer } from "./health";
 import { startScheduler, makeInstanceId } from "./scheduler";
 
 async function main() {
@@ -25,8 +25,8 @@ async function main() {
   await mongoose.connect(mongoUri);
   console.log("Connected to MongoDB");
 
-  // Start HTTP server with Mini App support (includes webhook handler)
-  startServer({ bot, webhookPath });
+  // Start HTTP server with Mini App support (now with await)
+  await startServer({ bot, webhookPath });
 
   // Webhook URL
   const webhookUrl =
