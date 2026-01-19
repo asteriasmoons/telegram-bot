@@ -5,6 +5,7 @@ import express from "express";
 import { Telegraf } from "telegraf";
 import path from "path";
 import miniappRouter from "./miniapp/api";
+import calendarRouter from "./miniapp/calendar-api";  // ✅ Add this
 
 export async function startServer(opts: { bot: Telegraf<any>; webhookPath: string }) {
   const app = express();
@@ -20,11 +21,12 @@ export async function startServer(opts: { bot: Telegraf<any>; webhookPath: strin
     next();
   });
 
-  // Telegram webhook endpoint - use webhookCallback directly without createWebhook
+  // Telegram webhook endpoint
   app.post(opts.webhookPath, (req, res) => opts.bot.handleUpdate(req.body, res));
 
   // Mini App API routes
   app.use("/api/miniapp", miniappRouter);
+  app.use("/api/miniapp/calendar", calendarRouter);  // ✅ Add this
 
   // Serve Mini App static files (HTML/CSS/JS)
   app.use("/miniapp", express.static(path.join(__dirname, "../public/miniapp")));

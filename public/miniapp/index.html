@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Lystaria Reminders</title>
+  <title>Lystaria</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -39,8 +39,63 @@
 
     #root {
       min-height: 100vh;
-      padding: 16px;
       padding-bottom: 80px;
+    }
+
+    /* Bottom Navigation */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      padding: 12px 0;
+      z-index: 1000;
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 8px;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+      border: none;
+      background: none;
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+    }
+
+    .nav-item-icon {
+      font-size: 24px;
+    }
+
+    .nav-item-label {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* View Container */
+    .view-container {
+      display: none;
+      animation: fadeIn 0.3s;
+    }
+
+    .view-container.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     /* Header */
@@ -49,6 +104,7 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 24px;
+      padding: 16px;
       padding-bottom: 16px;
       border-bottom: 1px solid var(--border);
     }
@@ -105,7 +161,7 @@
       background: var(--card-bg);
       border-radius: 16px;
       padding: 20px;
-      margin-bottom: 12px;
+      margin: 0 16px 12px;
       border: 1px solid var(--border);
       transition: all 0.2s;
       cursor: pointer;
@@ -150,7 +206,6 @@
       line-height: 1.5;
       margin-bottom: 16px;
       color: var(--text-primary);
-      white-space: pre-wrap;
     }
 
     .card-actions {
@@ -207,7 +262,7 @@
     /* FAB */
     .fab {
       position: fixed;
-      bottom: 24px;
+      bottom: 80px;
       right: 24px;
       width: 56px;
       height: 56px;
@@ -219,7 +274,7 @@
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(91, 141, 239, 0.4);
       transition: all 0.2s;
-      z-index: 1000;
+      z-index: 999;
     }
 
     .fab:hover {
@@ -244,11 +299,6 @@
       justify-content: center;
       z-index: 2000;
       animation: fadeIn 0.2s;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
     }
 
     .modal {
@@ -380,7 +430,7 @@
       justify-content: center;
       padding: 12px;
     }
-    
+
     /* Empty state */
     .empty-state {
       text-align: center;
@@ -397,7 +447,6 @@
     .empty-state-text {
       font-size: 16px;
       line-height: 1.6;
-      white-space: pre-line;
     }
 
     /* Loading */
@@ -425,7 +474,7 @@
     .quick-actions {
       display: flex;
       gap: 8px;
-      margin-bottom: 24px;
+      margin: 0 16px 24px;
       overflow-x: auto;
       padding-bottom: 8px;
     }
@@ -451,6 +500,151 @@
     .quick-action.active {
       background: var(--accent);
       border-color: var(--accent);
+    }
+
+    /* Calendar Styles */
+    .calendar-header {
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .calendar-month {
+      font-size: 24px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .calendar-nav-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-primary);
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+
+    .calendar-nav-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--accent);
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: var(--border);
+      margin: 16px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .calendar-day-header {
+      background: var(--card-bg);
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .calendar-day {
+      background: var(--card-bg);
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 4px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+
+    .calendar-day:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .calendar-day.other-month {
+      opacity: 0.3;
+    }
+
+    .calendar-day.today {
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+    }
+
+    .calendar-day.has-events::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      width: 4px;
+      height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    .calendar-day.today.has-events::after {
+      background: white;
+    }
+
+    .calendar-day-number {
+      font-size: 14px;
+    }
+
+    .event-list {
+      padding: 0 16px 16px;
+    }
+
+    .event-list-header {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .event-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border-left: 4px solid var(--accent);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .event-card:hover {
+      transform: translateX(4px);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .event-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .event-card-time {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .event-card-location {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -486,26 +680,6 @@
 
       return response.json();
     }
-    
-    // Format Text
-    function formatReminderText(raw) {
-  if (!raw) return "";
-
-  // Normalize newlines
-  let text = String(raw).replace(/\r\n/g, "\n");
-
-  // If it already has line breaks, keep it as-is
-  if (text.includes("\n")) return text;
-
-  // Heuristic: if it contains multiple " - " segments, treat as a list
-  const dashCount = (text.match(/\s-\s/g) || []).length;
-  if (dashCount >= 2) {
-    // Convert " - Item" into "\n• Item"
-    text = text.replace(/\s-\s/g, "\n• ");
-  }
-
-  return text;
-}
 
     // Format date/time
     function formatDateTime(date) {
@@ -531,6 +705,20 @@
       return `${dayStr} at ${timeStr}`;
     }
 
+    function formatEventTime(event) {
+      const start = new Date(event.startDate);
+      if (event.allDay) {
+        return 'All day';
+      }
+      const timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      if (event.endDate) {
+        const end = new Date(event.endDate);
+        const endTimeStr = end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        return `${timeStr} - ${endTimeStr}`;
+      }
+      return timeStr;
+    }
+
     // Reminder Card Component
     function ReminderCard({ reminder, onEdit, onSnooze, onDone, onDelete }) {
       const [expanded, setExpanded] = useState(false);
@@ -544,15 +732,14 @@
         <div className="card" onClick={() => setExpanded(!expanded)}>
           <div className="card-header">
             <div className="card-time">
-
-<span>{formatDateTime(reminder.nextRunAt)}</span>
+              <span>{formatDateTime(reminder.nextRunAt)}</span>
             </div>
             <span className={getBadgeClass()}>
               {reminder.schedule?.kind || 'once'}
             </span>
           </div>
           
-          <div className="card-text">{formatReminderText(reminder.text)}</div>
+          <div className="card-text">{reminder.text}</div>
           
           {expanded && (
             <div className="card-actions" onClick={e => e.stopPropagation()}>
@@ -577,7 +764,7 @@
       );
     }
 
-    // Create/Edit Modal
+    // Reminder Modal
     function ReminderModal({ reminder, onClose, onSave }) {
       const [text, setText] = useState(reminder?.text || '');
       const [date, setDate] = useState('');
@@ -615,7 +802,7 @@
           text,
           nextRunAt: nextRunAt.toISOString(),
           schedule,
-          timezone: 'America/Chicago', // You can get this from user settings
+          timezone: 'America/Chicago',
         });
       };
 
@@ -698,8 +885,377 @@
       );
     }
 
-    // Main App Component
-    function App() {
+    // Event Modal
+    function EventModal({ event, onClose, onSave }) {
+      const [title, setTitle] = useState(event?.title || '');
+      const [description, setDescription] = useState(event?.description || '');
+      const [date, setDate] = useState('');
+      const [time, setTime] = useState('');
+      const [endTime, setEndTime] = useState('');
+      const [allDay, setAllDay] = useState(event?.allDay || false);
+      const [location, setLocation] = useState(event?.location || '');
+
+      useEffect(() => {
+        if (event) {
+          const d = new Date(event.startDate);
+          setDate(d.toISOString().split('T')[0]);
+          setTime(d.toTimeString().slice(0, 5));
+          if (event.endDate) {
+            const e = new Date(event.endDate);
+            setEndTime(e.toTimeString().slice(0, 5));
+          }
+        } else {
+          const now = new Date();
+          setDate(now.toISOString().split('T')[0]);
+          setTime('09:00');
+          setEndTime('10:00');
+        }
+      }, [event]);
+
+      const handleSave = async () => {
+        if (!title.trim()) {
+          tg.showAlert('Please enter a title');
+          return;
+        }
+
+        const startDate = allDay 
+          ? new Date(`${date}T00:00:00`)
+          : new Date(`${date}T${time}`);
+        
+        const endDate = endTime && !allDay
+          ? new Date(`${date}T${endTime}`)
+          : null;
+
+        await onSave({
+          title,
+          description,
+          startDate: startDate.toISOString(),
+          endDate: endDate ? endDate.toISOString() : undefined,
+          allDay,
+          location,
+        });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{event ? 'Edit Event' : 'New Event'}</h2>
+              <button className="modal-close" onClick={onClose}>×</button>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Title</label>
+              <input
+                type="text"
+                className="form-input"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Event title"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Description</label>
+              <textarea
+                className="form-textarea"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Add details..."
+                style={{minHeight: '80px'}}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input
+                type="date"
+                className="form-input"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                <input
+                  type="checkbox"
+                  checked={allDay}
+                  onChange={e => setAllDay(e.target.checked)}
+                />
+                <span>All day event</span>
+              </label>
+            </div>
+
+            {!allDay && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Start Time</label>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={time}
+                    onChange={e => setTime(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">End Time</label>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={endTime}
+                    onChange={e => setEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Location</label>
+              <input
+                type="text"
+                className="form-input"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder="Add location"
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSave}>
+                {event ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Calendar View
+    function CalendarView({ onCreateEvent }) {
+      const [currentDate, setCurrentDate] = useState(new Date());
+      const [events, setEvents] = useState([]);
+      const [selectedDate, setSelectedDate] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [showEventModal, setShowEventModal] = useState(false);
+      const [editingEvent, setEditingEvent] = useState(null);
+
+      useEffect(() => {
+        loadEvents();
+      }, [currentDate]);
+
+      const loadEvents = async () => {
+        try {
+          setLoading(true);
+          const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+          const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+          
+          const data = await apiCall(
+            `/calendar/events?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}`
+          );
+          setEvents(data.events);
+        } catch (error) {
+          tg.showAlert('Failed to load events: ' + error.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const getDaysInMonth = () => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startingDayOfWeek = firstDay.getDay();
+        
+        const days = [];
+        
+        // Previous month days
+        const prevMonth = new Date(year, month, 0);
+        const daysInPrevMonth = prevMonth.getDate();
+        for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+          days.push({
+            date: new Date(year, month - 1, daysInPrevMonth - i),
+            isCurrentMonth: false,
+          });
+        }
+        
+        // Current month days
+        for (let i = 1; i <= daysInMonth; i++) {
+          days.push({
+            date: new Date(year, month, i),
+            isCurrentMonth: true,
+          });
+        }
+        
+        // Next month days
+        const remainingDays = 42 - days.length;
+        for (let i = 1; i <= remainingDays; i++) {
+          days.push({
+            date: new Date(year, month + 1, i),
+            isCurrentMonth: false,
+          });
+        }
+        
+        return days;
+      };
+
+      const hasEvents = (date) => {
+        return events.some(event => {
+          const eventDate = new Date(event.startDate);
+          return eventDate.toDateString() === date.toDateString();
+        });
+      };
+
+      const isToday = (date) => {
+        const today = new Date();
+        return date.toDateString() === today.toDateString();
+      };
+
+      const getEventsForDate = (date) => {
+        return events.filter(event => {
+          const eventDate = new Date(event.startDate);
+          return eventDate.toDateString() === date.toDateString();
+        });
+      };
+
+      const handlePrevMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
+      };
+
+      const handleNextMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
+      };
+
+      const handleDayClick = (day) => {
+        setSelectedDate(day.date);
+      };
+
+      const handleCreateEvent = () => {
+        setEditingEvent(null);
+        setShowEventModal(true);
+      };
+
+      const handleEditEvent = (event) => {
+        setEditingEvent(event);
+        setShowEventModal(true);
+      };
+
+      const handleSaveEvent = async (data) => {
+        try {
+          if (editingEvent) {
+            await apiCall(`/calendar/events/${editingEvent._id}`, {
+              method: 'PUT',
+              body: JSON.stringify(data),
+            });
+            tg.showAlert('Event updated!');
+          } else {
+            await apiCall('/calendar/events', {
+              method: 'POST',
+              body: JSON.stringify(data),
+            });
+            tg.showAlert('Event created!');
+          }
+          setShowEventModal(false);
+          loadEvents();
+        } catch (error) {
+          tg.showAlert('Failed to save: ' + error.message);
+        }
+      };
+
+      const handleDeleteEvent = async (eventId) => {
+        try {
+          await apiCall(`/calendar/events/${eventId}`, {
+            method: 'DELETE',
+          });
+          tg.showPopup({ message: 'Event deleted' });
+          loadEvents();
+        } catch (error) {
+          tg.showAlert('Failed to delete: ' + error.message);
+        }
+      };
+
+      const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const days = getDaysInMonth();
+      const selectedEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+
+      return (
+        <div>
+          <div className="calendar-header">
+            <div className="calendar-month">
+              <button className="calendar-nav-btn" onClick={handlePrevMonth}>‹</button>
+              <span>{monthName}</span>
+              <button className="calendar-nav-btn" onClick={handleNextMonth}>›</button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="loading">
+              <div className="spinner" />
+              <div>Loading calendar...</div>
+            </div>
+          ) : (
+            <>
+              <div className="calendar-grid">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="calendar-day-header">{day}</div>
+                ))}
+                
+                {days.map((day, idx) => (
+                  <div
+                    key={idx}
+                    className={`calendar-day ${!day.isCurrentMonth ? 'other-month' : ''} ${isToday(day.date) ? 'today' : ''} ${hasEvents(day.date) ? 'has-events' : ''}`}
+                    onClick={() => handleDayClick(day)}
+                  >
+                    <span className="calendar-day-number">{day.date.getDate()}</span>
+                  </div>
+                ))}
+              </div>
+
+              {selectedDate && (
+                <div className="event-list">
+                  <div className="event-list-header">
+                    {selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                  </div>
+                  
+                  {selectedEvents.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">📅</div>
+                      <div className="empty-state-text">No events on this day</div>
+                    </div>
+                  ) : (
+                    selectedEvents.map(event => (
+                      <div key={event._id} className="event-card" onClick={() => handleEditEvent(event)}>
+                        <div className="event-card-title">{event.title}</div>
+                        <div className="event-card-time">{formatEventTime(event)}</div>
+                        {event.location && (
+                          <div className="event-card-location">📍 {event.location}</div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {showEventModal && (
+            <EventModal
+              event={editingEvent}
+              onClose={() => setShowEventModal(false)}
+              onSave={handleSaveEvent}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // Reminders View
+    function RemindersView() {
       const [reminders, setReminders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showHistory, setShowHistory] = useState(false);
@@ -867,10 +1423,6 @@
             ))
           )}
 
-          <button className="fab" onClick={handleCreate}>
-            +
-          </button>
-
           {showModal && (
             <ReminderModal
               reminder={editingReminder}
@@ -881,6 +1433,68 @@
         </div>
       );
     }
+
+    // Main App Component
+    function App() {
+      const [activeView, setActiveView] = useState('reminders');
+      const [showFab, setShowFab] = useState(true);
+
+      const handleFabClick = () => {
+        if (activeView === 'reminders') {
+          // Trigger create reminder modal
+          document.querySelector('[data-create-reminder]')?.click();
+        } else if (activeView === 'calendar') {
+          // Trigger create event modal
+          document.querySelector('[data-create-event]')?.click();
+        }
+      };
+
+      return (
+        <div>
+          <div className={`view-container ${activeView === 'reminders' ? 'active' : ''}`}>
+            <RemindersView />
+          </div>
+
+          <div className={`view-container ${activeView === 'calendar' ? 'active' : ''}`}>
+            <CalendarView />
+          </div>
+
+          {showFab && (
+            <button className="fab" onClick={handleFabClick}>
+              +
+            </button>
+          )}
+
+          <div className="bottom-nav">
+            <button
+              className={`nav-item ${activeView === 'reminders' ? 'active' : ''}`}
+              onClick={() => setActiveView('reminders')}
+            >
+              <div className="nav-item-icon">📋</div>
+              <div className="nav-item-label">Reminders</div>
+            </button>
+            <button
+              className={`nav-item ${activeView === 'calendar' ? 'active' : ''}`}
+              onClick={() => setActiveView('calendar')}
+            >
+              <div className="nav-item-icon">📅</div>
+              <div className="nav-item-label">Calendar</div>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Helper to trigger modals from FAB
+    window.addEventListener('DOMContentLoaded', () => {
+      const remindersView = document.querySelector('.view-container');
+      if (remindersView) {
+        const createBtn = document.createElement('button');
+        createBtn.setAttribute('data-create-reminder', 'true');
+        createBtn.style.display = 'none';
+        remindersView.appendChild(createBtn);
+      }
+    });
 
     ReactDOM.render(<App />, document.getElementById('root'));
   </script>
