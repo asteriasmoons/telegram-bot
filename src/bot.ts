@@ -35,7 +35,7 @@ export function createBot(token: string) {
     }
 
     await ctx.reply(
-      "Bot is alive.\n\nCommands:\n/start\n/ping\n/remind\n/reminders\n/reminders_app\n\nReminders deliver to DM."
+      "Hello lovely. Welcome to the Lystaria Bot experience! This bot was created with intention in mind for every day living.\n\nBot Commands:\n/start\n/ping\n/remind\n/reminders\n\nReminders deliver to DM.\nMore coming soon!"
     );
 
     // Set the persistent "Open App" button in the chat (menu button)
