@@ -42,7 +42,7 @@ body {
 
 #root {
   min-height: 100vh;
-  padding-bottom: 80px;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 /* Bottom Navigation */
@@ -55,7 +55,7 @@ body {
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-around;
-  padding: 12px 0;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
   z-index: 1000;
 }
 
@@ -209,6 +209,8 @@ body {
   line-height: 1.5;
   margin-bottom: 16px;
   color: var(--text-primary);
+  white-space: pre-line;
+  word-break: break-word;
 }
 
 .card-actions {
@@ -266,7 +268,7 @@ body {
 /* FAB */
 .fab {
   position: fixed;
-  bottom: 80px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
   right: 24px;
   width: 56px;
   height: 56px;
