@@ -74,6 +74,14 @@ export function startServer(opts: ServerOptions) {
     const method = (req.method || "GET").toUpperCase();
 
     console.log(`[HTTP] ${method} ${rawUrl}`);
+    
+    // 🔎 VERSION CHECK (debug)
+if (url === "/__version") {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.end("health.ts version: 2026-01-18-APP-ROUTER-V1");
+  return;
+}
 
     // Health
     if (url === "/health") {
