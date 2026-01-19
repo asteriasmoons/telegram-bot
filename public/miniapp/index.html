@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lystaria Reminders</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-color: #0a0a0a;
+      --card-bg: #1a1a1a;
+      --text-primary: #ffffff;
+      --text-secondary: #888888;
+      --accent: #5b8def;
+      --accent-hover: #4a7bd8;
+      --success: #4caf50;
+      --danger: #f44336;
+      --warning: #ff9800;
+      --border: #2a2a2a;
+      --shadow: rgba(0, 0, 0, 0.3);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-primary);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #root {
+      min-height: 100vh;
+      padding: 16px;
+      padding-bottom: 80px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .toggle {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 14px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-switch {
+      width: 44px;
+      height: 24px;
+      background: var(--border);
+      border-radius: 12px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch.active {
+      background: var(--accent);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: left 0.2s;
+    }
+
+    .toggle-switch.active::after {
+      left: 23px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .card-time {
+      font-size: 13px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-once { background: rgba(91, 141, 239, 0.15); color: #5b8def; }
+    .badge-daily { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
+    .badge-weekly { background: rgba(255, 152, 0, 0.15); color: #ff9800; }
+    .badge-interval { background: rgba(156, 39, 176, 0.15); color: #9c27b0; }
+
+    .card-text {
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    /* FAB */
+    .fab {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(91, 141, 239, 0.4);
+      transition: all 0.2s;
+      z-index: 1000;
+    }
+
+    .fab:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(91, 141, 239, 0.6);
+    }
+
+    .fab:active {
+      transform: scale(0.95);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      animation: fadeIn 0.2s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 24px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      animation: slideUp 0.3s;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .modal-header h2 {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-input,
+    .form-textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-size: 15px;
+      transition: all 0.2s;
+    }
+
+    .form-input:focus,
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 100px;
+      font-family: inherit;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-select {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .form-select:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+      justify-content: center;
+      padding: 12px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    .empty-state-text {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-secondary);
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Quick actions */
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+
+    .quick-action {
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .quick-action:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--accent);
+    }
+
+    .quick-action.active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Initialize Telegram Web App
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    // API base URL
+    const API_BASE = window.location.origin + '/api/miniapp';
+
+    // Helper function to make API calls
+    async function apiCall(endpoint, options = {}) {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': tg.initData,
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Request failed');
+      }
+
+      return response.json();
+    }
+
+    // Format date/time
+    function formatDateTime(date) {
+      const d = new Date(date);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const dateStr = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      
+      let dayStr;
+      if (dateStr.getTime() === today.getTime()) {
+        dayStr = 'Today';
+      } else if (dateStr.getTime() === tomorrow.getTime()) {
+        dayStr = 'Tomorrow';
+      } else {
+        dayStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      
+      const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      
+      return `${dayStr} at ${timeStr}`;
+    }
+
+    // Reminder Card Component
+    function ReminderCard({ reminder, onEdit, onSnooze, onDone, onDelete }) {
+      const [expanded, setExpanded] = useState(false);
+
+      const getBadgeClass = () => {
+        const kind = reminder.schedule?.kind || 'once';
+        return `card-badge badge-${kind}`;
+      };
+
+      return (
+        <div className="card" onClick={() => setExpanded(!expanded)}>
+          <div className="card-header">
+            <div className="card-time">
+              <span>⏰</span>
+              <span>{formatDateTime(reminder.nextRunAt)}</span>
+            </div>
+            <span className={getBadgeClass()}>
+              {reminder.schedule?.kind || 'once'}
+            </span>
+          </div>
+          
+          <div className="card-text">{reminder.text}</div>
+          
+          {expanded && (
+            <div className="card-actions" onClick={e => e.stopPropagation()}>
+              <button className="btn btn-primary" onClick={() => onEdit(reminder)}>
+                Edit
+              </button>
+              <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 15)}>
+                15m
+              </button>
+              <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 60)}>
+                1h
+              </button>
+              <button className="btn btn-success" onClick={() => onDone(reminder._id)}>
+                Done
+              </button>
+              <button className="btn btn-danger" onClick={() => onDelete(reminder._id)}>
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Create/Edit Modal
+    function ReminderModal({ reminder, onClose, onSave }) {
+      const [text, setText] = useState(reminder?.text || '');
+      const [date, setDate] = useState('');
+      const [time, setTime] = useState('');
+      const [scheduleKind, setScheduleKind] = useState(reminder?.schedule?.kind || 'once');
+      const [intervalMinutes, setIntervalMinutes] = useState(reminder?.schedule?.intervalMinutes || 30);
+
+      useEffect(() => {
+        if (reminder) {
+          const d = new Date(reminder.nextRunAt);
+          setDate(d.toISOString().split('T')[0]);
+          setTime(d.toTimeString().slice(0, 5));
+        } else {
+          const now = new Date();
+          setDate(now.toISOString().split('T')[0]);
+          setTime('09:00');
+        }
+      }, [reminder]);
+
+      const handleSave = async () => {
+        if (!text.trim()) {
+          tg.showAlert('Please enter a message');
+          return;
+        }
+
+        const nextRunAt = new Date(`${date}T${time}`);
+        
+        const schedule = scheduleKind === 'once' 
+          ? { kind: 'once' }
+          : scheduleKind === 'interval'
+          ? { kind: 'interval', intervalMinutes }
+          : { kind: scheduleKind, timeOfDay: time };
+
+        await onSave({
+          text,
+          nextRunAt: nextRunAt.toISOString(),
+          schedule,
+          timezone: 'America/Chicago', // You can get this from user settings
+        });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{reminder ? 'Edit Reminder' : 'New Reminder'}</h2>
+              <button className="modal-close" onClick={onClose}>×</button>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Message</label>
+              <textarea
+                className="form-textarea"
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="What do you want to be reminded about?"
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Date</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Time</label>
+                <input
+                  type="time"
+                  className="form-input"
+                  value={time}
+                  onChange={e => setTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Repeat</label>
+              <select
+                className="form-select"
+                value={scheduleKind}
+                onChange={e => setScheduleKind(e.target.value)}
+              >
+                <option value="once">Once</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="interval">Custom Interval</option>
+              </select>
+            </div>
+
+            {scheduleKind === 'interval' && (
+              <div className="form-group">
+                <label className="form-label">Interval (minutes)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={intervalMinutes}
+                  onChange={e => setIntervalMinutes(Number(e.target.value))}
+                  min="1"
+                />
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSave}>
+                {reminder ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Main App Component
+    function App() {
+      const [reminders, setReminders] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [showHistory, setShowHistory] = useState(false);
+      const [showModal, setShowModal] = useState(false);
+      const [editingReminder, setEditingReminder] = useState(null);
+      const [filter, setFilter] = useState('all');
+
+      useEffect(() => {
+        loadReminders();
+      }, [showHistory]);
+
+      const loadReminders = async () => {
+        try {
+          setLoading(true);
+          const data = await apiCall(`/reminders?includeHistory=${showHistory}`);
+          setReminders(data.reminders);
+        } catch (error) {
+          tg.showAlert('Failed to load reminders: ' + error.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleCreate = () => {
+        setEditingReminder(null);
+        setShowModal(true);
+      };
+
+      const handleEdit = (reminder) => {
+        setEditingReminder(reminder);
+        setShowModal(true);
+      };
+
+      const handleSave = async (data) => {
+        try {
+          if (editingReminder) {
+            await apiCall(`/reminders/${editingReminder._id}`, {
+              method: 'PUT',
+              body: JSON.stringify(data),
+            });
+            tg.showAlert('Reminder updated!');
+          } else {
+            await apiCall('/reminders', {
+              method: 'POST',
+              body: JSON.stringify(data),
+            });
+            tg.showAlert('Reminder created!');
+          }
+          setShowModal(false);
+          loadReminders();
+        } catch (error) {
+          tg.showAlert('Failed to save: ' + error.message);
+        }
+      };
+
+      const handleSnooze = async (id, minutes) => {
+        try {
+          await apiCall(`/reminders/${id}/snooze`, {
+            method: 'POST',
+            body: JSON.stringify({ minutes }),
+          });
+          tg.showPopup({ message: `Snoozed for ${minutes} minutes` });
+          loadReminders();
+        } catch (error) {
+          tg.showAlert('Failed to snooze: ' + error.message);
+        }
+      };
+
+      const handleDone = async (id) => {
+        try {
+          await apiCall(`/reminders/${id}/done`, {
+            method: 'POST',
+          });
+          tg.showPopup({ message: 'Marked as done!' });
+          loadReminders();
+        } catch (error) {
+          tg.showAlert('Failed to mark as done: ' + error.message);
+        }
+      };
+
+      const handleDelete = async (id) => {
+        try {
+          await apiCall(`/reminders/${id}`, {
+            method: 'DELETE',
+          });
+          tg.showPopup({ message: 'Reminder deleted' });
+          loadReminders();
+        } catch (error) {
+          tg.showAlert('Failed to delete: ' + error.message);
+        }
+      };
+
+      const filteredReminders = reminders.filter(r => {
+        if (filter === 'all') return true;
+        return r.schedule?.kind === filter;
+      });
+
+      return (
+        <div>
+          <div className="header">
+            <h1>Reminders</h1>
+            <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
+              <span>History</span>
+              <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
+            </div>
+          </div>
+
+          <div className="quick-actions">
+            <div
+              className={`quick-action ${filter === 'all' ? 'active' : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              All
+            </div>
+            <div
+              className={`quick-action ${filter === 'once' ? 'active' : ''}`}
+              onClick={() => setFilter('once')}
+            >
+              Once
+            </div>
+            <div
+              className={`quick-action ${filter === 'daily' ? 'active' : ''}`}
+              onClick={() => setFilter('daily')}
+            >
+              Daily
+            </div>
+            <div
+              className={`quick-action ${filter === 'weekly' ? 'active' : ''}`}
+              onClick={() => setFilter('weekly')}
+            >
+              Weekly
+            </div>
+            <div
+              className={`quick-action ${filter === 'interval' ? 'active' : ''}`}
+              onClick={() => setFilter('interval')}
+            >
+              Interval
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="loading">
+              <div className="spinner" />
+              <div>Loading reminders...</div>
+            </div>
+          ) : filteredReminders.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">📝</div>
+              <div className="empty-state-text">
+                {filter === 'all'
+                  ? 'No reminders yet.\nTap the + button to create one!'
+                  : `No ${filter} reminders found.`}
+              </div>
+            </div>
+          ) : (
+            filteredReminders.map(reminder => (
+              <ReminderCard
+                key={reminder._id}
+                reminder={reminder}
+                onEdit={handleEdit}
+                onSnooze={handleSnooze}
+                onDone={handleDone}
+                onDelete={handleDelete}
+              />
+            ))
+          )}
+
+          <button className="fab" onClick={handleCreate}>
+            +
+          </button>
+
+          {showModal && (
+            <ReminderModal
+              reminder={editingReminder}
+              onClose={() => setShowModal(false)}
+              onSave={handleSave}
+            />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
