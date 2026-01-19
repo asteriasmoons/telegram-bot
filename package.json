@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@types/express": "^5.0.6",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
@@ -9,6 +9,7 @@
     "telegraf": "^4.16.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/luxon": "^3.4.2",
     "@types/node": "^25.0.9",
