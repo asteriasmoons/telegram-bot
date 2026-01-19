@@ -1,545 +1,716 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Lystaria</title>
+
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Paste your FULL CSS here (the styles block we separated out) -->
   <style>
     * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    :root {
-      --bg-color: #0a0a0a;
-      --card-bg: #1a1a1a;
-      --text-primary: #ffffff;
-      --text-secondary: #888888;
-      --accent: #5b8def;
-      --accent-hover: #4a7bd8;
-      --success: #4caf50;
-      --danger: #f44336;
-      --warning: #ff9800;
-      --border: #2a2a2a;
-      --shadow: rgba(0, 0, 0, 0.3);
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: var(--bg-color);
-      color: var(--text-primary);
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    #root {
-      min-height: 100vh;
-      padding-bottom: 80px;
-    }
-
-    /* Bottom Navigation */
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: var(--card-bg);
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-around;
-      padding: 12px 0;
-      z-index: 1000;
-    }
-
-    .nav-item {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      padding: 8px;
-      color: var(--text-secondary);
-      transition: all 0.2s;
-      border: none;
-      background: none;
-    }
-
-    .nav-item.active {
-      color: var(--accent);
-    }
-
-    .nav-item-icon {
-      font-size: 24px;
-    }
-
-    .nav-item-label {
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    /* View Container */
-    .view-container {
-      display: none;
-      animation: fadeIn 0.3s;
-    }
-
-    .view-container.active {
-      display: block;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    /* Header */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      padding: 16px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header h1 {
-      font-size: 28px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .toggle {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      font-size: 14px;
-      color: var(--text-secondary);
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .toggle-switch {
-      width: 44px;
-      height: 24px;
-      background: var(--border);
-      border-radius: 12px;
-      position: relative;
-      transition: background 0.2s;
-    }
-
-    .toggle-switch.active {
-      background: var(--accent);
-    }
-
-    .toggle-switch::after {
-      content: '';
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      background: white;
-      border-radius: 50%;
-      top: 3px;
-      left: 3px;
-      transition: left 0.2s;
-    }
-
-    .toggle-switch.active::after {
-      left: 23px;
-    }
-
-    /* Cards */
-    .card {
-      background: var(--card-bg);
-      border-radius: 16px;
-      padding: 20px;
-      margin: 0 16px 12px;
-      border: 1px solid var(--border);
-      transition: all 0.2s;
-      cursor: pointer;
-    }
-
-    .card:hover {
-      border-color: var(--accent);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px var(--shadow);
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 12px;
-    }
-
-    .card-time {
-      font-size: 13px;
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .card-badge {
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .badge-once { background: rgba(91, 141, 239, 0.15); color: #5b8def; }
-    .badge-daily { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
-    .badge-weekly { background: rgba(255, 152, 0, 0.15); color: #ff9800; }
-    .badge-interval { background: rgba(156, 39, 176, 0.15); color: #9c27b0; }
-
-    .card-text {
-      font-size: 15px;
-      line-height: 1.5;
-      margin-bottom: 16px;
-      color: var(--text-primary);
-    }
-
-    .card-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      padding: 8px 16px;
-      border-radius: 8px;
-      border: none;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-hover);
-    }
-
-    .btn-success {
-      background: var(--success);
-      color: white;
-    }
-
-    .btn-danger {
-      background: var(--danger);
-      color: white;
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--text-primary);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .btn:active {
-      transform: scale(0.95);
-    }
-
-    /* FAB */
-    .fab {
-      position: fixed;
-      bottom: 80px;
-      right: 24px;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
-      border: none;
-      color: white;
-      font-size: 24px;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(91, 141, 239, 0.4);
-      transition: all 0.2s;
-      z-index: 999;
-    }
-
-    .fab:hover {
-      transform: scale(1.1);
-      box-shadow: 0 6px 20px rgba(91, 141, 239, 0.6);
-    }
-
-    .fab:active {
-      transform: scale(0.95);
-    }
-
-    /* Modal */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      animation: fadeIn 0.2s;
-    }
-
-    .modal {
-      background: var(--card-bg);
-      border-radius: 20px;
-      padding: 24px;
-      width: 90%;
-      max-width: 500px;
-      max-height: 80vh;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-      animation: slideUp 0.3s;
-    }
-
-    @keyframes slideUp {
-      from {
-        transform: translateY(100px);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-
-    .modal-header h2 {
-      font-size: 24px;
-      font-weight: 700;
-    }
-
-    .modal-close {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 24px;
-      cursor: pointer;
-      padding: 0;
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: all 0.2s;
-    }
-
-    .modal-close:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    .form-label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .form-input,
-    .form-textarea {
-      width: 100%;
-      padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      color: var(--text-primary);
-      font-size: 15px;
-      transition: all 0.2s;
-    }
-
-    .form-input:focus,
-    .form-textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .form-textarea {
-      resize: vertical;
-      min-height: 100px;
-      font-family: inherit;
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .form-select {
-      width: 100%;
-      padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      color: var(--text-primary);
-      font-size: 15px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .form-select:focus {
-      outline: none;
-      border-color: var(--accent);
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 24px;
-    }
-
-    .modal-actions .btn {
-      flex: 1;
-      justify-content: center;
-      padding: 12px;
-    }
-
-    /* Empty state */
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-secondary);
-    }
-
-    .empty-state-icon {
-      font-size: 64px;
-      margin-bottom: 16px;
-      opacity: 0.3;
-    }
-
-    .empty-state-text {
-      font-size: 16px;
-      line-height: 1.6;
-    }
-
-    /* Loading */
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: var(--text-secondary);
-    }
-
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Quick actions */
-    .quick-actions {
-      display: flex;
-      gap: 8px;
-      margin: 0 16px 24px;
-      overflow-x: auto;
-      padding-bottom: 8px;
-    }
-
-    .quick-action {
-      padding: 10px 20px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      color: var(--text-primary);
-      font-size: 13px;
-      font-weight: 600;
-      white-space: nowrap;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .quick-action:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: var(--accent);
-    }
-
-    .quick-action.active {
-      background: var(--accent);
-      border-color: var(--accent);
-    }
-
-    /* Calendar Header */
-    .calendar-header {
-      padding: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .calendar-month {
-      font-size: 24px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .calendar-nav-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--text-primary);
-      font-size: 18px;
-      transition: all 0.2s;
-    }
-
-    .calendar-nav-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: var(--accent);
-    }
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-color: #0a0a0a;
+  --card-bg: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #888888;
+  --accent: #5b8def;
+  --accent-hover: #4a7bd8;
+  --success: #4caf50;
+  --danger: #f44336;
+  --warning: #ff9800;
+  --border: #2a2a2a;
+  --shadow: rgba(0, 0, 0, 0.3);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: var(--bg-color);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  z-index: 1000;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 8px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  border: none;
+  background: none;
+}
+
+.nav-item.active {
+  color: var(--accent);
+}
+
+.nav-item-icon {
+  font-size: 24px;
+}
+
+.nav-item-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* View Container */
+.view-container {
+  display: none;
+  animation: fadeIn 0.3s;
+}
+
+.view-container.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-switch {
+  width: 44px;
+  height: 24px;
+  background: var(--border);
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.toggle-switch.active {
+  background: var(--accent);
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  transition: left 0.2s;
+}
+
+.toggle-switch.active::after {
+  left: 23px;
+}
+
+/* Cards */
+.card {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 20px;
+  margin: 0 16px 12px;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px var(--shadow);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.card-time {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-once { background: rgba(91, 141, 239, 0.15); color: #5b8def; }
+.badge-daily { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
+.badge-weekly { background: rgba(255, 152, 0, 0.15); color: #ff9800; }
+.badge-interval { background: rgba(156, 39, 176, 0.15); color: #9c27b0; }
+
+.card-text {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-success {
+  background: var(--success);
+  color: white;
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+/* FAB */
+.fab {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(91, 141, 239, 0.4);
+  transition: all 0.2s;
+  z-index: 999;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(91, 141, 239, 0.6);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.2s;
+}
+
+.modal {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.modal-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 15px;
+  transition: all 0.2s;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.form-textarea.form-textarea--sm {
+  min-height: 80px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-actions .btn {
+  flex: 1;
+  justify-content: center;
+  padding: 12px;
+}
+
+/* Checkbox row (moved from inline styles) */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.empty-state-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.empty-state-text {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Quick actions */
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  margin: 0 16px 24px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.quick-action {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.quick-action.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Calendar Header */
+.calendar-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.calendar-month {
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.calendar-nav-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 18px;
+  transition: all 0.2s;
+}
+
+.calendar-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+/* -------- Calendar View (moved from inline styles) -------- */
+
+.calendar-body {
+  padding: 16px;
+}
+
+.calendar-day {
+  margin-bottom: 16px;
+}
+
+.calendar-day-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.calendar-datebox {
+  min-width: 60px;
+  text-align: center;
+}
+
+.calendar-datebox-day {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.calendar-datebox-day.is-today {
+  color: #5b8def;
+}
+
+.calendar-datebox-dow {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.calendar-events {
+  flex: 1;
+}
+
+.calendar-no-events {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-add-icon-btn {
+  background: rgba(91, 141, 239, 0.15);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #5b8def;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-event {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid #5b8def;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calendar-event:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.calendar-event-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.calendar-event-main {
+  flex: 1;
+}
+
+.calendar-event-allday {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.calendar-event-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.calendar-event-time {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.calendar-event-location {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.calendar-event-delete {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.calendar-add-event {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  width: 100%;
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Utility */
+.is-hidden {
+  display: none !important;
+}
   </style>
 </head>
+
 <body>
   <div id="root"></div>
 
@@ -580,9 +751,9 @@
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      
+
       const dateStr = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      
+
       let dayStr;
       if (dateStr.getTime() === today.getTime()) {
         dayStr = 'Today';
@@ -591,9 +762,9 @@
       } else {
         dayStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }
-      
+
       const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      
+
       return `${dayStr} at ${timeStr}`;
     }
 
@@ -631,9 +802,9 @@
               {reminder.schedule?.kind || 'once'}
             </span>
           </div>
-          
+
           <div className="card-text">{reminder.text}</div>
-          
+
           {expanded && (
             <div className="card-actions" onClick={e => e.stopPropagation()}>
               <button className="btn btn-primary" onClick={() => onEdit(reminder)}>
@@ -684,8 +855,8 @@
         }
 
         const nextRunAt = new Date(`${date}T${time}`);
-        
-        const schedule = scheduleKind === 'once' 
+
+        const schedule = scheduleKind === 'once'
           ? { kind: 'once' }
           : scheduleKind === 'interval'
           ? { kind: 'interval', intervalMinutes }
@@ -815,10 +986,10 @@
           return;
         }
 
-        const startDate = allDay 
+        const startDate = allDay
           ? new Date(`${date}T00:00:00`)
           : new Date(`${date}T${time}`);
-        
+
         const endDate = endTime && !allDay
           ? new Date(`${date}T${endTime}`)
           : null;
@@ -855,11 +1026,10 @@
             <div className="form-group">
               <label className="form-label">Description</label>
               <textarea
-                className="form-textarea"
+                className="form-textarea form-textarea--sm"
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Add details..."
-                style={{minHeight: '80px'}}
               />
             </div>
 
@@ -874,7 +1044,7 @@
             </div>
 
             <div className="form-group">
-              <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+              <label className="checkbox-row">
                 <input
                   type="checkbox"
                   checked={allDay}
@@ -950,7 +1120,7 @@
           setLoading(true);
           const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
           const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-          
+
           const data = await apiCall(
             `/calendar/events?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}`
           );
@@ -966,12 +1136,12 @@
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
+
         const days = [];
         for (let i = 1; i <= daysInMonth; i++) {
           days.push(new Date(year, month, i));
         }
-        
+
         return days;
       };
 
@@ -1062,72 +1232,33 @@
               <div>Loading calendar...</div>
             </div>
           ) : (
-            <div style={{padding: '16px'}}>
+            <div className="calendar-body">
               {days.map(date => {
                 const dayEvents = getEventsForDate(date);
                 const dateIsToday = isToday(date);
-                
+
                 return (
-                  <div key={date.toISOString()} style={{marginBottom: '16px'}}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '16px',
-                    }}>
+                  <div key={date.toISOString()} className="calendar-day">
+                    <div className="calendar-day-row">
                       {/* Date box */}
-                      <div style={{
-                        minWidth: '60px',
-                        textAlign: 'center',
-                      }}>
-                        <div style={{
-                          fontSize: '28px',
-                          fontWeight: '700',
-                          color: dateIsToday ? '#5b8def' : '#fff',
-                          lineHeight: '1',
-                        }}>
+                      <div className="calendar-datebox">
+                        <div className={`calendar-datebox-day ${dateIsToday ? 'is-today' : ''}`}>
                           {date.getDate()}
                         </div>
-                        <div style={{
-                          fontSize: '12px',
-                          color: '#888',
-                          textTransform: 'uppercase',
-                          marginTop: '4px',
-                        }}>
+                        <div className="calendar-datebox-dow">
                           {date.toLocaleDateString('en-US', { weekday: 'short' })}
                         </div>
                       </div>
 
                       {/* Events container */}
-                      <div style={{flex: 1}}>
+                      <div className="calendar-events">
                         {dayEvents.length === 0 ? (
-                          <div style={{
-                            background: 'var(--card-bg)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '12px',
-                            padding: '16px',
-                            color: 'var(--text-secondary)',
-                            fontSize: '14px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                          }}>
+                          <div className="calendar-no-events">
                             <span>No events</span>
                             <button
                               ref={el => createEventRefs.current[date.toISOString()] = el}
                               onClick={() => handleCreateEvent(date)}
-                              style={{
-                                background: 'rgba(91, 141, 239, 0.15)',
-                                border: 'none',
-                                borderRadius: '8px',
-                                width: '32px',
-                                height: '32px',
-                                color: '#5b8def',
-                                fontSize: '20px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
+                              className="calendar-add-icon-btn"
                             >
                               +
                             </button>
@@ -1138,80 +1269,32 @@
                               <div
                                 key={event._id}
                                 onClick={() => handleEditEvent(event)}
-                                style={{
-                                  background: 'var(--card-bg)',
-                                  border: '1px solid var(--border)',
-                                  borderLeft: '4px solid #5b8def',
-                                  borderRadius: '12px',
-                                  padding: '12px 16px',
-                                  marginBottom: '8px',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = 'var(--card-bg)';
-                                }}
+                                className="calendar-event"
                               >
-                                <div style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'flex-start',
-                                }}>
-                                  <div style={{flex: 1}}>
+                                <div className="calendar-event-top">
+                                  <div className="calendar-event-main">
                                     {event.allDay && (
-                                      <div style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        background: 'rgba(76, 175, 80, 0.15)',
-                                        color: '#4caf50',
-                                        fontSize: '11px',
-                                        fontWeight: '600',
-                                        padding: '2px 8px',
-                                        borderRadius: '6px',
-                                        marginBottom: '4px',
-                                      }}>
+                                      <div className="calendar-event-allday">
                                         ● All day
                                       </div>
                                     )}
-                                    <div style={{
-                                      fontSize: '15px',
-                                      fontWeight: '600',
-                                      color: 'var(--text-primary)',
-                                      marginBottom: '4px',
-                                    }}>
+                                    <div className="calendar-event-title">
                                       {event.title}
                                     </div>
                                     {!event.allDay && (
-                                      <div style={{
-                                        fontSize: '13px',
-                                        color: 'var(--text-secondary)',
-                                      }}>
+                                      <div className="calendar-event-time">
                                         {formatEventTime(event)}
                                       </div>
                                     )}
                                     {event.location && (
-                                      <div style={{
-                                        fontSize: '13px',
-                                        color: 'var(--text-secondary)',
-                                        marginTop: '2px',
-                                      }}>
+                                      <div className="calendar-event-location">
                                         📍 {event.location}
                                       </div>
                                     )}
                                   </div>
                                   <button
                                     onClick={(e) => handleDeleteEvent(event._id, e)}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      color: 'var(--danger)',
-                                      fontSize: '18px',
-                                      cursor: 'pointer',
-                                      padding: '4px',
-                                    }}
+                                    className="calendar-event-delete"
                                   >
                                     🗑️
                                   </button>
@@ -1221,20 +1304,7 @@
                             <button
                               ref={el => createEventRefs.current[date.toISOString()] = el}
                               onClick={() => handleCreateEvent(date)}
-                              style={{
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                border: '1px dashed var(--border)',
-                                borderRadius: '12px',
-                                width: '100%',
-                                padding: '12px',
-                                color: 'var(--text-secondary)',
-                                fontSize: '14px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                              }}
+                              className="calendar-add-event"
                             >
                               + Add event
                             </button>
@@ -1433,7 +1503,7 @@
             ))
           )}
 
-          <button ref={createReminderRef} onClick={handleCreate} style={{display: 'none'}} />
+          <button ref={createReminderRef} onClick={handleCreate} className="is-hidden" />
 
           {showModal && (
             <ReminderModal
@@ -1455,13 +1525,11 @@
       const handleFabClick = () => {
         if (activeView === 'reminders') {
           // Find and click the hidden create reminder button
-          const btn = document.querySelector('[data-view="reminders"]')?.querySelector('button[style*="display: none"]');
+          const btn = document.querySelector('[data-view="reminders"]')?.querySelector('button');
           if (btn) btn.click();
         } else if (activeView === 'calendar') {
           // Trigger create event for today
           const today = new Date();
-          const todayKey = today.toISOString();
-          // We'll need to expose this via a global ref or find today's + button
           const todayBtn = document.querySelector(`[data-date="${today.toDateString()}"]`);
           if (todayBtn) todayBtn.click();
         }
