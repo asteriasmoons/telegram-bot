@@ -20,12 +20,8 @@ export async function startServer(opts: { bot: Telegraf<any>; webhookPath: strin
     next();
   });
 
-  // Telegram webhook endpoint - use the path from opts
-  const webhookCallback = await opts.bot.createWebhook({ 
-    domain: process.env.WEBHOOK_DOMAIN || "",
-    path: opts.webhookPath  // ✅ Add this line!
-  });
-  app.use(opts.webhookPath, webhookCallback);
+  // Telegram webhook endpoint - use webhookCallback directly without createWebhook
+  app.post(opts.webhookPath, (req, res) => opts.bot.handleUpdate(req.body, res));
 
   // Mini App API routes
   app.use("/api/miniapp", miniappRouter);
