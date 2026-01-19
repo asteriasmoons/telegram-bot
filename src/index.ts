@@ -25,7 +25,7 @@ async function main() {
   await mongoose.connect(mongoUri);
   console.log("Connected to MongoDB");
 
-  // Start HTTP server with Mini App support (now with await)
+  // Start HTTP server with Mini App support
   await startServer({ bot, webhookPath });
 
   // Webhook URL
@@ -34,14 +34,28 @@ async function main() {
       ? `${webhookDomain.slice(0, -1)}${webhookPath}`
       : `${webhookDomain}${webhookPath}`;
 
-  // IMPORTANT: WEBHOOK MODE. No Telegram polling.
-  console.log("Setting webhook:", webhookUrl);
-  await bot.telegram.setWebhook(webhookUrl, {
-    allowed_updates: ["message", "channel_post", "callback_query"],
-  });
-  console.log("Webhook set.");
-  const info = await bot.telegram.getWebhookInfo();
-  console.log("Webhook info:", JSON.stringify(info, null, 2));
+  // Check current webhook before setting
+  try {
+    const info = await bot.telegram.getWebhookInfo();
+    console.log("Current webhook info:", JSON.stringify(info, null, 2));
+
+    // Only set webhook if it's different
+    if (info.url !== webhookUrl) {
+      console.log("Setting webhook:", webhookUrl);
+      await bot.telegram.setWebhook(webhookUrl, {
+        allowed_updates: ["message", "channel_post", "callback_query"],
+      });
+      console.log("Webhook set successfully.");
+    } else {
+      console.log("Webhook already correctly configured, skipping setWebhook call.");
+    }
+  } catch (error: any) {
+    if (error.response?.error_code === 429) {
+      console.warn("Rate limited by Telegram. Webhook might already be set correctly. Continuing...");
+    } else {
+      throw error;
+    }
+  }
 
   // Log identity
   const me = await bot.telegram.getMe();
