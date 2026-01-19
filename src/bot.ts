@@ -3,6 +3,7 @@ import { Telegraf, Markup } from "telegraf";
 import { registerRemindersFlow as registerCreateRemindFlow } from "./flows/remind";
 import { registerRemindersListFlow } from "./flows/reminders";
 import { registerChatIdCommand } from "./commands/chatId";
+import { requireChannel } from "./commands/requireChannel";
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -16,7 +17,8 @@ export function createBot(token: string) {
     return next();
   });
 
-  bot.start(async (ctx) => {
+  // 🔒 START COMMAND (gated)
+  bot.start(requireChannel, async (ctx) => {
     const userId = ctx.from?.id;
     const chat = ctx.chat;
 
@@ -38,7 +40,7 @@ export function createBot(token: string) {
       "Hello lovely. Welcome to the Lystaria Bot experience! This bot was created with intention in mind for every day living.\n\nBot Commands:\n/start\n/ping\n/remind\n/reminders\n\nReminders deliver to DM.\nMore coming soon!"
     );
 
-    // Set the persistent "Open App" button in the chat (menu button)
+    // Persistent menu button
     const url = process.env.WEBAPP_URL;
     if (url && chat?.id) {
       await ctx.telegram.setChatMenuButton({
@@ -52,11 +54,13 @@ export function createBot(token: string) {
     }
   });
 
-  bot.command("ping", async (ctx) => {
+  // 🔒 PING (gated)
+  bot.command("ping", requireChannel, async (ctx) => {
     await ctx.reply("pong");
   });
 
-  bot.command("reminders_app", async (ctx) => {
+  // 🔒 MINI APP OPEN (gated)
+  bot.command("reminders_app", requireChannel, async (ctx) => {
     const url = process.env.WEBAPP_URL;
     if (!url) {
       await ctx.reply("Mini app URL is not configured yet.");
@@ -65,11 +69,19 @@ export function createBot(token: string) {
 
     await ctx.reply(
       "Open your Reminder Manager:",
-      Markup.inlineKeyboard([Markup.button.webApp("Open Reminder Manager", url)])
+      Markup.inlineKeyboard([
+        Markup.button.webApp("Open Reminder Manager", url),
+      ])
     );
   });
 
-  // Reminder action buttons
+  // 🔄 Refresh button after joining channel
+  bot.action("check_channel", requireChannel, async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply("Access granted! You’re all set.");
+  });
+
+  // Reminder action buttons (already gated implicitly via reminder ownership)
   bot.action(/^r:done:/, async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
     const id = (ctx.callbackQuery as any).data.split(":")[2];
@@ -89,7 +101,12 @@ export function createBot(token: string) {
 
     await Reminder.updateOne(
       { _id: id },
-      { $set: { nextRunAt: addMinutes(new Date(), minutes), status: "scheduled" } }
+      {
+        $set: {
+          nextRunAt: addMinutes(new Date(), minutes),
+          status: "scheduled",
+        },
+      }
     );
 
     await ctx.reply(`Snoozed for ${minutes} minutes.`);
@@ -102,6 +119,7 @@ export function createBot(token: string) {
     await ctx.reply("Deleted.");
   });
 
+  // 🔒 FLOWS (gated inside their own logic if needed)
   registerCreateRemindFlow(bot);
   registerRemindersListFlow(bot);
   registerChatIdCommand(bot);
