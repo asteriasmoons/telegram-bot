@@ -69,14 +69,39 @@ router.get("/reminders", async (req, res) => {
     if (includeHistory === "true") {
       query.status = { $in: ["scheduled", "sent"] };
     } else {
-      query.status = status;
+      // For active reminders, include:
+      // 1. All "scheduled" reminders
+      // 2. "sent" reminders with recurring schedules that are due today or in the future
+      query.$or = [
+        { status: "scheduled" },
+        {
+          status: "sent",
+          schedule: { $exists: true, $ne: null },
+          "schedule.kind": { $in: ["daily", "weekly", "interval"] },
+          nextRunAt: { $lte: new Date(Date.now() + 24 * 60 * 60 * 1000) } // Due within next 24 hours
+        }
+      ];
     }
     
     const reminders = await Reminder.find(query)
       .sort({ nextRunAt: 1 })
       .lean();
     
-    res.json({ reminders });
+    // For display purposes, treat recurring "sent" reminders as "scheduled" if they're due soon
+    const processedReminders = reminders.map(r => {
+      if (r.status === "sent" && r.schedule && r.schedule.kind !== "once") {
+        const nextRun = new Date(r.nextRunAt);
+        const now = new Date();
+        
+        // If nextRunAt is today or future, show it as scheduled
+        if (nextRun >= now || nextRun.toDateString() === now.toDateString()) {
+          return { ...r, displayStatus: "scheduled" };
+        }
+      }
+      return { ...r, displayStatus: r.status };
+    });
+    
+    res.json({ reminders: processedReminders });
   } catch (error) {
     console.error("Error fetching reminders:", error);
     res.status(500).json({ error: "Failed to fetch reminders" });
