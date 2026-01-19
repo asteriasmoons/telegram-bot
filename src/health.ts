@@ -20,8 +20,8 @@ export async function startServer(opts: { bot: Telegraf<any>; webhookPath: strin
     next();
   });
 
-  // Telegram webhook endpoint
-  app.use(opts.webhookPath, await opts.bot.createWebhook({ domain: "" }));
+  // Telegram webhook endpoint - REMOVE the domain parameter, let Telegraf handle it
+  app.use(opts.webhookPath, await opts.bot.createWebhook({ drop_pending_updates: true }));
 
   // Mini App API routes
   app.use("/api/miniapp", miniappRouter);
