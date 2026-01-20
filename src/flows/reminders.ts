@@ -208,7 +208,20 @@ await clearEditDraft(userId);
 
 const page = 0;
 
-const reminders = await Reminder.find({ userId, status: { $in: LIST_STATUSES as any } })
+const in24h = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+const reminders = await Reminder.find({
+  userId,
+  $or: [
+    { status: "scheduled" },
+    {
+      status: "sent",
+      schedule: { $exists: true, $ne: null },
+      "schedule.kind": { $in: ["daily", "weekly", "interval"] },
+      nextRunAt: { $lte: in24h }
+    }
+  ]
+})
   .sort({ nextRunAt: 1 })
   .skip(page * PAGE_SIZE)
   .limit(PAGE_SIZE)
