@@ -72,6 +72,23 @@ function isHexColor(s: string) {
   return /^#([0-9a-fA-F]{6})$/.test(s);
 }
 
+function dateFromTimeZone(dateYYYYMMDD: string, timeHHMM: string, tz: string): Date {
+  const [y, m, d] = dateYYYYMMDD.split("-").map(Number);
+  const [hh, mm] = timeHHMM.split(":").map(Number);
+
+  // Start with a UTC "guess" using the same wall-clock components
+  const utcGuess = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
+
+  // Figure out what local time that UTC guess would be in the target tz
+  const asTzLocal = new Date(utcGuess.toLocaleString("en-US", { timeZone: tz }));
+
+  // Offset between guessed UTC and tz-local interpretation
+  const offsetMs = asTzLocal.getTime() - utcGuess.getTime();
+
+  // Subtract offset to get the real UTC instant for that wall-clock time in tz
+  return new Date(utcGuess.getTime() - offsetMs);
+}
+
 async function getTimezone(userId: number): Promise<string> {
   const UserSettings = (mongoose.models as any).UserSettings;
   if (!UserSettings) return "America/Chicago";
