@@ -1,6 +1,10 @@
 import { Telegraf, Markup } from "telegraf";
 import { listEvents } from "../services/events.service";
-import { clearState, getState, setState } from "../state/conversationStore";
+
+function requireUser(ctx: any): number | null {
+  const userId = ctx.from?.id;
+  return typeof userId === "number" ? userId : null;
+}
 
 function getCbData(ctx: any): string | null {
   const cq = ctx.callbackQuery;
@@ -10,186 +14,131 @@ function getCbData(ctx: any): string | null {
 }
 
 const CB = {
-  CANCEL: "ev:list:cancel",
   RANGE_7: "ev:list:range:7",
   RANGE_30: "ev:list:range:30",
   RANGE_90: "ev:list:range:90",
-  REFRESH: "ev:list:refresh",
-  EDIT_FROM_LIST_PREFIX: "ev:list:edit:",   // + <eventId>
-  DELETE_FROM_LIST_PREFIX: "ev:list:del:",  // + <eventId>
+  REFRESH_30: "ev:list:refresh:30",
+  CLOSE: "ev:list:close",
 } as const;
 
-function fmtWhen(e: any) {
-  const d = new Date(e.startDate);
-  if (e.allDay) return `${d.toLocaleDateString()} (all day)`;
-  return d.toLocaleString([], {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  } as any);
+function fmtDate(d: Date) {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function safeLine(s?: string) {
-  return (s || "").trim();
+function fmtTime(d: Date) {
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-function listMenuKeyboard(days: number) {
+function fmtWhen(ev: any) {
+  const start = new Date(ev.startDate);
+  if (ev.allDay) return `${fmtDate(start)} (all day)`;
+  return `${fmtDate(start)} at ${fmtTime(start)}`;
+}
+
+function chunk<T>(arr: T[], size: number) {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function headerKeyboard(selectedDays: number) {
+  const label = (days: number) => (selectedDays === days ? `Next ${days} days ✓` : `Next ${days} days`);
   return Markup.inlineKeyboard([
-    [
-      Markup.button.callback(days === 7 ? "Next 7 days ✓" : "Next 7 days", CB.RANGE_7),
-      Markup.button.callback(days === 30 ? "Next 30 days ✓" : "Next 30 days", CB.RANGE_30),
-    ],
-    [
-      Markup.button.callback(days === 90 ? "Next 90 days ✓" : "Next 90 days", CB.RANGE_90),
-      Markup.button.callback("Refresh", CB.REFRESH),
-    ],
-    [Markup.button.callback("Close", CB.CANCEL)],
+    [Markup.button.callback(label(7), CB.RANGE_7), Markup.button.callback(label(30), CB.RANGE_30)],
+    [Markup.button.callback(label(90), CB.RANGE_90), Markup.button.callback("Refresh", CB.REFRESH_30)],
+    [Markup.button.callback("Close", CB.CLOSE)],
   ]);
 }
 
-async function sendList(ctx: any, userId: number) {
-  const state: any = getState(userId);
-  const days: number = state?.draft?.days ?? 30;
-
+async function sendList(ctx: any, userId: number, days: number) {
   const now = new Date();
   const end = new Date(now);
   end.setDate(end.getDate() + days);
 
   const events = await listEvents(userId, { startDate: now, endDate: end, limit: 50 });
 
-  await ctx.reply(
-    `Event list (next ${days} days): ${events.length}\nChoose a range or refresh:`,
-    listMenuKeyboard(days)
-  );
+  await ctx.reply(`Events (next ${days} days): ${events.length}`, headerKeyboard(days));
 
   if (!events.length) {
     await ctx.reply("No events found in that range.");
     return;
   }
 
-  for (const ev of events) {
-    const when = fmtWhen(ev);
-    const title = safeLine(ev.title) || "(Untitled)";
-    const loc = safeLine(ev.location);
-    const desc = safeLine(ev.description);
+  // Send in small chunks so Telegram doesn’t choke, and your chat doesn’t become unreadable
+  const groups = chunk(events, 5);
 
-    const lines = [
-      `ID: ${ev._id}`,
-      `${when}`,
-      `${title}`,
-      loc ? `Location: ${loc}` : null,
-      desc ? `Description: ${desc}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    await ctx.reply(
-      lines,
-      Markup.inlineKeyboard([
+  for (const group of groups) {
+    const lines: string[] = [];
+    for (const ev of group) {
+      lines.push(
         [
-          Markup.button.callback("Edit", `${CB.EDIT_FROM_LIST_PREFIX}${ev._id}`),
-          Markup.button.callback("Delete", `${CB.DELETE_FROM_LIST_PREFIX}${ev._id}`),
-        ],
-      ])
-    );
+          `• ${ev.title || "Untitled"}`,
+          `  When: ${fmtWhen(ev)}`,
+          ev.location ? `  Where: ${ev.location}` : null,
+          `  ID: ${ev._id}`,
+        ].filter(Boolean).join("\n")
+      );
+    }
+
+    await ctx.reply(lines.join("\n\n"));
   }
+
+  await ctx.reply(
+    "Want to change something?",
+    Markup.inlineKeyboard([
+      [Markup.button.callback("Edit (use /eventedit)", "noop:edit")],
+      [Markup.button.callback("Delete (use /eventdelete)", "noop:delete")],
+    ])
+  );
 }
 
 export function register(bot: Telegraf) {
+  // /eventlist
   bot.command("eventlist", async (ctx) => {
-    const userId = ctx.from?.id;
+    const userId = requireUser(ctx);
     if (!userId) return;
 
-    // This is a "view" flow, so we can clear other states safely if you want:
-    // clearState(userId);
-
-    setState(userId, { kind: "event_list", step: "menu", draft: { days: 30 } });
-
     try {
-      await sendList(ctx, userId);
+      await sendList(ctx, userId, 30);
     } catch (e: any) {
       await ctx.reply(`Failed to list events: ${e?.message ?? "Unknown error"}`);
-      clearState(userId);
     }
   });
 
-  bot.action([CB.RANGE_7, CB.RANGE_30, CB.RANGE_90, CB.REFRESH], async (ctx) => {
-    const userId = ctx.from?.id;
+  // Range/refresh buttons
+  bot.action([CB.RANGE_7, CB.RANGE_30, CB.RANGE_90, CB.REFRESH_30], async (ctx) => {
+    const userId = requireUser(ctx);
     if (!userId) return;
-
-    const state: any = getState(userId);
-    if (!state || state.kind !== "event_list") return;
 
     const data = getCbData(ctx);
     if (!data) return;
 
     await ctx.answerCbQuery();
 
-    if (data === CB.RANGE_7) state.draft.days = 7;
-    if (data === CB.RANGE_30) state.draft.days = 30;
-    if (data === CB.RANGE_90) state.draft.days = 90;
-
-    setState(userId, state);
+    let days = 30;
+    if (data === CB.RANGE_7) days = 7;
+    if (data === CB.RANGE_30) days = 30;
+    if (data === CB.RANGE_90) days = 90;
+    if (data === CB.REFRESH_30) days = 30;
 
     try {
-      await sendList(ctx, userId);
+      await sendList(ctx, userId, days);
     } catch (e: any) {
       await ctx.reply(`Failed to list events: ${e?.message ?? "Unknown error"}`);
-      clearState(userId);
     }
   });
 
-  bot.action(CB.CANCEL, async (ctx) => {
-    const userId = ctx.from?.id;
-    if (!userId) return;
-
-    clearState(userId);
+  bot.action(CB.CLOSE, async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply("Closed.");
   });
 
-  // Route Edit -> tell them to use /eventedit (or we could auto-start edit flow if you prefer later)
-  bot.action(new RegExp(`^${CB.EDIT_FROM_LIST_PREFIX}[0-9a-fA-F]{24}$`), async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.reply("Run /eventedit to edit events (pick the event from the buttons).");
-  });
-
-  // Route Delete -> auto-start delete flow with that ID (button-driven)
-  bot.action(new RegExp(`^${CB.DELETE_FROM_LIST_PREFIX}[0-9a-fA-F]{24}$`), async (ctx) => {
-    const userId = ctx.from?.id;
-    if (!userId) return;
-
+  // These are just informational buttons so users understand the flow
+  bot.action(["noop:edit", "noop:delete"], async (ctx) => {
     const data = getCbData(ctx);
-    if (!data) return;
-
-    const eventId = data.slice(CB.DELETE_FROM_LIST_PREFIX.length);
-
     await ctx.answerCbQuery();
 
-    // Put them into delete confirm state directly:
-    setState(userId, { kind: "event_delete", step: "confirm", draft: { eventId } });
-
-    await ctx.reply(
-      `Delete this event?\nID: ${eventId}`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback("Yes, delete", "ev:del:yes")],
-        [Markup.button.callback("No, cancel", "ev:del:no")],
-      ])
-    );
-  });
-
-  // These two handlers are shared with event-delete.ts and intentionally duplicated-safe.
-  bot.action("ev:del:no", async (ctx) => {
-    const userId = ctx.from?.id;
-    if (!userId) return;
-
-    const st: any = getState(userId);
-    if (!st || st.kind !== "event_delete" || st.step !== "confirm") return;
-
-    clearState(userId);
-    await ctx.answerCbQuery();
-    await ctx.reply("Canceled.");
+    if (data === "noop:edit") return ctx.reply("Run /eventedit to edit with buttons.");
+    if (data === "noop:delete") return ctx.reply("Run /eventdelete to delete with buttons.");
   });
 }
