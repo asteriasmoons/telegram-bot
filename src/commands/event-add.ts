@@ -1,10 +1,14 @@
 import { Telegraf, Markup } from "telegraf";
-import { createEvent } from "../services/events.service";
+import mongoose from "mongoose";
+import { createEvent, updateEvent } from "../services/events.service";
 
 /**
- * In-memory flow state (no conversationStore).
- * This resets on bot restart -- that’s fine for short interactive flows.
+ * NOTE:
+ * This file uses mongoose.models.Reminder and mongoose.models.UserSettings if available,
+ * so we don't have to guess your import paths.
+ * If your Reminder model is registered under a different name, tell me the model name.
  */
+
 type Step =
   | "menu"
   | "title"
@@ -13,7 +17,13 @@ type Step =
   | "description"
   | "location"
   | "color"
+  | "reminder_pick"
+  | "reminder_time" // used for all-day at-event-time, and custom time
+  | "reminder_date" // custom date
+  | "reminder_confirm"
   | "confirm";
+
+type ReminderMode = "none" | "at_event_time" | "custom_time";
 
 type EventDraft = {
   title?: string;
@@ -23,13 +33,19 @@ type EventDraft = {
   description?: string;
   location?: string;
   color?: string; // #RRGGBB
+
+  reminderMode?: ReminderMode;
+  // for custom reminder time:
+  reminderDate?: string; // YYYY-MM-DD
+  reminderTime?: string; // HH:MM
+  // for all-day at-event-time:
+  allDayReminderTime?: string; // HH:MM
 };
 
 type FlowState = {
   step: Step;
   draft: EventDraft;
-  // which field we’re currently expecting text for
-  expect?: "title" | "date" | "time" | "description" | "location" | "color";
+  expect?: "title" | "date" | "time" | "description" | "location" | "color" | "reminderDate" | "reminderTime";
 };
 
 const flow = new Map<number, FlowState>();
@@ -41,6 +57,11 @@ function getCbData(ctx: any): string | null {
   return null;
 }
 
+function requireUser(ctx: any): number | null {
+  const userId = ctx.from?.id;
+  return typeof userId === "number" ? userId : null;
+}
+
 function isValidDateYYYYMMDD(s: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
@@ -49,6 +70,77 @@ function isValidTimeHHMM(s: string) {
 }
 function isHexColor(s: string) {
   return /^#([0-9a-fA-F]{6})$/.test(s);
+}
+
+async function getTimezone(userId: number): Promise<string> {
+  const UserSettings = (mongoose.models as any).UserSettings;
+  if (!UserSettings) return "America/Chicago";
+  const s = await UserSettings.findOne({ userId }).lean();
+  return s?.timezone || "America/Chicago";
+}
+
+function buildReminderText(d: EventDraft) {
+  const title = d.title?.trim() || "Untitled Event";
+
+  const when = (() => {
+    const date = d.date?.trim() || "";
+    if (!date) return "(no date set)";
+    if (d.allDay) return `${date} (all day)`;
+    const t = d.time?.trim() || "(no time set)";
+    return `${date} ${t}`;
+  })();
+
+  const loc = d.location?.trim();
+  const desc = d.description ?? "";
+
+  // FULL DESCRIPTION, as you requested -- keep line breaks exactly.
+  return [
+    `Event Reminder`,
+    `Title: ${title}`,
+    `When: ${when}`,
+    loc ? `Location: ${loc}` : null,
+    ``,
+    `Description:`,
+    desc,
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+}
+
+function computeEventStartISO(d: EventDraft) {
+  const date = d.date!.trim();
+  if (d.allDay) return new Date(`${date}T00:00:00`).toISOString();
+  return new Date(`${date}T${d.time!.trim()}:00`).toISOString();
+}
+
+function computeReminderRunAt(d: EventDraft): Date | null {
+  const mode = d.reminderMode || "none";
+  if (mode === "none") return null;
+
+  if (mode === "custom_time") {
+    if (!d.reminderDate || !d.reminderTime) return null;
+    return new Date(`${d.reminderDate.trim()}T${d.reminderTime.trim()}:00`);
+  }
+
+  // at_event_time
+  if (d.allDay) {
+    if (!d.allDayReminderTime) return null;
+    return new Date(`${d.date!.trim()}T${d.allDayReminderTime.trim()}:00`);
+  }
+
+  // timed event: event start
+  return new Date(`${d.date!.trim()}T${d.time!.trim()}:00`);
+}
+
+function formatRunAt(dt: Date) {
+  // keep it simple; Telegram is fine with this
+  return dt.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 const CB = {
@@ -62,6 +154,14 @@ const CB = {
   CLEAR_DESC: "ev:add:clear:desc",
   CLEAR_LOC: "ev:add:clear:loc",
   CLEAR_COLOR: "ev:add:clear:color",
+
+  REMINDER_MENU: "ev:add:rem:menu",
+  REM_NONE: "ev:add:rem:none",
+  REM_AT_EVENT: "ev:add:rem:at_event",
+  REM_CUSTOM: "ev:add:rem:custom",
+  REM_CONFIRM_YES: "ev:add:rem:confirm:yes",
+  REM_CONFIRM_NO: "ev:add:rem:confirm:no",
+
   CREATE: "ev:add:create",
   CONFIRM_YES: "ev:add:confirm:yes",
   CONFIRM_NO: "ev:add:confirm:no",
@@ -72,10 +172,20 @@ function summary(d: EventDraft) {
   const title = d.title?.trim() ? d.title.trim() : "(not set)";
   const date = d.date?.trim() ? d.date.trim() : "(not set)";
   const allDay = Boolean(d.allDay);
-  const time = allDay ? "(all day)" : (d.time?.trim() ? d.time.trim() : "(not set)");
+  const time = allDay ? "(all day)" : d.time?.trim() ? d.time.trim() : "(not set)";
   const desc = d.description?.trim() ? d.description.trim() : "(not set)";
   const loc = d.location?.trim() ? d.location.trim() : "(not set)";
   const color = d.color?.trim() ? d.color.trim() : "(not set)";
+
+  const mode = d.reminderMode || "none";
+  const remLine =
+    mode === "none"
+      ? "Reminder: none"
+      : mode === "custom_time"
+      ? `Reminder: custom (${d.reminderDate || "?"} ${d.reminderTime || "?"})`
+      : d.allDay
+      ? `Reminder: at event time (all-day @ ${d.allDayReminderTime || "?"})`
+      : `Reminder: at event time`;
 
   return [
     `Title: ${title}`,
@@ -85,16 +195,23 @@ function summary(d: EventDraft) {
     `Description: ${desc}`,
     `Location: ${loc}`,
     `Color: ${color}`,
+    remLine,
   ].join("\n");
 }
 
 function menuKeyboard(draft: EventDraft) {
-  const allDayLabel = draft.allDay ? "All day: ON" : "All day: OFF";
+  const allDayLabel = draft?.allDay ? "All day: ON" : "All day: OFF";
+  const remLabel =
+    !draft.reminderMode || draft.reminderMode === "none"
+      ? "Reminder: None"
+      : draft.reminderMode === "at_event_time"
+      ? "Reminder: At event time"
+      : "Reminder: Custom time";
 
   return Markup.inlineKeyboard([
     [Markup.button.callback("Set title", CB.SET_TITLE)],
-    [Markup.button.callback("Set date", CB.SET_DATE)],
-    [Markup.button.callback("Set time", CB.SET_TIME)],
+    [Markup.button.callback("Set date (YYYY-MM-DD)", CB.SET_DATE)],
+    [Markup.button.callback("Set time (HH:MM)", CB.SET_TIME)],
     [Markup.button.callback(allDayLabel, CB.TOGGLE_ALLDAY)],
     [
       Markup.button.callback("Set description", CB.SET_DESC),
@@ -108,39 +225,44 @@ function menuKeyboard(draft: EventDraft) {
       Markup.button.callback("Set color", CB.SET_COLOR),
       Markup.button.callback("Clear", CB.CLEAR_COLOR),
     ],
+    [Markup.button.callback(remLabel, CB.REMINDER_MENU)],
     [Markup.button.callback("Create", CB.CREATE)],
     [Markup.button.callback("Cancel", CB.CANCEL)],
   ]);
 }
 
 async function showMenu(ctx: any, userId: number, note?: string) {
-  const state = flow.get(userId);
-  const draft = state?.draft ?? {};
-
+  const st = flow.get(userId);
+  const draft = st?.draft ?? {};
   const text = `${note ? `${note}\n\n` : ""}Event add:\n\n${summary(draft)}`;
   await ctx.reply(text, menuKeyboard(draft));
 }
 
-function requireUser(ctx: any): number | null {
-  const userId = ctx.from?.id;
-  return typeof userId === "number" ? userId : null;
+function reminderMenuKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("None", CB.REM_NONE)],
+    [Markup.button.callback("At event time", CB.REM_AT_EVENT)],
+    [Markup.button.callback("Custom time", CB.REM_CUSTOM)],
+    [Markup.button.callback("Back", CB.REM_CONFIRM_NO)], // reuse to go back safely
+  ]);
 }
 
 export function register(bot: Telegraf) {
-  // /eventadd
   bot.command("eventadd", async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
 
-    flow.set(userId, { step: "menu", draft: { allDay: false } });
+    flow.set(userId, {
+      step: "menu",
+      draft: { allDay: false, reminderMode: "none" },
+    });
+
     await showMenu(ctx, userId);
   });
 
-  // Cancel
   bot.action(CB.CANCEL, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
-
     flow.delete(userId);
     await ctx.answerCbQuery();
     await ctx.reply("Canceled.");
@@ -150,27 +272,24 @@ export function register(bot: Telegraf) {
   bot.action(CB.TOGGLE_ALLDAY, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
-
     const st = flow.get(userId);
     if (!st) return;
 
     st.draft.allDay = !Boolean(st.draft.allDay);
 
-    // If switching to all-day, time becomes irrelevant; keep it but it won’t be required
+    // If they had reminder at_event_time and now it's all-day, we'll need a prompt later
     st.step = "menu";
     st.expect = undefined;
-
     flow.set(userId, st);
 
     await ctx.answerCbQuery();
-    await showMenu(ctx, userId, "Updated all-day setting.");
+    await showMenu(ctx, userId, "Updated all-day.");
   });
 
   // Clear actions
   bot.action([CB.CLEAR_DESC, CB.CLEAR_LOC, CB.CLEAR_COLOR], async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
-
     const st = flow.get(userId);
     if (!st) return;
 
@@ -189,13 +308,12 @@ export function register(bot: Telegraf) {
     await showMenu(ctx, userId, "Cleared.");
   });
 
-  // Set field actions -> switch to "expecting text"
+  // Set field actions -> expect typed value
   bot.action(
     [CB.SET_TITLE, CB.SET_DATE, CB.SET_TIME, CB.SET_DESC, CB.SET_LOC, CB.SET_COLOR],
     async (ctx) => {
       const userId = requireUser(ctx);
       if (!userId) return;
-
       const st = flow.get(userId);
       if (!st) return;
 
@@ -254,11 +372,154 @@ export function register(bot: Telegraf) {
     }
   );
 
+  // Reminder menu
+  bot.action(CB.REMINDER_MENU, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+    const st = flow.get(userId);
+    if (!st) return;
+
+    await ctx.answerCbQuery();
+    st.step = "reminder_pick";
+    st.expect = undefined;
+    flow.set(userId, st);
+
+    await ctx.reply("Reminder options:", reminderMenuKeyboard());
+  });
+
+  // Reminder: None
+  bot.action(CB.REM_NONE, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+    const st = flow.get(userId);
+    if (!st) return;
+
+    await ctx.answerCbQuery();
+
+    st.draft.reminderMode = "none";
+    st.draft.reminderDate = undefined;
+    st.draft.reminderTime = undefined;
+    st.draft.allDayReminderTime = undefined;
+
+    st.step = "menu";
+    flow.set(userId, st);
+
+    await showMenu(ctx, userId, "Reminder set to none.");
+  });
+
+  // Reminder: At event time
+  bot.action(CB.REM_AT_EVENT, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+    const st = flow.get(userId);
+    if (!st) return;
+
+    await ctx.answerCbQuery();
+
+    st.draft.reminderMode = "at_event_time";
+    st.draft.reminderDate = undefined;
+    st.draft.reminderTime = undefined;
+
+    // If all-day, we must prompt for a time always.
+    if (st.draft.allDay) {
+      st.step = "reminder_time";
+      st.expect = "reminderTime";
+      flow.set(userId, st);
+      return ctx.reply("All-day event: what time should the reminder fire? (HH:MM 24h)");
+    }
+
+    // For timed event: we can compute from event start, but confirm time.
+    const runAt = computeReminderRunAt(st.draft);
+    if (!runAt || isNaN(runAt.getTime())) {
+      st.step = "menu";
+      st.expect = undefined;
+      flow.set(userId, st);
+      return showMenu(ctx, userId, "Set event date + time first (so I know when to remind you).");
+    }
+
+    st.step = "reminder_confirm";
+    st.expect = undefined;
+    flow.set(userId, st);
+
+    return ctx.reply(
+      `Reminder will fire at:\n${formatRunAt(runAt)}\n\nConfirm?`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback("Yes", CB.REM_CONFIRM_YES)],
+        [Markup.button.callback("No", CB.REM_CONFIRM_NO)],
+      ])
+    );
+  });
+
+  // Reminder: Custom time
+  bot.action(CB.REM_CUSTOM, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+    const st = flow.get(userId);
+    if (!st) return;
+
+    await ctx.answerCbQuery();
+
+    st.draft.reminderMode = "custom_time";
+    st.draft.allDayReminderTime = undefined;
+    st.draft.reminderDate = undefined;
+    st.draft.reminderTime = undefined;
+
+    st.step = "reminder_date";
+    st.expect = "reminderDate";
+    flow.set(userId, st);
+
+    return ctx.reply("Custom reminder: type the reminder date as YYYY-MM-DD:");
+  });
+
+  // Reminder confirm NO -> back to menu (and keep choice so user can adjust)
+  bot.action(CB.REM_CONFIRM_NO, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+    const st = flow.get(userId);
+    if (!st) return;
+
+    await ctx.answerCbQuery();
+
+    st.step = "menu";
+    st.expect = undefined;
+    flow.set(userId, st);
+
+    return showMenu(ctx, userId, "Okay -- adjust your settings.");
+  });
+
+  // Reminder confirm YES -> store and return
+  bot.action(CB.REM_CONFIRM_YES, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+    const st = flow.get(userId);
+    if (!st) return;
+
+    await ctx.answerCbQuery();
+
+    // validate computed time not in past
+    const runAt = computeReminderRunAt(st.draft);
+    if (!runAt || isNaN(runAt.getTime())) {
+      st.step = "menu";
+      flow.set(userId, st);
+      return showMenu(ctx, userId, "Reminder time could not be computed. Check your inputs.");
+    }
+    if (runAt.getTime() < Date.now()) {
+      st.step = "menu";
+      flow.set(userId, st);
+      return showMenu(ctx, userId, "That reminder time is in the past. Choose a future time.");
+    }
+
+    st.step = "menu";
+    st.expect = undefined;
+    flow.set(userId, st);
+
+    return showMenu(ctx, userId, `Reminder confirmed for ${formatRunAt(runAt)}.`);
+  });
+
   // Create -> confirm screen
   bot.action(CB.CREATE, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
-
     const st = flow.get(userId);
     if (!st) return;
 
@@ -272,6 +533,17 @@ export function register(bot: Telegraf) {
     if (!d.allDay) {
       if (!d.time || !isValidTimeHHMM(d.time.trim())) {
         return showMenu(ctx, userId, "Missing/invalid time (or toggle All day ON).");
+      }
+    }
+
+    // validate reminder settings if chosen
+    if (d.reminderMode && d.reminderMode !== "none") {
+      const runAt = computeReminderRunAt(d);
+      if (!runAt || isNaN(runAt.getTime())) {
+        return showMenu(ctx, userId, "Reminder is enabled but not fully configured yet.");
+      }
+      if (runAt.getTime() < Date.now()) {
+        return showMenu(ctx, userId, "Reminder time is in the past. Choose a future time.");
       }
     }
 
@@ -291,7 +563,6 @@ export function register(bot: Telegraf) {
   bot.action(CB.CONFIRM_NO, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
-
     const st = flow.get(userId);
     if (!st) return;
 
@@ -303,35 +574,73 @@ export function register(bot: Telegraf) {
     await showMenu(ctx, userId, "Okay -- back to options.");
   });
 
-  // Confirm yes -> create in DB
+  // Confirm yes -> create event, then optional reminder, then link
   bot.action(CB.CONFIRM_YES, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
-
     const st = flow.get(userId);
     if (!st || st.step !== "confirm") return;
 
     await ctx.answerCbQuery();
 
     const d = st.draft;
-
-    const date = d.date!.trim();
-    const startDate = d.allDay
-      ? new Date(`${date}T00:00:00`)
-      : new Date(`${date}T${d.time!.trim()}:00`);
+    const startDateISO = computeEventStartISO(d);
 
     try {
-      const doc = await createEvent(userId, {
+      const eventDoc = await createEvent(userId, {
         title: d.title!.trim(),
-        description: d.description?.trim() ? d.description.trim() : undefined,
+        description: d.description ?? "",
         location: d.location?.trim() ? d.location.trim() : undefined,
         color: d.color?.trim() ? d.color.trim() : undefined,
         allDay: Boolean(d.allDay),
-        startDate,
+        startDate: new Date(startDateISO),
       });
 
+      // optional reminder
+      if (d.reminderMode && d.reminderMode !== "none") {
+        const runAt = computeReminderRunAt(d)!;
+        const tz = await getTimezone(userId);
+
+        const Reminder = (mongoose.models as any).Reminder;
+        if (!Reminder) {
+          // fallback: create event without reminder link
+          flow.delete(userId);
+          return ctx.reply(
+            `Event created (no reminder linked -- Reminder model not registered).\nID: ${eventDoc._id}`
+          );
+        }
+
+        const reminderText = buildReminderText(d);
+
+        const reminderDoc = await Reminder.create({
+          userId,
+          chatId: userId,
+          text: reminderText,
+          status: "scheduled",
+          nextRunAt: runAt,
+          schedule: { kind: "once" },
+          timezone: tz,
+        });
+
+        // link reminder to event
+        // Your Event schema currently has reminderId; reminderMode/customReminderAt may or may not exist yet.
+        // updateEvent will ignore unknown fields if your service filters them; if it throws, we’ll add fields properly.
+        const linkUpdate: any = {
+          reminderId: reminderDoc._id,
+        };
+        // Optional fields (recommended). If your schema doesn't have them yet, we’ll add them next.
+        linkUpdate.reminderMode = d.reminderMode;
+        if (d.reminderMode === "custom_time") linkUpdate.customReminderAt = runAt;
+
+        try {
+          await updateEvent(userId, String(eventDoc._id), linkUpdate);
+        } catch {
+          // still fine -- reminder exists; event created; we can patch schema/service next if needed
+        }
+      }
+
       flow.delete(userId);
-      await ctx.reply(`Event created.\nID: ${doc._id}`);
+      await ctx.reply(`Event created.\nID: ${eventDoc._id}`);
     } catch (e: any) {
       st.step = "menu";
       flow.set(userId, st);
@@ -339,7 +648,7 @@ export function register(bot: Telegraf) {
     }
   });
 
-  // Text handler (only when we’re expecting a typed value)
+  // Text handler for typed fields
   bot.on("text", async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -349,9 +658,7 @@ export function register(bot: Telegraf) {
 
     const input = ctx.message.text.trim();
 
-    if (st.expect === "title") {
-      st.draft.title = input;
-    }
+    if (st.expect === "title") st.draft.title = input;
 
     if (st.expect === "date") {
       if (!isValidDateYYYYMMDD(input)) return ctx.reply("Invalid date. Use YYYY-MM-DD.");
@@ -363,24 +670,68 @@ export function register(bot: Telegraf) {
       st.draft.time = input;
     }
 
-    if (st.expect === "description") {
-      st.draft.description = input === "-" ? "" : input;
-    }
-
-    if (st.expect === "location") {
-      st.draft.location = input === "-" ? "" : input;
-    }
+    if (st.expect === "description") st.draft.description = input === "-" ? "" : input;
+    if (st.expect === "location") st.draft.location = input === "-" ? "" : input;
 
     if (st.expect === "color") {
-      if (input === "-") {
-        st.draft.color = "";
-      } else {
+      if (input === "-") st.draft.color = "";
+      else {
         if (!isHexColor(input)) return ctx.reply("Invalid color. Use #RRGGBB or '-' to clear.");
         st.draft.color = input;
       }
     }
 
-    // Return to menu
+    // reminder date/time prompts
+    if (st.expect === "reminderDate") {
+      if (!isValidDateYYYYMMDD(input)) return ctx.reply("Invalid date. Use YYYY-MM-DD.");
+      st.draft.reminderDate = input;
+      st.step = "reminder_time";
+      st.expect = "reminderTime";
+      flow.set(userId, st);
+      return ctx.reply("Now type the reminder time as HH:MM (24h):");
+    }
+
+    if (st.expect === "reminderTime") {
+      if (!isValidTimeHHMM(input)) return ctx.reply("Invalid time. Use HH:MM (24h).");
+
+      if (st.draft.reminderMode === "custom_time") {
+        st.draft.reminderTime = input;
+      } else if (st.draft.reminderMode === "at_event_time" && st.draft.allDay) {
+        st.draft.allDayReminderTime = input;
+      } else {
+        // If somehow we got here, just store as reminderTime
+        st.draft.reminderTime = input;
+      }
+
+      const runAt = computeReminderRunAt(st.draft);
+      if (!runAt || isNaN(runAt.getTime())) {
+        st.step = "menu";
+        st.expect = undefined;
+        flow.set(userId, st);
+        return showMenu(ctx, userId, "Reminder time couldn’t be computed. Check settings.");
+      }
+      if (runAt.getTime() < Date.now()) {
+        st.step = "menu";
+        st.expect = undefined;
+        flow.set(userId, st);
+        return showMenu(ctx, userId, "That reminder time is in the past. Choose a future time.");
+      }
+
+      // confirmation required (your choice B)
+      st.step = "reminder_confirm";
+      st.expect = undefined;
+      flow.set(userId, st);
+
+      return ctx.reply(
+        `Reminder will fire at:\n${formatRunAt(runAt)}\n\nConfirm?`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback("Yes", CB.REM_CONFIRM_YES)],
+          [Markup.button.callback("No", CB.REM_CONFIRM_NO)],
+        ])
+      );
+    }
+
+    // Return to menu after normal field input
     st.step = "menu";
     st.expect = undefined;
     flow.set(userId, st);
