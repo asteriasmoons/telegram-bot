@@ -5,6 +5,11 @@ import { registerRemindersListFlow } from "./flows/reminders";
 import { registerChatIdCommand } from "./commands/chatId";
 import { requireChannel } from "./commands/requireChannel";
 
+import { register as registerEventAdd } from "./commands/event-add";
+import { register as registerEventList } from "./commands/event-list";
+import { register as registerEventEdit } from "./commands/event-edit";
+import { register as registerEventDelete } from "./commands/event-delete";
+
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
 import { addMinutes } from "./utils/time";
@@ -123,6 +128,12 @@ export function createBot(token: string) {
   registerCreateRemindFlow(bot);
   registerRemindersListFlow(bot);
   registerChatIdCommand(bot);
+  
+  // Register EVENT commands
+  registerEventAdd(bot);
+  registerEventList(bot);
+  registerEventEdit(bot);
+  registerEventDelete(bot)
 
   bot.catch((err) => {
     console.error("Bot error:", err);
