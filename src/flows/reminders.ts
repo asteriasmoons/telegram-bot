@@ -256,11 +256,24 @@ if (data === "re:close") {
 if (data.startsWith("re:list:")) {
   const page = Number(data.split(":")[2] || "0");
 
-  const reminders = await Reminder.find({ userId, status: { $in: LIST_STATUSES as any } })
-    .sort({ nextRunAt: 1 })
-    .skip(page * PAGE_SIZE)
-    .limit(PAGE_SIZE)
-    .lean();
+const in24h = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+const reminders = await Reminder.find({
+  userId,
+  $or: [
+    { status: "scheduled" },
+    {
+      status: "sent",
+      schedule: { $exists: true, $ne: null },
+      "schedule.kind": { $in: ["daily", "weekly", "interval"] },
+      nextRunAt: { $lte: in24h }
+    }
+  ]
+})
+  .sort({ nextRunAt: 1 })
+  .skip(page * PAGE_SIZE)
+  .limit(PAGE_SIZE)
+  .lean();
 
   if (reminders.length === 0) {
     await ctx.reply("No reminders on that page.");
