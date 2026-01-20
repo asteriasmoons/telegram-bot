@@ -3,10 +3,9 @@ import mongoose from "mongoose";
 import { createEvent, updateEvent } from "../services/events.service";
 
 /**
- * NOTE:
- * This file uses mongoose.models.Reminder and mongoose.models.UserSettings if available,
- * so we don't have to guess your import paths.
- * If your Reminder model is registered under a different name, tell me the model name.
+ * Event Add (button-driven) + Optional linked Reminder
+ * - Fixes "time is in the past" bug by parsing user-entered date/time in the user's timezone.
+ * - Uses mongoose.models.Reminder and mongoose.models.UserSettings if available.
  */
 
 type Step =
@@ -45,7 +44,15 @@ type EventDraft = {
 type FlowState = {
   step: Step;
   draft: EventDraft;
-  expect?: "title" | "date" | "time" | "description" | "location" | "color" | "reminderDate" | "reminderTime";
+  expect?:
+    | "title"
+    | "date"
+    | "time"
+    | "description"
+    | "location"
+    | "color"
+    | "reminderDate"
+    | "reminderTime";
 };
 
 const flow = new Map<number, FlowState>();
@@ -72,14 +79,25 @@ function isHexColor(s: string) {
   return /^#([0-9a-fA-F]{6})$/.test(s);
 }
 
+async function getTimezone(userId: number): Promise<string> {
+  const UserSettings = (mongoose.models as any).UserSettings;
+  if (!UserSettings) return "America/Chicago";
+  const s = await UserSettings.findOne({ userId }).lean();
+  return s?.timezone || "America/Chicago";
+}
+
+/**
+ * Critical fix:
+ * Convert a wall-clock date+time in a specific IANA timezone into a real Date (UTC instant).
+ */
 function dateFromTimeZone(dateYYYYMMDD: string, timeHHMM: string, tz: string): Date {
   const [y, m, d] = dateYYYYMMDD.split("-").map(Number);
   const [hh, mm] = timeHHMM.split(":").map(Number);
 
-  // Start with a UTC "guess" using the same wall-clock components
+  // Start with a UTC guess using the same wall-clock components
   const utcGuess = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
 
-  // Figure out what local time that UTC guess would be in the target tz
+  // Interpret that guess in the target timezone (as a local time)
   const asTzLocal = new Date(utcGuess.toLocaleString("en-US", { timeZone: tz }));
 
   // Offset between guessed UTC and tz-local interpretation
@@ -87,13 +105,6 @@ function dateFromTimeZone(dateYYYYMMDD: string, timeHHMM: string, tz: string): D
 
   // Subtract offset to get the real UTC instant for that wall-clock time in tz
   return new Date(utcGuess.getTime() - offsetMs);
-}
-
-async function getTimezone(userId: number): Promise<string> {
-  const UserSettings = (mongoose.models as any).UserSettings;
-  if (!UserSettings) return "America/Chicago";
-  const s = await UserSettings.findOne({ userId }).lean();
-  return s?.timezone || "America/Chicago";
 }
 
 function buildReminderText(d: EventDraft) {
@@ -110,7 +121,7 @@ function buildReminderText(d: EventDraft) {
   const loc = d.location?.trim();
   const desc = d.description ?? "";
 
-  // FULL DESCRIPTION, as you requested -- keep line breaks exactly.
+  // FULL DESCRIPTION, exactly as typed.
   return [
     `Event Reminder`,
     `Title: ${title}`,
@@ -145,11 +156,11 @@ function computeReminderRunAt(d: EventDraft, tz: string): Date | null {
     return dateFromTimeZone(d.date!.trim(), d.allDayReminderTime.trim(), tz);
   }
 
+  // timed event: event start
   return dateFromTimeZone(d.date!.trim(), d.time!.trim(), tz);
 }
 
 function formatRunAt(dt: Date) {
-  // keep it simple; Telegram is fine with this
   return dt.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -259,7 +270,7 @@ function reminderMenuKeyboard() {
     [Markup.button.callback("None", CB.REM_NONE)],
     [Markup.button.callback("At event time", CB.REM_AT_EVENT)],
     [Markup.button.callback("Custom time", CB.REM_CUSTOM)],
-    [Markup.button.callback("Back", CB.REM_CONFIRM_NO)], // reuse to go back safely
+    [Markup.button.callback("Back", CB.REM_CONFIRM_NO)],
   ]);
 }
 
@@ -293,7 +304,6 @@ export function register(bot: Telegraf) {
 
     st.draft.allDay = !Boolean(st.draft.allDay);
 
-    // If they had reminder at_event_time and now it's all-day, we'll need a prompt later
     st.step = "menu";
     st.expect = undefined;
     flow.set(userId, st);
@@ -444,8 +454,9 @@ export function register(bot: Telegraf) {
       return ctx.reply("All-day event: what time should the reminder fire? (HH:MM 24h)");
     }
 
-    // For timed event: we can compute from event start, but confirm time.
-    const runAt = computeReminderRunAt(st.draft);
+    // For timed event: compute from event start, but confirm time.
+    const tz = await getTimezone(userId);
+    const runAt = computeReminderRunAt(st.draft, tz);
     if (!runAt || isNaN(runAt.getTime())) {
       st.step = "menu";
       st.expect = undefined;
@@ -487,7 +498,7 @@ export function register(bot: Telegraf) {
     return ctx.reply("Custom reminder: type the reminder date as YYYY-MM-DD:");
   });
 
-  // Reminder confirm NO -> back to menu (and keep choice so user can adjust)
+  // Reminder confirm NO -> back to menu (keep choice so user can adjust)
   bot.action(CB.REM_CONFIRM_NO, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -503,7 +514,7 @@ export function register(bot: Telegraf) {
     return showMenu(ctx, userId, "Okay -- adjust your settings.");
   });
 
-  // Reminder confirm YES -> store and return
+  // Reminder confirm YES -> validate and return
   bot.action(CB.REM_CONFIRM_YES, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -512,8 +523,8 @@ export function register(bot: Telegraf) {
 
     await ctx.answerCbQuery();
 
-    // validate computed time not in past
-    const runAt = computeReminderRunAt(st.draft);
+    const tz = await getTimezone(userId);
+    const runAt = computeReminderRunAt(st.draft, tz);
     if (!runAt || isNaN(runAt.getTime())) {
       st.step = "menu";
       flow.set(userId, st);
@@ -554,7 +565,8 @@ export function register(bot: Telegraf) {
 
     // validate reminder settings if chosen
     if (d.reminderMode && d.reminderMode !== "none") {
-      const runAt = computeReminderRunAt(d);
+      const tz = await getTimezone(userId);
+      const runAt = computeReminderRunAt(d, tz);
       if (!runAt || isNaN(runAt.getTime())) {
         return showMenu(ctx, userId, "Reminder is enabled but not fully configured yet.");
       }
@@ -600,9 +612,11 @@ export function register(bot: Telegraf) {
     await ctx.answerCbQuery();
 
     const d = st.draft;
-    const startDateISO = computeEventStartISO(d);
 
     try {
+      const tz = await getTimezone(userId);
+      const startDateISO = computeEventStartISO(d, tz);
+
       const eventDoc = await createEvent(userId, {
         title: d.title!.trim(),
         description: d.description ?? "",
@@ -614,44 +628,47 @@ export function register(bot: Telegraf) {
 
       // optional reminder
       if (d.reminderMode && d.reminderMode !== "none") {
-        const runAt = computeReminderRunAt(d)!;
-        const tz = await getTimezone(userId);
+        const runAt = computeReminderRunAt(d, tz);
+        if (runAt && !isNaN(runAt.getTime())) {
+          if (runAt.getTime() < Date.now()) {
+            // Shouldn't happen due to validation, but guard anyway
+            flow.delete(userId);
+            return ctx.reply(`Event created.\nID: ${eventDoc._id}\n(Reminder not linked: time was in the past.)`);
+          }
 
-        const Reminder = (mongoose.models as any).Reminder;
-        if (!Reminder) {
-          // fallback: create event without reminder link
-          flow.delete(userId);
-          return ctx.reply(
-            `Event created (no reminder linked -- Reminder model not registered).\nID: ${eventDoc._id}`
-          );
-        }
+          const Reminder = (mongoose.models as any).Reminder;
+          if (!Reminder) {
+            flow.delete(userId);
+            return ctx.reply(
+              `Event created (no reminder linked -- Reminder model not registered).\nID: ${eventDoc._id}`
+            );
+          }
 
-        const reminderText = buildReminderText(d);
+          const reminderText = buildReminderText(d);
 
-        const reminderDoc = await Reminder.create({
-          userId,
-          chatId: userId,
-          text: reminderText,
-          status: "scheduled",
-          nextRunAt: runAt,
-          schedule: { kind: "once" },
-          timezone: tz,
-        });
+          const reminderDoc = await Reminder.create({
+            userId,
+            chatId: userId,
+            text: reminderText,
+            status: "scheduled",
+            nextRunAt: runAt,
+            schedule: { kind: "once" },
+            timezone: tz,
+          });
 
-        // link reminder to event
-        // Your Event schema currently has reminderId; reminderMode/customReminderAt may or may not exist yet.
-        // updateEvent will ignore unknown fields if your service filters them; if it throws, we’ll add fields properly.
-        const linkUpdate: any = {
-          reminderId: reminderDoc._id,
-        };
-        // Optional fields (recommended). If your schema doesn't have them yet, we’ll add them next.
-        linkUpdate.reminderMode = d.reminderMode;
-        if (d.reminderMode === "custom_time") linkUpdate.customReminderAt = runAt;
+          // link reminder to event
+          const linkUpdate: any = {
+            reminderId: reminderDoc._id,
+          };
+          // Optional fields (recommended for edit behavior later):
+          linkUpdate.reminderMode = d.reminderMode;
+          if (d.reminderMode === "custom_time") linkUpdate.customReminderAt = runAt;
 
-        try {
-          await updateEvent(userId, String(eventDoc._id), linkUpdate);
-        } catch {
-          // still fine -- reminder exists; event created; we can patch schema/service next if needed
+          try {
+            await updateEvent(userId, String(eventDoc._id), linkUpdate);
+          } catch {
+            // If your schema/service doesn't accept these fields yet, we'll add them when we do event-edit reminder settings.
+          }
         }
       }
 
@@ -715,11 +732,12 @@ export function register(bot: Telegraf) {
       } else if (st.draft.reminderMode === "at_event_time" && st.draft.allDay) {
         st.draft.allDayReminderTime = input;
       } else {
-        // If somehow we got here, just store as reminderTime
         st.draft.reminderTime = input;
       }
 
-      const runAt = computeReminderRunAt(st.draft);
+      const tz = await getTimezone(userId);
+      const runAt = computeReminderRunAt(st.draft, tz);
+
       if (!runAt || isNaN(runAt.getTime())) {
         st.step = "menu";
         st.expect = undefined;
