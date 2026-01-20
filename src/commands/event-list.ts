@@ -3,19 +3,33 @@ import { listEvents } from "../services/events.service";
 import { clearState, setState } from "../state/conversationStore";
 
 /**
+ * Telegraf typing fix:
+ * CallbackQuery is a union; not all variants have "data" in TS.
+ */
+function getCbData(ctx: any): string | null {
+  const cq = ctx.callbackQuery;
+  if (!cq) return null;
+  if ("data" in cq && typeof (cq as any).data === "string") return (cq as any).data;
+  return null;
+}
+
+/**
  * Callback data strings (kept local so you don't have to edit another file right now)
  * callback_data must stay short (<64 bytes).
  */
-const CB_PICK_EVENT_PREFIX = "ev:pick:";          // + <eventId>
 const CB_EDIT_FROM_LIST_PREFIX = "ev:editfrom:";  // + <eventId>
 const CB_DELETE_FROM_LIST_PREFIX = "ev:delfrom:"; // + <eventId>
 
 function fmtWhen(e: any) {
   const d = new Date(e.startDate);
-  if (e.allDay) {
-    return `${d.toLocaleDateString()} (all day)`;
-  }
-  return d.toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" } as any);
+  if (e.allDay) return `${d.toLocaleDateString()} (all day)`;
+  return d.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  } as any);
 }
 
 function safeLine(s?: string) {
@@ -33,7 +47,7 @@ export function register(bot: Telegraf) {
     try {
       const now = new Date();
       const end = new Date(now);
-      end.setDate(end.getDate() + 30); // next 30 days (adjust if you want)
+      end.setDate(end.getDate() + 30); // next 30 days
 
       const events = await listEvents(userId, { startDate: now, endDate: end, limit: 50 });
 
@@ -55,7 +69,9 @@ export function register(bot: Telegraf) {
           `${title}`,
           loc ? `Location: ${loc}` : null,
           desc ? `Description: ${desc}` : null,
-        ].filter(Boolean).join("\n");
+        ]
+          .filter(Boolean)
+          .join("\n");
 
         await ctx.reply(
           lines,
@@ -74,14 +90,15 @@ export function register(bot: Telegraf) {
 
   /**
    * Edit button directly from list
-   * Sets edit flow state and prompts field selection (event-edit file handles the rest too,
-   * but we keep this handler here so list feels complete).
+   * Sets edit flow state and prompts field selection
    */
   bot.action(new RegExp(`^${CB_EDIT_FROM_LIST_PREFIX}[0-9a-fA-F]{24}$`), async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const data = ctx.callbackQuery.data;
+    const data = getCbData(ctx);
+    if (!data) return;
+
     const eventId = data.slice(CB_EDIT_FROM_LIST_PREFIX.length);
 
     // Hand off to edit flow
@@ -114,11 +131,12 @@ export function register(bot: Telegraf) {
   });
 
   /**
-   * Delete button from list (we're implementing delete in the NEXT message).
-   * For now: acknowledge and tell user it's next.
+   * Delete button from list
+   * (Delete flow is in event-delete.ts -- this just tells user to run /eventdelete if they want it.)
+   * If you prefer: we can wire this to start the delete flow directly.
    */
   bot.action(new RegExp(`^${CB_DELETE_FROM_LIST_PREFIX}[0-9a-fA-F]{24}$`), async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply("Delete is next -- we’ll wire that command/flow in the next step.");
+    await ctx.reply("To delete events, run /eventdelete (we wired the full delete flow there).");
   });
 }

@@ -3,6 +3,17 @@ import { getEvent, listEvents, updateEvent } from "../services/events.service";
 import { clearState, getState, setState } from "../state/conversationStore";
 
 /**
+ * Telegraf typing fix:
+ * CallbackQuery is a union; not all variants have "data" in TS.
+ */
+function getCbData(ctx: any): string | null {
+  const cq = ctx.callbackQuery;
+  if (!cq) return null;
+  if ("data" in cq && typeof (cq as any).data === "string") return (cq as any).data;
+  return null;
+}
+
+/**
  * Local callback strings (kept short)
  */
 const CB_PICK_EVENT_PREFIX = "ev:pick:";            // + <eventId>
@@ -33,7 +44,6 @@ function prettyFieldName(field: string) {
 }
 
 async function sendPickEventList(ctx: any, userId: number) {
-  // Next 30 days like list (you can change this window)
   const now = new Date();
   const end = new Date(now);
   end.setDate(end.getDate() + 30);
@@ -52,11 +62,13 @@ async function sendPickEventList(ctx: any, userId: number) {
     const b = events[i + 1];
 
     const row = [
-      Markup.button.callback(`${a.title.slice(0, 20) || "Untitled"}`, `${CB_PICK_EVENT_PREFIX}${a._id}`),
+      Markup.button.callback(`${(a.title || "Untitled").slice(0, 20)}`, `${CB_PICK_EVENT_PREFIX}${a._id}`),
     ];
 
     if (b) {
-      row.push(Markup.button.callback(`${b.title.slice(0, 20) || "Untitled"}`, `${CB_PICK_EVENT_PREFIX}${b._id}`));
+      row.push(
+        Markup.button.callback(`${(b.title || "Untitled").slice(0, 20)}`, `${CB_PICK_EVENT_PREFIX}${b._id}`)
+      );
     }
 
     rows.push(row);
@@ -118,7 +130,9 @@ export function register(bot: Telegraf) {
     const state = getState(userId);
     if (!state || state.kind !== "event_edit" || state.step !== "pick_event") return;
 
-    const data = ctx.callbackQuery.data;
+    const data = getCbData(ctx);
+    if (!data) return;
+
     const eventId = data.slice(CB_PICK_EVENT_PREFIX.length);
 
     state.draft.eventId = eventId;
@@ -139,7 +153,10 @@ export function register(bot: Telegraf) {
     const state = getState(userId);
     if (!state || state.kind !== "event_edit" || state.step !== "pick_field") return;
 
-    const field = ctx.callbackQuery.data.slice(CB_EDIT_FIELD_PREFIX.length) as any;
+    const data = getCbData(ctx);
+    if (!data) return;
+
+    const field = data.slice(CB_EDIT_FIELD_PREFIX.length) as any;
 
     state.draft.field = field;
     state.step = "enter_value";
@@ -157,19 +174,14 @@ export function register(bot: Telegraf) {
       );
     }
 
-    // Prompt user to type the value (still "prompting in chat" like you want)
-    if (field === "date") {
-      return ctx.reply("Enter the new date (YYYY-MM-DD):");
-    }
-    if (field === "time") {
-      return ctx.reply("Enter the new time (HH:MM, 24h):");
-    }
+    if (field === "date") return ctx.reply("Enter the new date (YYYY-MM-DD):");
+    if (field === "time") return ctx.reply("Enter the new time (HH:MM, 24h):");
 
     return ctx.reply(`Enter the new ${prettyFieldName(field)}:`);
   });
 
   /**
-   * AllDay yes/no buttons (value entry via buttons)
+   * AllDay yes/no buttons
    */
   bot.action([CB_EDIT_ALLDAY_YES, CB_EDIT_ALLDAY_NO], async (ctx) => {
     const userId = ctx.from?.id;
@@ -179,7 +191,10 @@ export function register(bot: Telegraf) {
     if (!state || state.kind !== "event_edit" || state.step !== "enter_value") return;
     if (state.draft.field !== "allDay") return;
 
-    const val = ctx.callbackQuery.data === CB_EDIT_ALLDAY_YES;
+    const data = getCbData(ctx);
+    if (!data) return;
+
+    const val = data === CB_EDIT_ALLDAY_YES;
 
     state.draft.value = val;
     state.step = "confirm";
@@ -212,13 +227,8 @@ export function register(bot: Telegraf) {
 
     const text = ctx.message.text.trim();
 
-    // Validate date/time formats when needed
-    if (field === "date") {
-      if (!isValidDateYYYYMMDD(text)) return ctx.reply("Please use YYYY-MM-DD.");
-    }
-    if (field === "time") {
-      if (!isValidTimeHHMM(text)) return ctx.reply("Please use HH:MM (24h).");
-    }
+    if (field === "date" && !isValidDateYYYYMMDD(text)) return ctx.reply("Please use YYYY-MM-DD.");
+    if (field === "time" && !isValidTimeHHMM(text)) return ctx.reply("Please use HH:MM (24h).");
 
     state.draft.value = text;
     state.step = "confirm";
@@ -264,7 +274,6 @@ export function register(bot: Telegraf) {
     await ctx.answerCbQuery();
 
     try {
-      // Build update payload
       const updates: any = {};
 
       if (field === "allDay") {
@@ -278,7 +287,6 @@ export function register(bot: Telegraf) {
       } else if (field === "color") {
         updates.color = String(value);
       } else if (field === "date" || field === "time") {
-        // Date/time edits must preserve the other half of startDate
         const existing = await getEvent(userId, eventId);
         const ex = new Date(existing.startDate);
 
@@ -305,7 +313,6 @@ export function register(bot: Telegraf) {
       await ctx.reply("Event updated.");
     } catch (err: any) {
       await ctx.reply(`Failed to update event: ${err?.message ?? "Unknown error"}`);
-      // keep state so they can retry save/cancel
     }
   });
 }
