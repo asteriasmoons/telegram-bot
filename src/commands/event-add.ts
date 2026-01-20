@@ -124,29 +124,28 @@ function buildReminderText(d: EventDraft) {
     .join("\n");
 }
 
-function computeEventStartISO(d: EventDraft) {
+function computeEventStartISO(d: EventDraft, tz: string) {
   const date = d.date!.trim();
-  if (d.allDay) return new Date(`${date}T00:00:00`).toISOString();
-  return new Date(`${date}T${d.time!.trim()}:00`).toISOString();
+  if (d.allDay) return dateFromTimeZone(date, "00:00", tz).toISOString();
+  return dateFromTimeZone(date, d.time!.trim(), tz).toISOString();
 }
 
-function computeReminderRunAt(d: EventDraft): Date | null {
+function computeReminderRunAt(d: EventDraft, tz: string): Date | null {
   const mode = d.reminderMode || "none";
   if (mode === "none") return null;
 
   if (mode === "custom_time") {
     if (!d.reminderDate || !d.reminderTime) return null;
-    return new Date(`${d.reminderDate.trim()}T${d.reminderTime.trim()}:00`);
+    return dateFromTimeZone(d.reminderDate.trim(), d.reminderTime.trim(), tz);
   }
 
   // at_event_time
   if (d.allDay) {
     if (!d.allDayReminderTime) return null;
-    return new Date(`${d.date!.trim()}T${d.allDayReminderTime.trim()}:00`);
+    return dateFromTimeZone(d.date!.trim(), d.allDayReminderTime.trim(), tz);
   }
 
-  // timed event: event start
-  return new Date(`${d.date!.trim()}T${d.time!.trim()}:00`);
+  return dateFromTimeZone(d.date!.trim(), d.time!.trim(), tz);
 }
 
 function formatRunAt(dt: Date) {
