@@ -2,6 +2,13 @@ import { Telegraf, Markup } from "telegraf";
 import { listEvents, deleteEvent } from "../services/events.service";
 import { clearState, getState, setState } from "../state/conversationStore";
 
+function getCbData(ctx: any): string | null {
+  const cq = ctx.callbackQuery;
+  if (!cq) return null;
+  if ("data" in cq && typeof (cq as any).data === "string") return (cq as any).data;
+  return null;
+}
+
 const CB_PICK_EVENT_PREFIX = "ev:del:pick:"; // + <eventId>
 const CB_CONFIRM_YES = "ev:del:yes";
 const CB_CONFIRM_NO = "ev:del:no";
@@ -73,7 +80,9 @@ export function register(bot: Telegraf) {
     const state = getState(userId);
     if (!state || state.kind !== "event_delete" || state.step !== "pick_event") return;
 
-    const data = ctx.callbackQuery.data;
+    const data = getCbData(ctx);
+    if (!data) return;
+
     const eventId = data.slice(CB_PICK_EVENT_PREFIX.length);
 
     state.draft.eventId = eventId;
@@ -117,7 +126,6 @@ export function register(bot: Telegraf) {
       await ctx.reply("Event deleted.");
     } catch (err: any) {
       await ctx.reply(`Failed to delete event: ${err?.message ?? "Unknown error"}`);
-      // keep state so they can cancel or try again
     }
   });
 }
