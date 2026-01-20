@@ -9,11 +9,36 @@ function getCbData(ctx: any): string | null {
   return null;
 }
 
-const CB_PICK_EVENT_PREFIX = "ev:del:pick:"; // + <eventId>
-const CB_CONFIRM_YES = "ev:del:yes";
-const CB_CONFIRM_NO = "ev:del:no";
+const CB = {
+  CANCEL: "ev:del:cancel",
+  PICK_PREFIX: "ev:del:pick:", // + <eventId>
+  CONFIRM_YES: "ev:del:yes",
+  CONFIRM_NO: "ev:del:no",
+  REFRESH: "ev:del:refresh",
+} as const;
 
-async function sendPickEventList(ctx: any, userId: number) {
+function pickKeyboard(events: any[]) {
+  const rows: any[] = [];
+
+  for (let i = 0; i < events.length; i += 2) {
+    const a = events[i];
+    const b = events[i + 1];
+
+    const row = [
+      Markup.button.callback(`${(a.title || "Untitled").slice(0, 20)}`, `${CB.PICK_PREFIX}${a._id}`),
+    ];
+    if (b) row.push(Markup.button.callback(`${(b.title || "Untitled").slice(0, 20)}`, `${CB.PICK_PREFIX}${b._id}`));
+
+    rows.push(row);
+  }
+
+  rows.push([Markup.button.callback("Refresh", CB.REFRESH)]);
+  rows.push([Markup.button.callback("Cancel", CB.CANCEL)]);
+
+  return Markup.inlineKeyboard(rows);
+}
+
+async function sendPickList(ctx: any, userId: number) {
   const now = new Date();
   const end = new Date(now);
   end.setDate(end.getDate() + 30);
@@ -25,33 +50,7 @@ async function sendPickEventList(ctx: any, userId: number) {
     return;
   }
 
-  const rows: any[] = [];
-  for (let i = 0; i < events.length; i += 2) {
-    const a = events[i];
-    const b = events[i + 1];
-
-    const row = [
-      Markup.button.callback(
-        `${(a.title || "Untitled").slice(0, 20)}`,
-        `${CB_PICK_EVENT_PREFIX}${a._id}`
-      ),
-    ];
-
-    if (b) {
-      row.push(
-        Markup.button.callback(
-          `${(b.title || "Untitled").slice(0, 20)}`,
-          `${CB_PICK_EVENT_PREFIX}${b._id}`
-        )
-      );
-    }
-
-    rows.push(row);
-  }
-
-  rows.push([Markup.button.callback("Cancel", CB_CONFIRM_NO)]);
-
-  await ctx.reply("Which event do you want to delete?", Markup.inlineKeyboard(rows));
+  await ctx.reply("Pick an event to delete:", pickKeyboard(events));
 }
 
 export function register(bot: Telegraf) {
@@ -59,47 +58,34 @@ export function register(bot: Telegraf) {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    setState(userId, {
-      kind: "event_delete",
-      step: "pick_event",
-      draft: {},
-    });
+    setState(userId, { kind: "event_delete", step: "pick", draft: {} });
 
     try {
-      await sendPickEventList(ctx, userId);
-    } catch (err: any) {
-      await ctx.reply(`Failed to load events: ${err?.message ?? "Unknown error"}`);
+      await sendPickList(ctx, userId);
+    } catch (e: any) {
       clearState(userId);
+      await ctx.reply(`Failed to load events: ${e?.message ?? "Unknown error"}`);
     }
   });
 
-  bot.action(new RegExp(`^${CB_PICK_EVENT_PREFIX}[0-9a-fA-F]{24}$`), async (ctx) => {
+  bot.action(CB.REFRESH, async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const state = getState(userId);
-    if (!state || state.kind !== "event_delete" || state.step !== "pick_event") return;
-
-    const data = getCbData(ctx);
-    if (!data) return;
-
-    const eventId = data.slice(CB_PICK_EVENT_PREFIX.length);
-
-    state.draft.eventId = eventId;
-    state.step = "confirm";
-    setState(userId, state);
+    const state: any = getState(userId);
+    if (!state || state.kind !== "event_delete") return;
 
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `Delete this event?\nID: ${eventId}`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback("Yes, delete", CB_CONFIRM_YES)],
-        [Markup.button.callback("No, cancel", CB_CONFIRM_NO)],
-      ])
-    );
+
+    try {
+      await sendPickList(ctx, userId);
+    } catch (e: any) {
+      clearState(userId);
+      await ctx.reply(`Failed to load events: ${e?.message ?? "Unknown error"}`);
+    }
   });
 
-  bot.action(CB_CONFIRM_NO, async (ctx) => {
+  bot.action(CB.CANCEL, async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
@@ -108,14 +94,51 @@ export function register(bot: Telegraf) {
     await ctx.reply("Canceled.");
   });
 
-  bot.action(CB_CONFIRM_YES, async (ctx) => {
+  bot.action(new RegExp(`^${CB.PICK_PREFIX}[0-9a-fA-F]{24}$`), async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const state = getState(userId);
-    if (!state || state.kind !== "event_delete" || state.step !== "confirm") return;
+    const state: any = getState(userId);
+    if (!state || state.kind !== "event_delete") return;
 
-    const eventId = state.draft.eventId;
+    const data = getCbData(ctx);
+    if (!data) return;
+
+    const eventId = data.slice(CB.PICK_PREFIX.length);
+
+    await ctx.answerCbQuery();
+
+    setState(userId, { kind: "event_delete", step: "confirm", draft: { eventId } });
+
+    await ctx.reply(
+      `Delete this event?\nID: ${eventId}`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback("Yes, delete", CB.CONFIRM_YES)],
+        [Markup.button.callback("No, cancel", CB.CONFIRM_NO)],
+      ])
+    );
+  });
+
+  bot.action(CB.CONFIRM_NO, async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const st: any = getState(userId);
+    if (!st || st.kind !== "event_delete" || st.step !== "confirm") return;
+
+    clearState(userId);
+    await ctx.answerCbQuery();
+    await ctx.reply("Canceled.");
+  });
+
+  bot.action(CB.CONFIRM_YES, async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const st: any = getState(userId);
+    if (!st || st.kind !== "event_delete" || st.step !== "confirm") return;
+
+    const eventId = st.draft?.eventId;
     if (!eventId) return;
 
     await ctx.answerCbQuery();
@@ -124,8 +147,8 @@ export function register(bot: Telegraf) {
       await deleteEvent(userId, eventId);
       clearState(userId);
       await ctx.reply("Event deleted.");
-    } catch (err: any) {
-      await ctx.reply(`Failed to delete event: ${err?.message ?? "Unknown error"}`);
+    } catch (e: any) {
+      await ctx.reply(`Failed to delete: ${e?.message ?? "Unknown error"}`);
     }
   });
 }
