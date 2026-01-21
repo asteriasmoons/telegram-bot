@@ -5,6 +5,7 @@ import { Router } from "express";
 import { Reminder } from "../models/Reminder";
 import { UserSettings } from "../models/UserSettings";
 import crypto from "crypto";
+import { DateTime } from "luxon";
 
 const router = Router();
 
@@ -212,20 +213,101 @@ router.post("/reminders/:id/snooze", async (req, res) => {
   }
 });
 
+function computeNextRunFromSchedule(
+  schedule: any,
+  tz: string,
+  fromDate: Date
+): Date | null {
+  if (!schedule || schedule.kind === "once") return null;
+
+  const from = DateTime.fromJSDate(fromDate, { zone: tz });
+
+  if (schedule.kind === "interval") {
+    const mins = Number(schedule.intervalMinutes);
+    if (!Number.isFinite(mins) || mins <= 0) return null;
+    return from.plus({ minutes: mins }).toJSDate();
+  }
+
+  const timeOfDay = String(schedule.timeOfDay || "");
+  const [hRaw, mRaw] = timeOfDay.split(":");
+  const hour = Number(hRaw);
+  const minute = Number(mRaw);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+
+  if (schedule.kind === "daily") {
+    let candidate = from.set({ hour, minute, second: 0, millisecond: 0 });
+    if (candidate <= from) candidate = candidate.plus({ days: 1 });
+    return candidate.toJSDate();
+  }
+
+  if (schedule.kind === "weekly") {
+    const days: number[] = Array.isArray(schedule.daysOfWeek) ? schedule.daysOfWeek : [];
+    if (days.length === 0) return null;
+
+    // Your format: 0=Sun..6=Sat
+    // Luxon: 1=Mon..7=Sun
+    const luxonDays = days
+      .map(Number)
+      .filter(Number.isFinite)
+      .map((d) => (d === 0 ? 7 : d)); // Sun(0)->7, Mon(1)->1, ... Sat(6)->6
+
+    for (let add = 0; add <= 7; add++) {
+      const d = from.plus({ days: add });
+      if (!luxonDays.includes(d.weekday)) continue;
+
+      const candidate = d.set({ hour, minute, second: 0, millisecond: 0 });
+      if (candidate > from) return candidate.toJSDate();
+    }
+
+    // fallback: 1 week later same time
+    return from.plus({ days: 7 }).set({ hour, minute, second: 0, millisecond: 0 }).toJSDate();
+  }
+
+  return null;
+}
+
 // POST /api/miniapp/reminders/:id/done - Mark as done
+// POST /api/miniapp/reminders/:id/done - Mark as done (and reschedule recurring)
 router.post("/reminders/:id/done", async (req, res) => {
   try {
-    const reminder = await Reminder.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
-      { $set: { status: "sent", lastRunAt: new Date() } },
-      { new: true }
-    ).lean();
-    
-    if (!reminder) {
+    const now = new Date();
+
+    const rem = await Reminder.findOne({
+      _id: req.params.id,
+      userId: req.userId
+    }).lean();
+
+    if (!rem) {
       return res.status(404).json({ error: "Reminder not found" });
     }
-    
-    res.json({ reminder });
+
+    const tz = rem.timezone || "America/Chicago";
+    const kind = rem.schedule?.kind || "once";
+
+    // One-time reminders: mark sent and stop
+    if (kind === "once") {
+      const updated = await Reminder.findOneAndUpdate(
+        { _id: req.params.id, userId: req.userId },
+        { $set: { status: "sent", lastRunAt: now } },
+        { new: true }
+      ).lean();
+
+      return res.json({ reminder: updated });
+    }
+
+    // Recurring reminders: advance nextRunAt and keep scheduled
+    const next = computeNextRunFromSchedule(rem.schedule, tz, now);
+    if (!next) {
+      return res.status(500).json({ error: "Could not compute next run time" });
+    }
+
+    const updated = await Reminder.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { $set: { status: "scheduled", lastRunAt: now, nextRunAt: next } },
+      { new: true }
+    ).lean();
+
+    res.json({ reminder: updated });
   } catch (error) {
     console.error("Error marking reminder as done:", error);
     res.status(500).json({ error: "Failed to mark as done" });
