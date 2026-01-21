@@ -1,10 +1,32 @@
 import { Telegraf, Markup } from "telegraf";
-import { listEvents } from "../services/events.service";
+import mongoose from "mongoose";
+import { DateTime } from "luxon";
 
-function requireUser(ctx: any): number | null {
-  const userId = ctx.from?.id;
-  return typeof userId === "number" ? userId : null;
-}
+/**
+ * /eventlist
+ * Lists ALL events (no date filtering)
+ * - Paginated
+ * - Each event button routes into event-edit (uses ev:edit:pick:<id>)
+ * - Uses Luxon + user timezone for display
+ */
+
+const PAGE_SIZE = 7;
+
+// Must match the prefix in event-edit.ts so clicking an event jumps into edit flow
+const EDIT_PICK_PREFIX = "ev:edit:pick:";
+
+const CB = {
+  PAGE_PREV: "ev:list:page:prev",
+  PAGE_NEXT: "ev:list:page:next",
+  REFRESH: "ev:list:refresh",
+  CLOSE: "ev:list:close",
+} as const;
+
+type ListState = {
+  page: number;
+};
+
+const state = new Map<number, ListState>();
 
 function getCbData(ctx: any): string | null {
   const cq = ctx.callbackQuery;
@@ -13,132 +35,150 @@ function getCbData(ctx: any): string | null {
   return null;
 }
 
-const CB = {
-  RANGE_7: "ev:list:range:7",
-  RANGE_30: "ev:list:range:30",
-  RANGE_90: "ev:list:range:90",
-  REFRESH_30: "ev:list:refresh:30",
-  CLOSE: "ev:list:close",
-} as const;
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+function requireUser(ctx: any): number | null {
+  const userId = ctx.from?.id;
+  return typeof userId === "number" ? userId : null;
 }
 
-function fmtTime(d: Date) {
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+async function getTimezone(userId: number): Promise<string> {
+  const UserSettings = (mongoose.models as any).UserSettings;
+  if (!UserSettings) return "America/Chicago";
+  const s = await UserSettings.findOne({ userId }).lean();
+  return s?.timezone || "America/Chicago";
 }
 
-function fmtWhen(ev: any) {
-  const start = new Date(ev.startDate);
-  if (ev.allDay) return `${fmtDate(start)} (all day)`;
-  return `${fmtDate(start)} at ${fmtTime(start)}`;
+async function fetchEvents(userId: number, skip: number, limit: number) {
+  const EventModel = (mongoose.models as any).Event;
+  if (!EventModel) throw new Error("Event model not registered");
+
+  // pull one extra to detect next page
+  const docs = await EventModel.find({ userId })
+    .sort({ startDate: 1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  return docs as any[];
 }
 
-function chunk<T>(arr: T[], size: number) {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
+function formatLine(ev: any, tz: string): string {
+  const start = DateTime.fromJSDate(new Date(ev.startDate), { zone: tz });
+
+  const when = ev.allDay
+    ? start.toFormat("MMM d, yyyy") + " (all day)"
+    : start.toFormat("MMM d, yyyy h:mm a");
+
+  const title = (ev.title || "Untitled").toString();
+  const loc = ev.location ? ` -- ${String(ev.location)}` : "";
+  return `${when} -- ${title}${loc}`;
 }
 
-function headerKeyboard(selectedDays: number) {
-  const label = (days: number) => (selectedDays === days ? `Next ${days} days ✓` : `Next ${days} days`);
-  return Markup.inlineKeyboard([
-    [Markup.button.callback(label(7), CB.RANGE_7), Markup.button.callback(label(30), CB.RANGE_30)],
-    [Markup.button.callback(label(90), CB.RANGE_90), Markup.button.callback("Refresh", CB.REFRESH_30)],
-    [Markup.button.callback("Close", CB.CLOSE)],
+function buttonLabel(ev: any, tz: string): string {
+  const start = DateTime.fromJSDate(new Date(ev.startDate), { zone: tz });
+
+  const when = ev.allDay
+    ? start.toFormat("MMM d") + " • All day"
+    : start.toFormat("MMM d") + " • " + start.toFormat("h:mm a");
+
+  const title = (ev.title || "Untitled").toString();
+  const clipped = title.length > 24 ? title.slice(0, 24) + "…" : title;
+
+  return `${when} -- ${clipped}`;
+}
+
+async function renderList(ctx: any, userId: number) {
+  const tz = await getTimezone(userId);
+
+  const st = state.get(userId) || { page: 0 };
+  const page = Math.max(0, st.page || 0);
+
+  const skip = page * PAGE_SIZE;
+  const docs = await fetchEvents(userId, skip, PAGE_SIZE + 1);
+
+  const hasNext = docs.length > PAGE_SIZE;
+  const events = docs.slice(0, PAGE_SIZE);
+
+  if (events.length === 0) {
+    state.set(userId, { page: 0 });
+    return ctx.reply(
+      "You have no events yet.\n\nTip: create one in the mini app, then come back here to edit it with buttons.",
+      Markup.inlineKeyboard([[Markup.button.callback("Close", CB.CLOSE)]])
+    );
+  }
+
+  const lines = events.map((ev) => `• ${formatLine(ev, tz)}`).join("\n");
+
+  const rows: any[] = events.map((ev) => [
+    // Clicking this will be handled by event-edit.ts because it matches its pick regex
+    Markup.button.callback(buttonLabel(ev, tz), `${EDIT_PICK_PREFIX}${String(ev._id)}`),
   ]);
-}
 
-async function sendList(ctx: any, userId: number, days: number) {
-  const now = new Date();
-  const end = new Date(now);
-  end.setDate(end.getDate() + days);
+  const navRow: any[] = [];
+  if (page > 0) navRow.push(Markup.button.callback("‹ Prev", CB.PAGE_PREV));
+  if (hasNext) navRow.push(Markup.button.callback("Next ›", CB.PAGE_NEXT));
+  if (navRow.length) rows.push(navRow);
 
-  const events = await listEvents(userId, { startDate: now, endDate: end, limit: 50 });
+  rows.push([
+    Markup.button.callback("Refresh", CB.REFRESH),
+    Markup.button.callback("Close", CB.CLOSE),
+  ]);
 
-  await ctx.reply(`Events (next ${days} days): ${events.length}`, headerKeyboard(days));
+  state.set(userId, { page });
 
-  if (!events.length) {
-    await ctx.reply("No events found in that range.");
-    return;
-  }
-
-  // Send in small chunks so Telegram doesn’t choke, and your chat doesn’t become unreadable
-  const groups = chunk(events, 5);
-
-  for (const group of groups) {
-    const lines: string[] = [];
-    for (const ev of group) {
-      lines.push(
-        [
-          `• ${ev.title || "Untitled"}`,
-          `  When: ${fmtWhen(ev)}`,
-          ev.location ? `  Where: ${ev.location}` : null,
-          `  ID: ${ev._id}`,
-        ].filter(Boolean).join("\n")
-      );
-    }
-
-    await ctx.reply(lines.join("\n\n"));
-  }
-
-  await ctx.reply(
-    "Want to change something?",
-    Markup.inlineKeyboard([
-      [Markup.button.callback("Edit (use /eventedit)", "noop:edit")],
-      [Markup.button.callback("Delete (use /eventdelete)", "noop:delete")],
-    ])
-  );
+  return ctx.reply(`Events (page ${page + 1}):\n\n${lines}`, Markup.inlineKeyboard(rows));
 }
 
 export function register(bot: Telegraf) {
-  // /eventlist
   bot.command("eventlist", async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
 
-    try {
-      await sendList(ctx, userId, 30);
-    } catch (e: any) {
-      await ctx.reply(`Failed to list events: ${e?.message ?? "Unknown error"}`);
-    }
+    state.set(userId, { page: 0 });
+    await renderList(ctx, userId);
   });
 
-  // Range/refresh buttons
-  bot.action([CB.RANGE_7, CB.RANGE_30, CB.RANGE_90, CB.REFRESH_30], async (ctx) => {
+  bot.action(CB.PAGE_PREV, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
 
-    const data = getCbData(ctx);
-    if (!data) return;
+    await ctx.answerCbQuery();
+
+    const st = state.get(userId) || { page: 0 };
+    st.page = Math.max(0, (st.page || 0) - 1);
+    state.set(userId, st);
+
+    await renderList(ctx, userId);
+  });
+
+  bot.action(CB.PAGE_NEXT, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
 
     await ctx.answerCbQuery();
 
-    let days = 30;
-    if (data === CB.RANGE_7) days = 7;
-    if (data === CB.RANGE_30) days = 30;
-    if (data === CB.RANGE_90) days = 90;
-    if (data === CB.REFRESH_30) days = 30;
+    const st = state.get(userId) || { page: 0 };
+    st.page = (st.page || 0) + 1;
+    state.set(userId, st);
 
-    try {
-      await sendList(ctx, userId, days);
-    } catch (e: any) {
-      await ctx.reply(`Failed to list events: ${e?.message ?? "Unknown error"}`);
-    }
+    await renderList(ctx, userId);
+  });
+
+  bot.action(CB.REFRESH, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+
+    await ctx.answerCbQuery();
+
+    // keep current page, just reload
+    await renderList(ctx, userId);
   });
 
   bot.action(CB.CLOSE, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+
+    state.delete(userId);
     await ctx.answerCbQuery();
     await ctx.reply("Closed.");
-  });
-
-  // These are just informational buttons so users understand the flow
-  bot.action(["noop:edit", "noop:delete"], async (ctx) => {
-    const data = getCbData(ctx);
-    await ctx.answerCbQuery();
-
-    if (data === "noop:edit") return ctx.reply("Run /eventedit to edit with buttons.");
-    if (data === "noop:delete") return ctx.reply("Run /eventdelete to delete with buttons.");
   });
 }
