@@ -673,14 +673,15 @@ export function register(bot: Telegraf) {
     }
   });
 
-  bot.on("text", async (ctx) => {
-    const userId = requireUser(ctx);
-    if (!userId) return;
+bot.on("text", async (ctx, next) => {
+  const txt = ctx.message?.text ?? "";
+  if (txt.startsWith("/")) return next();
 
-    const st = flow.get(userId);
-    if (!st || !st.expect) return;
+  const userId = requireUser(ctx);
+  if (!userId) return;
 
-    const input = ctx.message.text.trim();
+  const st = flow.get(userId);
+  if (!st || !st.expect) return next();
 
     if (st.expect === "title") st.draft.title = input;
 
