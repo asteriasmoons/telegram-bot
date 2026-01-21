@@ -706,6 +706,17 @@ body {
   gap: 8px;
 }
 
+.event-reminder-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--warning);
+  margin-left: 8px;
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
 /* Utility */
 .is-hidden {
   display: none !important;
@@ -1468,7 +1479,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
                                       </div>
                                     )}
                                     <div className="calendar-event-title">
-                                      {event.title}
+                                      {event.title}                                 {event.reminderId && <span className="event-reminder-dot" />}
                                     </div>
                                     {!event.allDay && (
                                       <div className="calendar-event-time">
