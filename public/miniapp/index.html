@@ -952,156 +952,343 @@ body {
     }
 
     // Event Modal
-    function EventModal({ event, selectedDate, onClose, onSave }) {
-      const [title, setTitle] = useState(event?.title || '');
-      const [description, setDescription] = useState(event?.description || '');
-      const [date, setDate] = useState('');
-      const [time, setTime] = useState('');
-      const [endTime, setEndTime] = useState('');
-      const [allDay, setAllDay] = useState(event?.allDay || false);
-      const [location, setLocation] = useState(event?.location || '');
+function EventModal({ event, selectedDate, onClose, onSave }) {
+  const [title, setTitle] = useState(event?.title || '');
+  const [description, setDescription] = useState(event?.description || '');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [allDay, setAllDay] = useState(event?.allDay || false);
+  const [location, setLocation] = useState(event?.location || '');
 
-      useEffect(() => {
-        if (event) {
-          const d = new Date(event.startDate);
-          setDate(d.toISOString().split('T')[0]);
-          setTime(d.toTimeString().slice(0, 5));
-          if (event.endDate) {
-            const e = new Date(event.endDate);
-            setEndTime(e.toTimeString().slice(0, 5));
-          }
-        } else if (selectedDate) {
-          setDate(selectedDate.toISOString().split('T')[0]);
-          setTime('09:00');
-          setEndTime('10:00');
-        } else {
-          const now = new Date();
-          setDate(now.toISOString().split('T')[0]);
-          setTime('09:00');
-          setEndTime('10:00');
-        }
-      }, [event, selectedDate]);
+  // Reminder UI state (default OFF)
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderMode, setReminderMode] = useState('at_event'); // 'at_event' | 'offset' | 'custom'
+  const [offsetMinutes, setOffsetMinutes] = useState(10);
+  const [customReminderDate, setCustomReminderDate] = useState('');
+  const [customReminderTime, setCustomReminderTime] = useState('');
 
-      const handleSave = async () => {
-        if (!title.trim()) {
-          tg.showAlert('Please enter a title');
+  useEffect(() => {
+    // Base event fields
+    if (event) {
+      const d = new Date(event.startDate);
+      setDate(d.toISOString().split('T')[0]);
+      setTime(d.toTimeString().slice(0, 5));
+      setAllDay(!!event.allDay);
+      setLocation(event.location || '');
+      setDescription(event.description || '');
+      setTitle(event.title || '');
+
+      if (event.endDate) {
+        const e = new Date(event.endDate);
+        setEndTime(e.toTimeString().slice(0, 5));
+      } else {
+        setEndTime('');
+      }
+    } else if (selectedDate) {
+      setDate(selectedDate.toISOString().split('T')[0]);
+      setTime('09:00');
+      setEndTime('10:00');
+      setAllDay(false);
+      setLocation('');
+      setDescription('');
+      setTitle('');
+    } else {
+      const now = new Date();
+      setDate(now.toISOString().split('T')[0]);
+      setTime('09:00');
+      setEndTime('10:00');
+      setAllDay(false);
+      setLocation('');
+      setDescription('');
+      setTitle('');
+    }
+
+    // Reminder defaults
+    setReminderEnabled(false);
+    setReminderMode('at_event');
+    setOffsetMinutes(10);
+
+    const now = new Date();
+    setCustomReminderDate(now.toISOString().split('T')[0]);
+    setCustomReminderTime('09:00');
+
+    // If editing and backend returned a linked reminder, initialize UI from it
+    // (calendar-api.ts should be returning event.reminder or null)
+    if (event && event.reminder && event.reminder.nextRunAt) {
+      const rNext = new Date(event.reminder.nextRunAt);
+      const eStart = new Date(event.startDate);
+
+      setReminderEnabled(true);
+
+      const diffMs = eStart.getTime() - rNext.getTime();
+      const diffMinutes = Math.round(diffMs / 60000);
+
+      // Same time (or within 1 minute) => at_event
+      if (Math.abs(diffMinutes) <= 1) {
+        setReminderMode('at_event');
+      }
+      // Reminder before start => offset
+      else if (diffMinutes > 0) {
+        setReminderMode('offset');
+        setOffsetMinutes(Math.max(1, diffMinutes));
+      }
+      // Reminder after start or weird case => custom
+      else {
+        setReminderMode('custom');
+        setCustomReminderDate(rNext.toISOString().split('T')[0]);
+        setCustomReminderTime(rNext.toTimeString().slice(0, 5));
+      }
+    }
+  }, [event, selectedDate]);
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      tg.showAlert('Please enter a title');
+      return;
+    }
+
+    // Event dates
+    const startDate = allDay
+      ? new Date(`${date}T00:00:00`)
+      : new Date(`${date}T${time}`);
+
+    const endDate =
+      endTime && !allDay
+        ? new Date(`${date}T${endTime}`)
+        : null;
+
+    // Reminder payload for backend
+    let reminderPayload = { enabled: false };
+
+    if (reminderEnabled) {
+      // If all-day, force custom reminder time (otherwise it would be 00:00)
+      if (allDay && reminderMode !== 'custom') {
+        tg.showAlert('For all-day events, please use Custom reminder time.');
+        return;
+      }
+
+      if (reminderMode === 'at_event') {
+        reminderPayload = { enabled: true, mode: 'at_event' };
+      } else if (reminderMode === 'offset') {
+        reminderPayload = { enabled: true, mode: 'offset', offsetMinutes };
+      } else {
+        // custom
+        if (!customReminderDate || !customReminderTime) {
+          tg.showAlert('Please choose a custom reminder date and time.');
           return;
         }
+        const customDT = new Date(`${customReminderDate}T${customReminderTime}`);
+        reminderPayload = {
+          enabled: true,
+          mode: 'custom',
+          customDateTime: customDT.toISOString(),
+        };
+      }
+    }
 
-        const startDate = allDay
-          ? new Date(`${date}T00:00:00`)
-          : new Date(`${date}T${time}`);
+    await onSave({
+      title,
+      description,
+      startDate: startDate.toISOString(),
+      endDate: endDate ? endDate.toISOString() : undefined,
+      allDay,
+      location,
+      reminder: reminderPayload,
+    });
+  };
 
-        const endDate = endTime && !allDay
-          ? new Date(`${date}T${endTime}`)
-          : null;
+  const ReminderModeButton = ({ value, label }) => {
+    const active = reminderMode === value;
+    const className = `btn ${active ? 'btn-primary' : 'btn-secondary'}`;
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={() => setReminderMode(value)}
+      >
+        {label}
+      </button>
+    );
+  };
 
-        await onSave({
-          title,
-          description,
-          startDate: startDate.toISOString(),
-          endDate: endDate ? endDate.toISOString() : undefined,
-          allDay,
-          location,
-        });
-      };
+  const OffsetButton = ({ minutes }) => {
+    const active = offsetMinutes === minutes;
+    const className = `btn ${active ? 'btn-primary' : 'btn-secondary'}`;
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={() => setOffsetMinutes(minutes)}
+      >
+        {minutes}m
+      </button>
+    );
+  };
 
-      return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{event ? 'Edit Event' : 'New Event'}</h2>
-              <button className="modal-close" onClick={onClose}>×</button>
-            </div>
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{event ? 'Edit Event' : 'New Event'}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
 
+        <div className="form-group">
+          <label className="form-label">Title</label>
+          <input
+            type="text"
+            className="form-input"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Event title"
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Description</label>
+          <textarea
+            className="form-textarea form-textarea--sm"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Add details..."
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Date</label>
+          <input
+            type="date"
+            className="form-input"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={allDay}
+              onChange={e => setAllDay(e.target.checked)}
+            />
+            <span>All day event</span>
+          </label>
+        </div>
+
+        {!allDay && (
+          <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Title</label>
+              <label className="form-label">Start Time</label>
               <input
-                type="text"
+                type="time"
                 className="form-input"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="Event title"
+                value={time}
+                onChange={e => setTime(e.target.value)}
               />
             </div>
-
             <div className="form-group">
-              <label className="form-label">Description</label>
-              <textarea
-                className="form-textarea form-textarea--sm"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Add details..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Date</label>
+              <label className="form-label">End Time</label>
               <input
-                type="date"
+                type="time"
                 className="form-input"
-                value={date}
-                onChange={e => setDate(e.target.value)}
+                value={endTime}
+                onChange={e => setEndTime(e.target.value)}
               />
-            </div>
-
-            <div className="form-group">
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={allDay}
-                  onChange={e => setAllDay(e.target.checked)}
-                />
-                <span>All day event</span>
-              </label>
-            </div>
-
-            {!allDay && (
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Start Time</label>
-                  <input
-                    type="time"
-                    className="form-input"
-                    value={time}
-                    onChange={e => setTime(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">End Time</label>
-                  <input
-                    type="time"
-                    className="form-input"
-                    value={endTime}
-                    onChange={e => setEndTime(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="form-group">
-              <label className="form-label">Location</label>
-              <input
-                type="text"
-                className="form-input"
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-                placeholder="Add location"
-              />
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={onClose}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" onClick={handleSave}>
-                {event ? 'Update' : 'Create'}
-              </button>
             </div>
           </div>
+        )}
+
+        <div className="form-group">
+          <label className="form-label">Location</label>
+          <input
+            type="text"
+            className="form-input"
+            value={location}
+            onChange={e => setLocation(e.target.value)}
+            placeholder="Add location"
+          />
         </div>
-      );
-    }
+
+        {/* Reminder section */}
+        <div className="form-group">
+          <label className="form-label">Reminder</label>
+
+          <label className="checkbox-row" style={{ marginBottom: 12 }}>
+            <input
+              type="checkbox"
+              checked={reminderEnabled}
+              onChange={e => setReminderEnabled(e.target.checked)}
+            />
+            <span>Enable reminder</span>
+          </label>
+
+          {reminderEnabled && (
+            <div>
+              {/* Mode buttons */}
+              <div className="card-actions" style={{ marginBottom: 12 }}>
+                <ReminderModeButton value="at_event" label="At event time" />
+                <ReminderModeButton value="offset" label="Before event" />
+                <ReminderModeButton value="custom" label="Custom time" />
+              </div>
+
+              {/* Offset presets */}
+              {reminderMode === 'offset' && (
+                <div className="card-actions" style={{ marginBottom: 12 }}>
+                  <OffsetButton minutes={5} />
+                  <OffsetButton minutes={10} />
+                  <OffsetButton minutes={15} />
+                  <OffsetButton minutes={30} />
+                  <OffsetButton minutes={60} />
+                </div>
+              )}
+
+              {/* Custom date/time */}
+              {reminderMode === 'custom' && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Reminder Date</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={customReminderDate}
+                      onChange={e => setCustomReminderDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Reminder Time</label>
+                    <input
+                      type="time"
+                      className="form-input"
+                      value={customReminderTime}
+                      onChange={e => setCustomReminderTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* All-day hint */}
+              {allDay && reminderMode !== 'custom' && (
+                <div style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.4 }}>
+                  For all-day events, use Custom reminder time.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            {event ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
     // Calendar View - Day List Style
     function CalendarView() {
