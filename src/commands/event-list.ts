@@ -1,6 +1,7 @@
 import { Telegraf, Markup } from "telegraf";
 import mongoose from "mongoose";
 import { DateTime } from "luxon";
+import { Event } from "../models/Event"; // adjust path/case to match your file
 
 /**
  * /eventlist
@@ -48,7 +49,7 @@ async function getTimezone(userId: number): Promise<string> {
 }
 
 async function fetchEvents(userId: number, skip: number, limit: number) {
-  const EventModel = (mongoose.models as any).Event;
+const EventModel = Event;
   if (!EventModel) throw new Error("Event model not registered");
 
   // pull one extra to detect next page
