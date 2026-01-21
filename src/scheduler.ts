@@ -1,219 +1,422 @@
-import { Telegraf } from "telegraf";
+// src/scheduler.ts
+
+import { Telegraf, Markup } from "telegraf";
 import mongoose from "mongoose";
+import { DateTime } from "luxon";
+
 import { Reminder, ReminderDoc } from "./models/Reminder";
 import { addMinutes } from "./utils/time";
 
 export function makeInstanceId(prefix = "sched") {
-return `${prefix}_${process.pid}_${Date.now()}`;
+  return `${prefix}_${process.pid}_${Date.now()}`;
 }
 
 type SchedulerOptions = {
-// Preferred name
-pollEveryMs?: number;
+  // Preferred name
+  pollEveryMs?: number;
 
-// Backwards-compatible alias (in case some other file still uses it)
-pollIntervalMs?: number;
+  // Backwards-compatible alias (in case some other file still uses it)
+  pollIntervalMs?: number;
 
-// Lock TTL (preferred)
-lockTtlMs?: number;
+  // Lock TTL (preferred)
+  lockTtlMs?: number;
 
-// Backwards-compatible/alternate lock settings
-lockSeconds?: number;
+  // Backwards-compatible/alternate lock settings
+  lockSeconds?: number;
 
-instanceId?: string;
+  instanceId?: string;
 };
 
 function now() {
-return new Date();
+  return new Date();
 }
 
 function addSeconds(d: Date, seconds: number) {
-return new Date(d.getTime() + seconds * 1000);
+  return new Date(d.getTime() + seconds * 1000);
 }
 
 /**
-
-- Acquire a lock on a reminder so only one instance processes it.
-- Works across multiple Render deploys/instances.
-  */
-  async function acquireLock(reminderId: any, instanceId: string, lockSeconds: number) {
+ * - Acquire a lock on a reminder so only one instance processes it.
+ * - Works across multiple Render deploys/instances.
+ */
+async function acquireLock(reminderId: any, instanceId: string, lockSeconds: number) {
   const lockedAt = now();
   const lockExpiresAt = addSeconds(lockedAt, lockSeconds);
 
-const res = await Reminder.updateOne(
-{
-_id: reminderId,
-status: "scheduled",
-$or: [
-{ "lock.lockExpiresAt": { $exists: false } },
-{ "lock.lockExpiresAt": { $lte: lockedAt } }
-]
-},
-{
-$set: {
-"lock.lockedAt": lockedAt,
-"lock.lockExpiresAt": lockExpiresAt,
-"lock.lockedBy": instanceId
-}
-}
-);
-
-return res.modifiedCount === 1;
-}
-
-/**
-
-- Release lock safely using $unset (cleaner than setting undefined).
-  */
-  async function releaseLock(reminderId: any, instanceId: string) {
-  await Reminder.updateOne(
-  { _id: reminderId, "lock.lockedBy": instanceId },
-  {
-  $unset: {
-  "lock.lockedAt": 1,
-  "lock.lockExpiresAt": 1,
-  "lock.lockedBy": 1
-  }
-  }
+  const res = await Reminder.updateOne(
+    {
+      _id: reminderId,
+      status: "scheduled",
+      $or: [
+        { "lock.lockExpiresAt": { $exists: false } },
+        { "lock.lockExpiresAt": { $lte: lockedAt } }
+      ]
+    },
+    {
+      $set: {
+        "lock.lockedAt": lockedAt,
+        "lock.lockExpiresAt": lockExpiresAt,
+        "lock.lockedBy": instanceId
+      }
+    }
   );
-  }
+
+  return res.modifiedCount === 1;
+}
 
 /**
+ * - Release lock safely using $unset (cleaner than setting undefined).
+ */
+async function releaseLock(reminderId: any, instanceId: string) {
+  await Reminder.updateOne(
+    { _id: reminderId, "lock.lockedBy": instanceId },
+    {
+      $unset: {
+        "lock.lockedAt": 1,
+        "lock.lockExpiresAt": 1,
+        "lock.lockedBy": 1
+      }
+    }
+  );
+}
 
-- Compute next run time for repeating reminders.
-- Note: interval uses "now + intervalMinutes".
-- daily/weekly just add a fixed amount of minutes from last scheduled run.
-- (We can upgrade to timezone-accurate recurrence later if you want.)
-  */
-  function computeNextForRepeat(rem: ReminderDoc): Date | null {
+/**
+ * Convert a stored "HH:mm" into hour/minute numbers.
+ */
+function parseTimeOfDay(timeOfDay?: string): { hour: number; minute: number } | null {
+  if (!timeOfDay) return null;
+  const t = String(timeOfDay).trim();
+  if (!/^\d{2}:\d{2}$/.test(t)) return null;
+  const [hh, mm] = t.split(":").map((x) => Number(x));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return { hour: hh, minute: mm };
+}
+
+/**
+ * Timezone-accurate next-run computation for repeating reminders.
+ * - interval: now + intervalMinutes
+ * - daily: next day at schedule.timeOfDay (or keep same time as current nextRunAt)
+ * - weekly: next occurrence of schedule.daysOfWeek at schedule.timeOfDay
+ */
+function computeNextForRepeatLuxon(rem: any): Date | null {
+  const sched = rem.schedule;
+  if (!sched || !sched.kind || sched.kind === "once") return null;
+
+  const tz = String(rem.timezone || "America/Chicago");
+  const nowZ = DateTime.now().setZone(tz);
+
+  if (sched.kind === "interval") {
+    const mins = Number(sched.intervalMinutes);
+    if (!Number.isFinite(mins) || mins <= 0) return null;
+    return nowZ.plus({ minutes: mins }).toJSDate();
+  }
+
+  // pick the time-of-day:
+  // prefer schedule.timeOfDay; fallback: time in rem.nextRunAt; fallback: 09:00
+  const timeFromSchedule = parseTimeOfDay(sched.timeOfDay);
+  const timeFromNext = rem.nextRunAt
+    ? DateTime.fromJSDate(rem.nextRunAt, { zone: tz })
+    : null;
+
+  const hour =
+    timeFromSchedule?.hour ??
+    (timeFromNext?.isValid ? timeFromNext.hour : 9);
+
+  const minute =
+    timeFromSchedule?.minute ??
+    (timeFromNext?.isValid ? timeFromNext.minute : 0);
+
+  if (sched.kind === "daily") {
+    let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
+    // if already passed today, go tomorrow
+    if (candidate <= nowZ) candidate = candidate.plus({ days: 1 });
+    return candidate.toJSDate();
+  }
+
+  if (sched.kind === "weekly") {
+    const days: number[] = Array.isArray(sched.daysOfWeek) ? sched.daysOfWeek : [];
+
+    // daysOfWeek in your code is Sun=0..Sat=6
+    // Luxon weekday is Mon=1..Sun=7
+    const targetLuxonWeekdays = new Set(
+      days
+        .map((d) => Number(d))
+        .filter((d) => Number.isFinite(d) && d >= 0 && d <= 6)
+        .map((d) => (d === 0 ? 7 : d)) // Sun 0 -> 7
+    );
+
+    // If no days provided, default to the weekday of the current reminder time.
+    if (targetLuxonWeekdays.size === 0) {
+      const fallback = nowZ.weekday; // 1..7
+      targetLuxonWeekdays.add(fallback);
+    }
+
+    // Search next 7 days for a valid target day at HH:mm
+    for (let i = 0; i <= 7; i++) {
+      const day = nowZ.plus({ days: i });
+      if (!targetLuxonWeekdays.has(day.weekday)) continue;
+
+      const candidate = day.set({ hour, minute, second: 0, millisecond: 0 });
+
+      // For i=0, ensure it's still in the future
+      if (candidate > nowZ) return candidate.toJSDate();
+    }
+
+    // fallback: one week later same time
+    return nowZ.plus({ days: 7 }).set({ hour, minute, second: 0, millisecond: 0 }).toJSDate();
+  }
+
+  return null;
+}
+
+/**
+ * Back-compat repeat computation (kept, but we prefer Luxon version now).
+ * (Still used as fallback if Luxon can't compute for some reason.)
+ */
+function computeNextForRepeat(rem: ReminderDoc): Date | null {
   const sched = rem.schedule;
   if (!sched) return null;
 
-if (sched.kind === "interval") {
-const mins = sched.intervalMinutes;
-if (!mins || mins <= 0) return null;
-return addMinutes(now(), mins);
-}
+  if (sched.kind === "interval") {
+    const mins = sched.intervalMinutes;
+    if (!mins || mins <= 0) return null;
+    return addMinutes(now(), mins);
+  }
 
-if (sched.kind === "daily") return addMinutes(rem.nextRunAt, 24 * 60);
-if (sched.kind === "weekly") return addMinutes(rem.nextRunAt, 7 * 24 * 60);
+  if (sched.kind === "daily") return addMinutes(rem.nextRunAt, 24 * 60);
+  if (sched.kind === "weekly") return addMinutes(rem.nextRunAt, 7 * 24 * 60);
 
-return null;
+  return null;
 }
 
 /**
+ * Build inline buttons for the reminder DM message.
+ */
+function reminderActionKeyboard(reminderId: string) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback("Done", `rs:done:${reminderId}`),
+      Markup.button.callback("Snooze 15m", `rs:sz:${reminderId}:15`),
+      Markup.button.callback("Snooze 1h", `rs:sz:${reminderId}:60`)
+    ]
+  ]);
+}
 
-- SEND: important part for custom emojis + bold/italics/etc
-- Telegram renders formatting ONLY if it has message entities.
-- We store entities on the reminder document and replay them here.
-  */
-  async function sendReminder(bot: Telegraf<any>, rem: any) {
+/**
+ * - SEND: important part for custom emojis + bold/italics/etc
+ * - Telegram renders formatting ONLY if it has message entities.
+ * - We store entities on the reminder document and replay them here.
+ */
+async function sendReminder(bot: Telegraf<any>, rem: any) {
   const text = String(rem.text ?? "");
 
-const entities =
-Array.isArray(rem.entities) && rem.entities.length > 0 ? rem.entities : undefined;
+  const entities =
+    Array.isArray(rem.entities) && rem.entities.length > 0 ? rem.entities : undefined;
 
-// If entities exist, send them. This preserves:
-// - custom emojis (type: "custom_emoji", with custom_emoji_id)
-// - bold/italic/underline/spoiler/etc (entity types)
-// - links (text_link, url)
-const sendOpts: any = {};
-if (entities) {
-sendOpts.entities = entities;
+  const sendOpts: any = {};
+
+  if (entities) {
+    sendOpts.entities = entities;
+  }
+
+  // Add inline buttons (Done / Snooze)
+  sendOpts.reply_markup = reminderActionKeyboard(String(rem._id)).reply_markup;
+
+  try {
+    await bot.telegram.sendMessage(rem.chatId, text, sendOpts);
+  } catch (err: any) {
+    console.error(`Failed to send reminder ${rem._id} to chat ${rem.chatId}:`, err.message);
+    throw err;
+  }
 }
 
-try {
-await bot.telegram.sendMessage(rem.chatId, text, sendOpts);
-} catch (err: any) {
-// Log the specific error for debugging
-console.error(`Failed to send reminder ${rem._id} to chat ${rem.chatId}:`, err.message);
-throw err; // Re-throw so the scheduler can handle it
-}
+// Ensure we don't register handlers multiple times.
+let actionsRegistered = false;
+
+function registerReminderActionHandlers(bot: Telegraf<any>) {
+  if (actionsRegistered) return;
+  actionsRegistered = true;
+
+  bot.action(/^rs:/, async (ctx) => {
+    const data = (ctx.callbackQuery as any)?.data as string;
+    const userId = ctx.from?.id;
+
+    await ctx.answerCbQuery().catch(() => {});
+
+    if (!userId || !data) return;
+
+    const parts = data.split(":");
+
+    // rs:done:<id>
+    if (parts[1] === "done") {
+      const id = parts[2];
+      if (!id) return;
+
+      const rem = await Reminder.findOne({ _id: id, userId }).lean();
+      if (!rem) {
+        await ctx.reply("That reminder no longer exists.");
+        return;
+      }
+
+      const tz = String(rem.timezone || "America/Chicago");
+      const kind = rem.schedule?.kind || "once";
+
+      // If repeating, advance to next occurrence and keep it scheduled
+      if (kind !== "once") {
+        const nextLuxon = computeNextForRepeatLuxon(rem);
+        const nextFallback = nextLuxon ? null : computeNextForRepeat(rem as any);
+        const nextRunAt = nextLuxon || nextFallback;
+
+        if (nextRunAt) {
+          await Reminder.updateOne(
+            { _id: id, userId },
+            {
+              $set: {
+                status: "scheduled",
+                lastRunAt: new Date(),
+                nextRunAt
+              }
+            }
+          );
+
+          const nextStr = DateTime.fromJSDate(nextRunAt, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
+          await ctx.reply(`Marked done. Next reminder: ${nextStr}`);
+          return;
+        }
+
+        // If for some reason we can't compute next, just mark sent.
+        await Reminder.updateOne(
+          { _id: id, userId },
+          { $set: { status: "sent", lastRunAt: new Date() } }
+        );
+        await ctx.reply("Marked done.");
+        return;
+      }
+
+      // Once: just mark sent
+      await Reminder.updateOne(
+        { _id: id, userId },
+        { $set: { status: "sent", lastRunAt: new Date() } }
+      );
+      await ctx.reply("Marked done.");
+      return;
+    }
+
+    // rs:sz:<id>:<minutes>
+    if (parts[1] === "sz") {
+      const id = parts[2];
+      const minutes = Number(parts[3]);
+
+      if (!id || !Number.isFinite(minutes) || minutes <= 0) return;
+
+      const rem = await Reminder.findOne({ _id: id, userId }).lean();
+      if (!rem) {
+        await ctx.reply("That reminder no longer exists.");
+        return;
+      }
+
+      const newTime = new Date(Date.now() + minutes * 60 * 1000);
+
+      await Reminder.updateOne(
+        { _id: id, userId },
+        { $set: { nextRunAt: newTime, status: "scheduled" } }
+      );
+
+      const tz = String(rem.timezone || "America/Chicago");
+      const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
+      await ctx.reply(`Snoozed. Next reminder: ${nextStr}`);
+      return;
+    }
+  });
 }
 
 export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) {
-const pollEveryMs = opts.pollEveryMs ?? opts.pollIntervalMs ?? 10_000;
+  // register callback buttons handler (Done/Snooze)
+  registerReminderActionHandlers(bot);
 
-// lockSeconds priority:
-// 1) explicit lockSeconds
-// 2) lockTtlMs converted to seconds
-// 3) default 60s
-const lockSeconds =
-typeof opts.lockSeconds === "number" && opts.lockSeconds > 0
-? Math.floor(opts.lockSeconds)
-: typeof opts.lockTtlMs === "number" && opts.lockTtlMs > 0
-? Math.max(5, Math.floor(opts.lockTtlMs / 1000))
-: 60;
+  const pollEveryMs = opts.pollEveryMs ?? opts.pollIntervalMs ?? 10_000;
 
-const instanceId = opts.instanceId ?? makeInstanceId();
+  // lockSeconds priority:
+  // 1) explicit lockSeconds
+  // 2) lockTtlMs converted to seconds
+  // 3) default 60s
+  const lockSeconds =
+    typeof opts.lockSeconds === "number" && opts.lockSeconds > 0
+      ? Math.floor(opts.lockSeconds)
+      : typeof opts.lockTtlMs === "number" && opts.lockTtlMs > 0
+        ? Math.max(5, Math.floor(opts.lockTtlMs / 1000))
+        : 60;
 
-console.log(`Scheduler started (${instanceId}). Poll every ${pollEveryMs}ms`);
+  const instanceId = opts.instanceId ?? makeInstanceId();
 
-const tick = async () => {
-try {
-if (mongoose.connection.readyState !== 1) return;
+  console.log(`Scheduler started (${instanceId}). Poll every ${pollEveryMs}ms`);
 
-
-  const due = await Reminder.find({
-    status: "scheduled",
-    nextRunAt: { $lte: now() }
-  })
-    .sort({ nextRunAt: 1 })
-    .limit(25);
-
-  for (const rem of due) {
-    const got = await acquireLock(rem._id, instanceId, lockSeconds);
-    if (!got) continue;
-
+  const tick = async () => {
     try {
-      await sendReminder(bot, rem);
+      if (mongoose.connection.readyState !== 1) return;
 
-      const nextForRepeat = computeNextForRepeat(rem);
+      const due = await Reminder.find({
+        status: "scheduled",
+        nextRunAt: { $lte: now() }
+      })
+        .sort({ nextRunAt: 1 })
+        .limit(25);
 
-      if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
-        await Reminder.updateOne(
-          { _id: rem._id },
-          {
-            $set: {
-              nextRunAt: nextForRepeat,
-              lastRunAt: now(),
-              status: "scheduled"
-            }
+      for (const rem of due) {
+        const got = await acquireLock(rem._id, instanceId, lockSeconds);
+        if (!got) continue;
+
+        try {
+          await sendReminder(bot, rem);
+
+          // Prefer Luxon recurrence (timezone-accurate)
+          const nextForRepeatLuxon = computeNextForRepeatLuxon(rem);
+          const nextForRepeatFallback = nextForRepeatLuxon ? null : computeNextForRepeat(rem);
+          const nextForRepeat = nextForRepeatLuxon || nextForRepeatFallback;
+
+          if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
+            await Reminder.updateOne(
+              { _id: rem._id },
+              {
+                $set: {
+                  nextRunAt: nextForRepeat,
+                  lastRunAt: now(),
+                  status: "scheduled"
+                }
+              }
+            );
+          } else {
+            await Reminder.updateOne(
+              { _id: rem._id },
+              {
+                $set: { lastRunAt: now(), status: "sent" }
+              }
+            );
           }
-        );
-      } else {
-        await Reminder.updateOne(
-          { _id: rem._id },
-          {
-            $set: { lastRunAt: now(), status: "sent" }
-          }
-        );
+        } catch (err) {
+          console.error("Scheduler send error:", err);
+
+          // If send fails, push it out 5 minutes so it doesn't hammer.
+          await Reminder.updateOne(
+            { _id: rem._id },
+            { $set: { nextRunAt: addMinutes(now(), 5) } }
+          );
+        } finally {
+          await releaseLock(rem._id, instanceId);
+        }
       }
     } catch (err) {
-      console.error("Scheduler send error:", err);
-
-      // If send fails, push it out 5 minutes so it doesn't hammer.
-      await Reminder.updateOne(
-        { _id: rem._id },
-        { $set: { nextRunAt: addMinutes(now(), 5) } }
-      );
-    } finally {
-      await releaseLock(rem._id, instanceId);
+      console.error("Scheduler tick error:", err);
     }
-  }
-} catch (err) {
-  console.error("Scheduler tick error:", err);
-}
+  };
 
+  // fire once quickly
+  tick().catch(() => {});
 
-};
+  const handle = setInterval(() => {
+    tick().catch(() => {});
+  }, pollEveryMs);
 
-// fire once quickly
-tick().catch(() => {});
-
-const handle = setInterval(() => {
-tick().catch(() => {});
-}, pollEveryMs);
-
-return () => clearInterval(handle);
+  return () => clearInterval(handle);
 }
