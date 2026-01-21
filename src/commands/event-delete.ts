@@ -1,191 +1,269 @@
 import { Telegraf, Markup } from "telegraf";
-import { listEvents, deleteEvent } from "../services/events.service";
+import { DateTime } from "luxon";
+
+import { Event } from "../models/Event";
+import { UserSettings } from "../models/UserSettings";
+import { Reminder } from "../models/Reminder"; // <-- adjust if your filename differs
 
 /**
- * In-memory flow state (no conversationStore).
- * Resets on bot restart -- acceptable for short interactive flows.
+ * /eventdelete
+ * Button-driven delete flow:
+ * - Show paginated list of all events
+ * - User taps one to delete
+ * - Confirm delete (and mention linked reminder)
+ * - Delete event + linked reminder (if any)
+ * - Return to list
  */
-type Step = "pick_event" | "confirm";
 
-type DeleteFlowState = {
-  step: Step;
-  eventId?: string;
+const PAGE_SIZE = 7;
+
+const PICK_PREFIX = "ev:del:pick:";
+const CONFIRM_PREFIX = "ev:del:confirm:";
+
+const CB = {
+  PAGE_PREV: "ev:del:page:prev",
+  PAGE_NEXT: "ev:del:page:next",
+  REFRESH: "ev:del:refresh",
+  CLOSE: "ev:del:close",
+  CANCEL: "ev:del:cancel",
+} as const;
+
+type DeleteState = {
+  page: number;
+  pickEventId?: string;
 };
 
-const flow = new Map<number, DeleteFlowState>();
+const state = new Map<number, DeleteState>();
 
 function requireUser(ctx: any): number | null {
   const userId = ctx.from?.id;
   return typeof userId === "number" ? userId : null;
 }
 
-function getCbData(ctx: any): string | null {
-  const cq = ctx.callbackQuery;
-  if (!cq) return null;
-  if ("data" in cq && typeof (cq as any).data === "string") return (cq as any).data;
-  return null;
+async function getTimezone(userId: number): Promise<string> {
+  const s = await UserSettings.findOne({ userId }).lean();
+  return s?.timezone || "America/Chicago";
 }
 
-const CB = {
-  CANCEL: "ev:del:cancel",
-  REFRESH: "ev:del:refresh",
-  PICK_PREFIX: "ev:del:pick:",
-
-  CONFIRM_YES: "ev:del:confirm:yes",
-  CONFIRM_NO: "ev:del:confirm:no",
-} as const;
-
-function chunk<T>(arr: T[], size: number) {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
+function safeId(id: any): string {
+  return typeof id === "string" ? id : String(id);
 }
 
-async function sendPickList(ctx: any, userId: number) {
-  const now = new Date();
-  const end = new Date(now);
-  end.setDate(end.getDate() + 60);
+function clip(s: string, n: number) {
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
 
-  const events = await listEvents(userId, { startDate: now, endDate: end, limit: 24 });
+function formatWhen(ev: any, tz: string): string {
+  const start = DateTime.fromJSDate(new Date(ev.startDate), { zone: tz });
+  if (ev.allDay) return `${start.toFormat("MMM d, yyyy")} (all day)`;
+  return start.toFormat("MMM d, yyyy h:mm a");
+}
 
-  if (!events.length) {
-    await ctx.reply("No upcoming events found to delete.");
-    return;
+function buttonLabel(ev: any, tz: string): string {
+  const start = DateTime.fromJSDate(new Date(ev.startDate), { zone: tz });
+
+  const when = ev.allDay
+    ? `${start.toFormat("MMM d")} • All day`
+    : `${start.toFormat("MMM d")} • ${start.toFormat("h:mm a")}`;
+
+  const title = clip(String(ev.title || "Untitled"), 24);
+  return `${when} -- ${title}`;
+}
+
+async function fetchEventsPage(userId: number, skip: number, limit: number) {
+  const docs = await Event.find({ userId })
+    .sort({ startDate: 1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  return docs as any[];
+}
+
+async function renderPickMenu(ctx: any, userId: number) {
+  const tz = await getTimezone(userId);
+  const st = state.get(userId) || { page: 0 };
+  const page = Math.max(0, st.page || 0);
+
+  const skip = page * PAGE_SIZE;
+  const docs = await fetchEventsPage(userId, skip, PAGE_SIZE + 1);
+
+  const hasNext = docs.length > PAGE_SIZE;
+  const events = docs.slice(0, PAGE_SIZE);
+
+  if (events.length === 0) {
+    state.set(userId, { page: 0 });
+    return ctx.reply(
+      "You have no events to delete.",
+      Markup.inlineKeyboard([[Markup.button.callback("Close", CB.CLOSE)]])
+    );
   }
 
-  const rows: any[] = [];
-  const pairs = chunk(events, 2);
+  const rows: any[] = events.map((ev) => [
+    Markup.button.callback(buttonLabel(ev, tz), `${PICK_PREFIX}${safeId(ev._id)}`),
+  ]);
 
-  for (const pair of pairs) {
-    const row: any[] = [];
-    for (const ev of pair) {
-      const label = `${(ev.title || "Untitled").slice(0, 18)}`;
-      row.push(Markup.button.callback(label, `${CB.PICK_PREFIX}${ev._id}`));
-    }
-    rows.push(row);
+  const navRow: any[] = [];
+  if (page > 0) navRow.push(Markup.button.callback("‹ Prev", CB.PAGE_PREV));
+  if (hasNext) navRow.push(Markup.button.callback("Next ›", CB.PAGE_NEXT));
+  if (navRow.length) rows.push(navRow);
+
+  rows.push([
+    Markup.button.callback("Refresh", CB.REFRESH),
+    Markup.button.callback("Close", CB.CLOSE),
+  ]);
+
+  state.set(userId, { ...st, page });
+
+  return ctx.reply(`Pick an event to delete (page ${page + 1}):`, Markup.inlineKeyboard(rows));
+}
+
+async function renderConfirm(ctx: any, userId: number, eventId: string) {
+  const tz = await getTimezone(userId);
+
+  const ev = await Event.findOne({ _id: eventId, userId }).lean();
+  if (!ev) {
+    return ctx.reply(
+      "That event could not be found. Try again.",
+      Markup.inlineKeyboard([[Markup.button.callback("Back to list", CB.REFRESH)]])
+    );
   }
 
-  rows.push([Markup.button.callback("Refresh list", CB.REFRESH)]);
-  rows.push([Markup.button.callback("Cancel", CB.CANCEL)]);
+  const title = String(ev.title || "Untitled");
+  const when = formatWhen(ev, tz);
+  const hasReminder = !!ev.reminderId;
 
-  await ctx.reply("Pick an event to delete:", Markup.inlineKeyboard(rows));
+  const text =
+    `Delete this event?\n\n` +
+    `Title: ${title}\n` +
+    `When: ${when}\n` +
+    (ev.location ? `Location: ${String(ev.location)}\n` : "") +
+    (hasReminder ? `Linked reminder: Yes (will also be deleted)\n` : `Linked reminder: No\n`);
+
+  return ctx.reply(
+    text,
+    Markup.inlineKeyboard([
+      [Markup.button.callback("Delete", `${CONFIRM_PREFIX}${eventId}`)],
+      [Markup.button.callback("Cancel", CB.CANCEL)],
+    ])
+  );
+}
+
+async function deleteEventAndLinkedReminder(userId: number, eventId: string) {
+  const ev = await Event.findOne({ _id: eventId, userId }).lean();
+  if (!ev) return { ok: false as const, reason: "not_found" as const };
+
+  const reminderId = ev.reminderId ? safeId(ev.reminderId) : null;
+
+  await Event.deleteOne({ _id: eventId, userId });
+
+  if (reminderId) {
+    // Only delete if your Reminder model supports userId scoping (yours likely does)
+    await Reminder.deleteOne({ _id: reminderId, userId });
+  }
+
+  return { ok: true as const, deletedReminder: !!reminderId };
 }
 
 export function register(bot: Telegraf) {
-  // /eventdelete
   bot.command("eventdelete", async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
 
-    flow.set(userId, { step: "pick_event" });
-
-    try {
-      await sendPickList(ctx, userId);
-    } catch (e: any) {
-      flow.delete(userId);
-      await ctx.reply(`Failed to load events: ${e?.message ?? "Unknown error"}`);
-    }
+    state.set(userId, { page: 0 });
+    await renderPickMenu(ctx, userId);
   });
 
-  // Cancel
-  bot.action(CB.CANCEL, async (ctx) => {
+  bot.action(CB.PAGE_PREV, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
 
-    flow.delete(userId);
     await ctx.answerCbQuery();
-    await ctx.reply("Canceled.");
+
+    const st = state.get(userId) || { page: 0 };
+    st.page = Math.max(0, (st.page || 0) - 1);
+    state.set(userId, st);
+
+    await renderPickMenu(ctx, userId);
   });
 
-  // Refresh
+  bot.action(CB.PAGE_NEXT, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+
+    await ctx.answerCbQuery();
+
+    const st = state.get(userId) || { page: 0 };
+    st.page = (st.page || 0) + 1;
+    state.set(userId, st);
+
+    await renderPickMenu(ctx, userId);
+  });
+
   bot.action(CB.REFRESH, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
 
-    const st = flow.get(userId);
-    if (!st) return;
+    await ctx.answerCbQuery();
+    await renderPickMenu(ctx, userId);
+  });
 
-    st.step = "pick_event";
-    st.eventId = undefined;
-    flow.set(userId, st);
+  bot.action(CB.CANCEL, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+
+    await ctx.answerCbQuery();
+    await renderPickMenu(ctx, userId);
+  });
+
+  bot.action(CB.CLOSE, async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+
+    state.delete(userId);
+    await ctx.answerCbQuery();
+    await ctx.reply("Closed.");
+  });
+
+  // Pick event -> confirm
+  bot.action(new RegExp(`^${PICK_PREFIX}(.+)$`), async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+
+    const data = (ctx.callbackQuery as any).data as string;
+    const eventId = data.replace(PICK_PREFIX, "");
 
     await ctx.answerCbQuery();
 
-    try {
-      await sendPickList(ctx, userId);
-    } catch (e: any) {
-      flow.delete(userId);
-      await ctx.reply(`Failed to load events: ${e?.message ?? "Unknown error"}`);
+    const st = state.get(userId) || { page: 0 };
+    st.pickEventId = eventId;
+    state.set(userId, st);
+
+    await renderConfirm(ctx, userId, eventId);
+  });
+
+  // Confirm delete
+  bot.action(new RegExp(`^${CONFIRM_PREFIX}(.+)$`), async (ctx) => {
+    const userId = requireUser(ctx);
+    if (!userId) return;
+
+    const data = (ctx.callbackQuery as any).data as string;
+    const eventId = data.replace(CONFIRM_PREFIX, "");
+
+    await ctx.answerCbQuery();
+
+    const res = await deleteEventAndLinkedReminder(userId, eventId);
+
+    if (!res.ok) {
+      return ctx.reply(
+        "That event could not be found. Try again.",
+        Markup.inlineKeyboard([[Markup.button.callback("Refresh", CB.REFRESH)]])
+      );
     }
-  });
 
-  // Pick event
-  bot.action(new RegExp(`^${CB.PICK_PREFIX}[0-9a-fA-F]{24}$`), async (ctx) => {
-    const userId = requireUser(ctx);
-    if (!userId) return;
+    await ctx.reply(res.deletedReminder ? "Event (and linked reminder) deleted." : "Event deleted.");
 
-    const st = flow.get(userId);
-    if (!st || st.step !== "pick_event") return;
-
-    const data = getCbData(ctx);
-    if (!data) return;
-
-    const eventId = data.slice(CB.PICK_PREFIX.length);
-
-    st.step = "confirm";
-    st.eventId = eventId;
-    flow.set(userId, st);
-
-    await ctx.answerCbQuery();
-
-    await ctx.reply(
-      `Delete this event?\nID: ${eventId}`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback("Yes, delete", CB.CONFIRM_YES)],
-        [Markup.button.callback("No, cancel", CB.CONFIRM_NO)],
-      ])
-    );
-  });
-
-  // Confirm no
-  bot.action(CB.CONFIRM_NO, async (ctx) => {
-    const userId = requireUser(ctx);
-    if (!userId) return;
-
-    const st = flow.get(userId);
-    if (!st) return;
-
-    flow.delete(userId);
-    await ctx.answerCbQuery();
-    await ctx.reply("Canceled.");
-  });
-
-  // Confirm yes -> delete
-  bot.action(CB.CONFIRM_YES, async (ctx) => {
-    const userId = requireUser(ctx);
-    if (!userId) return;
-
-    const st = flow.get(userId);
-    if (!st || st.step !== "confirm" || !st.eventId) return;
-
-    await ctx.answerCbQuery();
-
-    try {
-      await deleteEvent(userId, st.eventId);
-      flow.delete(userId);
-      await ctx.reply("Event deleted.");
-    } catch (e: any) {
-      // keep them in flow so they can retry
-      st.step = "pick_event";
-      st.eventId = undefined;
-      flow.set(userId, st);
-
-      await ctx.reply(`Failed to delete: ${e?.message ?? "Unknown error"}`);
-      try {
-        await sendPickList(ctx, userId);
-      } catch {
-        // ignore
-      }
-    }
+    // Return to list
+    await renderPickMenu(ctx, userId);
   });
 }
