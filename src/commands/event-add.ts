@@ -1,11 +1,14 @@
 import { Telegraf, Markup } from "telegraf";
 import mongoose from "mongoose";
+import { DateTime } from "luxon";
 import { createEvent, updateEvent } from "../services/events.service";
 
 /**
  * Event Add (button-driven) + Optional linked Reminder
- * - Fixes "time is in the past" bug by parsing user-entered date/time in the user's timezone.
- * - Uses mongoose.models.Reminder and mongoose.models.UserSettings if available.
+ * Luxon-based timezone handling (matches reminders style):
+ * - Parse wall-clock date+time in user tz -> correct instant
+ * - Display confirmations in user tz
+ * - Validate "in the past" in user tz
  */
 
 type Step =
@@ -17,8 +20,8 @@ type Step =
   | "location"
   | "color"
   | "reminder_pick"
-  | "reminder_time" // used for all-day at-event-time, and custom time
-  | "reminder_date" // custom date
+  | "reminder_time"
+  | "reminder_date"
   | "reminder_confirm"
   | "confirm";
 
@@ -27,17 +30,15 @@ type ReminderMode = "none" | "at_event_time" | "custom_time";
 type EventDraft = {
   title?: string;
   date?: string; // YYYY-MM-DD
-  time?: string; // HH:MM
+  time?: string; // HH:MM (24h)
   allDay?: boolean;
   description?: string;
   location?: string;
   color?: string; // #RRGGBB
 
   reminderMode?: ReminderMode;
-  // for custom reminder time:
   reminderDate?: string; // YYYY-MM-DD
   reminderTime?: string; // HH:MM
-  // for all-day at-event-time:
   allDayReminderTime?: string; // HH:MM
 };
 
@@ -87,24 +88,66 @@ async function getTimezone(userId: number): Promise<string> {
 }
 
 /**
- * Critical fix:
- * Convert a wall-clock date+time in a specific IANA timezone into a real Date (UTC instant).
+ * Parse a wall-clock date + time in a specific timezone to a JS Date.
+ * This is the ONLY correct way (no server-timezone involvement).
  */
-function dateFromTimeZone(dateYYYYMMDD: string, timeHHMM: string, tz: string): Date {
-  const [y, m, d] = dateYYYYMMDD.split("-").map(Number);
-  const [hh, mm] = timeHHMM.split(":").map(Number);
+function parseZonedDateTime(dateYYYYMMDD: string, timeHHMM: string, tz: string): DateTime {
+  const dt = DateTime.fromISO(`${dateYYYYMMDD}T${timeHHMM}`, { zone: tz });
+  if (!dt.isValid) {
+    throw new Error(dt.invalidExplanation || "Invalid date/time");
+  }
+  return dt;
+}
 
-  // Start with a UTC guess using the same wall-clock components
-  const utcGuess = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
+/**
+ * Event start moment
+ * - all-day: store at local 00:00 in tz
+ * - timed: store at local HH:MM in tz
+ */
+function computeEventStart(d: EventDraft, tz: string): Date {
+  const date = d.date!.trim();
+  if (d.allDay) {
+    return parseZonedDateTime(date, "00:00", tz).toJSDate();
+  }
+  return parseZonedDateTime(date, d.time!.trim(), tz).toJSDate();
+}
 
-  // Interpret that guess in the target timezone (as a local time)
-  const asTzLocal = new Date(utcGuess.toLocaleString("en-US", { timeZone: tz }));
+/**
+ * Reminder runAt moment
+ */
+function computeReminderRunAt(d: EventDraft, tz: string): Date | null {
+  const mode = d.reminderMode || "none";
+  if (mode === "none") return null;
 
-  // Offset between guessed UTC and tz-local interpretation
-  const offsetMs = asTzLocal.getTime() - utcGuess.getTime();
+  if (mode === "custom_time") {
+    if (!d.reminderDate || !d.reminderTime) return null;
+    return parseZonedDateTime(d.reminderDate.trim(), d.reminderTime.trim(), tz).toJSDate();
+  }
 
-  // Subtract offset to get the real UTC instant for that wall-clock time in tz
-  return new Date(utcGuess.getTime() - offsetMs);
+  // at_event_time
+  if (d.allDay) {
+    if (!d.allDayReminderTime) return null;
+    return parseZonedDateTime(d.date!.trim(), d.allDayReminderTime.trim(), tz).toJSDate();
+  }
+
+  return parseZonedDateTime(d.date!.trim(), d.time!.trim(), tz).toJSDate();
+}
+
+/**
+ * Compare "past/future" in the user's timezone.
+ * We treat "now" as user-local now.
+ */
+function isPast(dt: Date, tz: string): boolean {
+  const now = DateTime.now().setZone(tz);
+  const when = DateTime.fromJSDate(dt, { zone: tz });
+  return when <= now;
+}
+
+/**
+ * Display in user tz (consistent, stable)
+ */
+function formatRunAt(dt: Date, tz: string): string {
+  return DateTime.fromJSDate(dt, { zone: tz }).toFormat("MMM d, yyyy h:mm a");
 }
 
 function buildReminderText(d: EventDraft) {
@@ -121,7 +164,6 @@ function buildReminderText(d: EventDraft) {
   const loc = d.location?.trim();
   const desc = d.description ?? "";
 
-  // FULL DESCRIPTION, exactly as typed.
   return [
     `Event Reminder`,
     `Title: ${title}`,
@@ -129,45 +171,10 @@ function buildReminderText(d: EventDraft) {
     loc ? `Location: ${loc}` : null,
     ``,
     `Description:`,
-    desc,
+    desc, // preserve line breaks
   ]
     .filter((x) => x !== null)
     .join("\n");
-}
-
-function computeEventStartISO(d: EventDraft, tz: string) {
-  const date = d.date!.trim();
-  if (d.allDay) return dateFromTimeZone(date, "00:00", tz).toISOString();
-  return dateFromTimeZone(date, d.time!.trim(), tz).toISOString();
-}
-
-function computeReminderRunAt(d: EventDraft, tz: string): Date | null {
-  const mode = d.reminderMode || "none";
-  if (mode === "none") return null;
-
-  if (mode === "custom_time") {
-    if (!d.reminderDate || !d.reminderTime) return null;
-    return dateFromTimeZone(d.reminderDate.trim(), d.reminderTime.trim(), tz);
-  }
-
-  // at_event_time
-  if (d.allDay) {
-    if (!d.allDayReminderTime) return null;
-    return dateFromTimeZone(d.date!.trim(), d.allDayReminderTime.trim(), tz);
-  }
-
-  // timed event: event start
-  return dateFromTimeZone(d.date!.trim(), d.time!.trim(), tz);
-}
-
-function formatRunAt(dt: Date) {
-  return dt.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 const CB = {
@@ -295,7 +302,6 @@ export function register(bot: Telegraf) {
     await ctx.reply("Canceled.");
   });
 
-  // Toggle all-day
   bot.action(CB.TOGGLE_ALLDAY, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -312,7 +318,6 @@ export function register(bot: Telegraf) {
     await showMenu(ctx, userId, "Updated all-day.");
   });
 
-  // Clear actions
   bot.action([CB.CLEAR_DESC, CB.CLEAR_LOC, CB.CLEAR_COLOR], async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -334,7 +339,6 @@ export function register(bot: Telegraf) {
     await showMenu(ctx, userId, "Cleared.");
   });
 
-  // Set field actions -> expect typed value
   bot.action(
     [CB.SET_TITLE, CB.SET_DATE, CB.SET_TIME, CB.SET_DESC, CB.SET_LOC, CB.SET_COLOR],
     async (ctx) => {
@@ -398,7 +402,6 @@ export function register(bot: Telegraf) {
     }
   );
 
-  // Reminder menu
   bot.action(CB.REMINDER_MENU, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -413,7 +416,6 @@ export function register(bot: Telegraf) {
     await ctx.reply("Reminder options:", reminderMenuKeyboard());
   });
 
-  // Reminder: None
   bot.action(CB.REM_NONE, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -433,7 +435,6 @@ export function register(bot: Telegraf) {
     await showMenu(ctx, userId, "Reminder set to none.");
   });
 
-  // Reminder: At event time
   bot.action(CB.REM_AT_EVENT, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -446,7 +447,6 @@ export function register(bot: Telegraf) {
     st.draft.reminderDate = undefined;
     st.draft.reminderTime = undefined;
 
-    // If all-day, we must prompt for a time always.
     if (st.draft.allDay) {
       st.step = "reminder_time";
       st.expect = "reminderTime";
@@ -454,7 +454,6 @@ export function register(bot: Telegraf) {
       return ctx.reply("All-day event: what time should the reminder fire? (HH:MM 24h)");
     }
 
-    // For timed event: compute from event start, but confirm time.
     const tz = await getTimezone(userId);
     const runAt = computeReminderRunAt(st.draft, tz);
     if (!runAt || isNaN(runAt.getTime())) {
@@ -469,7 +468,7 @@ export function register(bot: Telegraf) {
     flow.set(userId, st);
 
     return ctx.reply(
-      `Reminder will fire at:\n${formatRunAt(runAt)}\n\nConfirm?`,
+      `Reminder will fire at:\n${formatRunAt(runAt, tz)}\n\nConfirm?`,
       Markup.inlineKeyboard([
         [Markup.button.callback("Yes", CB.REM_CONFIRM_YES)],
         [Markup.button.callback("No", CB.REM_CONFIRM_NO)],
@@ -477,7 +476,6 @@ export function register(bot: Telegraf) {
     );
   });
 
-  // Reminder: Custom time
   bot.action(CB.REM_CUSTOM, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -498,7 +496,6 @@ export function register(bot: Telegraf) {
     return ctx.reply("Custom reminder: type the reminder date as YYYY-MM-DD:");
   });
 
-  // Reminder confirm NO -> back to menu (keep choice so user can adjust)
   bot.action(CB.REM_CONFIRM_NO, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -514,7 +511,6 @@ export function register(bot: Telegraf) {
     return showMenu(ctx, userId, "Okay -- adjust your settings.");
   });
 
-  // Reminder confirm YES -> validate and return
   bot.action(CB.REM_CONFIRM_YES, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -530,7 +526,7 @@ export function register(bot: Telegraf) {
       flow.set(userId, st);
       return showMenu(ctx, userId, "Reminder time could not be computed. Check your inputs.");
     }
-    if (runAt.getTime() < Date.now()) {
+    if (isPast(runAt, tz)) {
       st.step = "menu";
       flow.set(userId, st);
       return showMenu(ctx, userId, "That reminder time is in the past. Choose a future time.");
@@ -540,10 +536,9 @@ export function register(bot: Telegraf) {
     st.expect = undefined;
     flow.set(userId, st);
 
-    return showMenu(ctx, userId, `Reminder confirmed for ${formatRunAt(runAt)}.`);
+    return showMenu(ctx, userId, `Reminder confirmed for ${formatRunAt(runAt, tz)}.`);
   });
 
-  // Create -> confirm screen
   bot.action(CB.CREATE, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -563,17 +558,19 @@ export function register(bot: Telegraf) {
       }
     }
 
-    // validate reminder settings if chosen
     if (d.reminderMode && d.reminderMode !== "none") {
       const tz = await getTimezone(userId);
       const runAt = computeReminderRunAt(d, tz);
       if (!runAt || isNaN(runAt.getTime())) {
         return showMenu(ctx, userId, "Reminder is enabled but not fully configured yet.");
       }
-      if (runAt.getTime() < Date.now()) {
+      if (isPast(runAt, tz)) {
         return showMenu(ctx, userId, "Reminder time is in the past. Choose a future time.");
       }
     }
+
+    // Also validate event start isn't in the past if you want (optional).
+    // Not enforcing here unless you want it later.
 
     st.step = "confirm";
     st.expect = undefined;
@@ -602,7 +599,6 @@ export function register(bot: Telegraf) {
     await showMenu(ctx, userId, "Okay -- back to options.");
   });
 
-  // Confirm yes -> create event, then optional reminder, then link
   bot.action(CB.CONFIRM_YES, async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -615,7 +611,8 @@ export function register(bot: Telegraf) {
 
     try {
       const tz = await getTimezone(userId);
-      const startDateISO = computeEventStartISO(d, tz);
+
+      const startDate = computeEventStart(d, tz);
 
       const eventDoc = await createEvent(userId, {
         title: d.title!.trim(),
@@ -623,15 +620,13 @@ export function register(bot: Telegraf) {
         location: d.location?.trim() ? d.location.trim() : undefined,
         color: d.color?.trim() ? d.color.trim() : undefined,
         allDay: Boolean(d.allDay),
-        startDate: new Date(startDateISO),
+        startDate,
       });
 
-      // optional reminder
       if (d.reminderMode && d.reminderMode !== "none") {
         const runAt = computeReminderRunAt(d, tz);
         if (runAt && !isNaN(runAt.getTime())) {
-          if (runAt.getTime() < Date.now()) {
-            // Shouldn't happen due to validation, but guard anyway
+          if (isPast(runAt, tz)) {
             flow.delete(userId);
             return ctx.reply(`Event created.\nID: ${eventDoc._id}\n(Reminder not linked: time was in the past.)`);
           }
@@ -656,18 +651,15 @@ export function register(bot: Telegraf) {
             timezone: tz,
           });
 
-          // link reminder to event
-          const linkUpdate: any = {
-            reminderId: reminderDoc._id,
-          };
-          // Optional fields (recommended for edit behavior later):
+          const linkUpdate: any = { reminderId: reminderDoc._id };
+          // Optional fields for later edit behavior:
           linkUpdate.reminderMode = d.reminderMode;
           if (d.reminderMode === "custom_time") linkUpdate.customReminderAt = runAt;
 
           try {
             await updateEvent(userId, String(eventDoc._id), linkUpdate);
           } catch {
-            // If your schema/service doesn't accept these fields yet, we'll add them when we do event-edit reminder settings.
+            // If your schema/service doesn't accept these fields yet, we’ll add in event-edit step.
           }
         }
       }
@@ -681,7 +673,6 @@ export function register(bot: Telegraf) {
     }
   });
 
-  // Text handler for typed fields
   bot.on("text", async (ctx) => {
     const userId = requireUser(ctx);
     if (!userId) return;
@@ -714,7 +705,6 @@ export function register(bot: Telegraf) {
       }
     }
 
-    // reminder date/time prompts
     if (st.expect === "reminderDate") {
       if (!isValidDateYYYYMMDD(input)) return ctx.reply("Invalid date. Use YYYY-MM-DD.");
       st.draft.reminderDate = input;
@@ -744,20 +734,19 @@ export function register(bot: Telegraf) {
         flow.set(userId, st);
         return showMenu(ctx, userId, "Reminder time couldn’t be computed. Check settings.");
       }
-      if (runAt.getTime() < Date.now()) {
+      if (isPast(runAt, tz)) {
         st.step = "menu";
         st.expect = undefined;
         flow.set(userId, st);
         return showMenu(ctx, userId, "That reminder time is in the past. Choose a future time.");
       }
 
-      // confirmation required (your choice B)
       st.step = "reminder_confirm";
       st.expect = undefined;
       flow.set(userId, st);
 
       return ctx.reply(
-        `Reminder will fire at:\n${formatRunAt(runAt)}\n\nConfirm?`,
+        `Reminder will fire at:\n${formatRunAt(runAt, tz)}\n\nConfirm?`,
         Markup.inlineKeyboard([
           [Markup.button.callback("Yes", CB.REM_CONFIRM_YES)],
           [Markup.button.callback("No", CB.REM_CONFIRM_NO)],
@@ -765,7 +754,6 @@ export function register(bot: Telegraf) {
       );
     }
 
-    // Return to menu after normal field input
     st.step = "menu";
     st.expect = undefined;
     flow.set(userId, st);
