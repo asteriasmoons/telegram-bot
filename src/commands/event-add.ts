@@ -676,6 +676,8 @@ export function register(bot: Telegraf) {
 bot.on("text", async (ctx, next) => {
   const txt = ctx.message?.text ?? "";
   if (txt.startsWith("/")) return next();
+  
+  const input = ctx.message.text.trim();
 
   const userId = requireUser(ctx);
   if (!userId) return;

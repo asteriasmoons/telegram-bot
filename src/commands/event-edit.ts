@@ -851,6 +851,8 @@ bot.on("text", async (ctx, next) => {
 
   const st = flow.get(userId);
   if (!st || !st.expect) return next();
+  
+  const input = ctx.message.text.trim();
 
     if (st.expect === "title") st.draft.title = input;
 
