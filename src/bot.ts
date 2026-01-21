@@ -4,6 +4,8 @@ import { registerRemindersFlow as registerCreateRemindFlow } from "./flows/remin
 import { registerRemindersListFlow } from "./flows/reminders";
 import { registerChatIdCommand } from "./commands/chatId";
 import { requireChannel } from "./commands/requireChannel";
+import { registerUserIdCommand } from "./commands/userid";
+import { registerGroupIdCommand } from "./commands/groupid";
 
 import { register as registerEventAdd } from "./commands/event-add";
 import { register as registerEventList } from "./commands/event-list";
@@ -134,6 +136,11 @@ export function createBot(token: string) {
   registerEventList(bot);
   registerEventEdit(bot);
   registerEventDelete(bot)
+  
+  // ID COMMANDS
+  registerUserIdCommand(bot);
+  registerGroupIdCommand(bot);
+
 
   bot.catch((err) => {
     console.error("Bot error:", err);
