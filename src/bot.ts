@@ -12,6 +12,8 @@ import { register as registerEventList } from "./commands/event-list";
 import { register as registerEventEdit } from "./commands/event-edit";
 import { register as registerEventDelete } from "./commands/event-delete";
 
+import { registerJournalFlow } from "./commands/journal";
+
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
 import { addMinutes } from "./utils/time";
@@ -140,6 +142,9 @@ export function createBot(token: string) {
   // ID COMMANDS
   registerUserIdCommand(bot);
   registerGroupIdCommand(bot);
+  
+  // Journal Create Command
+  registerJournalFlow(bot);
 
 
   bot.catch((err) => {
