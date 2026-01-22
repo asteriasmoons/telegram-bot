@@ -16,7 +16,7 @@ export function registerChatIdCommand(bot: Telegraf<Context>) {
   });
 
   // 🔹 Channels (channel_post updates)
-  bot.on("channel_post", async (ctx) => {
+  bot.on("channel_post", async (ctx, next) => {
     const post = ctx.channelPost;
 
     // Safely extract text or caption
