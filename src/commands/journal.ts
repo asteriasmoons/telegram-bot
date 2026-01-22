@@ -239,6 +239,11 @@ export function registerJournalFlow(bot: Telegraf<any>) {
 
     const awaiting: Awaiting | undefined = d.entry?.awaiting;
     if (!awaiting) return next();
+     console.log("[JOURNAL] text handler hit", {
+  text,
+  awaiting,
+  userId,
+});
 
     // Capture entities if present (lets you preserve custom emojis later if you want)
     const rawEntities = (ctx.message as any)?.entities;
