@@ -14,8 +14,9 @@ function isDM(ctx: any) {
   return ctx.chat?.type === "private";
 }
 
-async function getSettings(userId: number) {
-  return UserSettings.findOne({ userId }).lean();
+async function getTimezone(userId: number) {
+  const s = await UserSettings.findOne({ userId }).lean();
+  return s?.timezone || "America/Chicago";
 }
 
 async function getDraft(userId: number) {
@@ -33,20 +34,20 @@ function normalizeTagsFromText(input: string): string[] {
     .filter(Boolean)
     .map((t) => t.toLowerCase());
 
-  // Unique
   return Array.from(new Set(tags));
 }
 
 async function upsertDraft(params: {
   userId: number;
   chatId: number;
+  tz: string;
   patch?: Record<string, any>;
   awaiting?: Awaiting;
 }) {
-  const { userId, chatId, patch, awaiting } = params;
+  const { userId, chatId, tz, patch, awaiting } = params;
 
   const current = await getDraft(userId);
-  const curEntry = current?.entry || {};
+  const cur = current?.journal || {};
 
   await Draft.findOneAndUpdate(
     { userId, kind: "journal" },
@@ -56,13 +57,14 @@ async function upsertDraft(params: {
         chatId,
         kind: "journal",
         step: "panel",
-        entry: {
-          ...curEntry,
+        timezone: tz,
+        journal: {
+          ...cur,
           ...(patch || {}),
-          awaiting: awaiting
+          awaiting: awaiting,
         },
-        expiresAt: expiresIn(30)
-      }
+        expiresAt: expiresIn(30),
+      },
     },
     { upsert: true, new: true }
   );
@@ -75,9 +77,9 @@ function fmtTags(tags: string[] | undefined) {
 }
 
 function panelText(d: any) {
-  const title = d?.entry?.title ? String(d.entry.title) : "";
-  const body = d?.entry?.body ? String(d.entry.body) : "";
-  const tags = Array.isArray(d?.entry?.tags) ? d.entry.tags : [];
+  const title = d?.journal?.title ? String(d.journal.title) : "";
+  const body = d?.journal?.body ? String(d.journal.body) : "";
+  const tags = Array.isArray(d?.journal?.tags) ? d.journal.tags : [];
 
   const lines: string[] = [];
   lines.push("New journal entry");
@@ -98,7 +100,7 @@ function kbMain() {
     [Markup.button.callback("Set body", "jr:body")],
     [Markup.button.callback("Set tags", "jr:tags")],
     [Markup.button.callback("Preview", "jr:preview"), Markup.button.callback("Save", "jr:save")],
-    [Markup.button.callback("Cancel", "jr:cancel")]
+    [Markup.button.callback("Cancel", "jr:cancel")],
   ]);
 }
 
@@ -114,10 +116,16 @@ export function registerJournalFlow(bot: Telegraf<any>) {
       return;
     }
 
-    // If you prefer forcing /start first, you can enforce dmChatId here.
-    // For now, we allow DM chatId directly (still DM-only).
+    const tz = await getTimezone(userId);
+
     await clearDraft(userId);
-    await upsertDraft({ userId, chatId, patch: { title: "", body: "", tags: [], entities: [] } });
+    await upsertDraft({
+      userId,
+      chatId,
+      tz,
+      patch: { title: "", body: "", tags: [], entities: [] },
+      awaiting: undefined,
+    });
 
     const d = await getDraft(userId);
     await ctx.reply(panelText(d), kbMain());
@@ -135,6 +143,8 @@ export function registerJournalFlow(bot: Telegraf<any>) {
       return;
     }
 
+    const tz = await getTimezone(userId);
+
     const data = (ctx.callbackQuery as any)?.data as string;
     const d = await getDraft(userId);
 
@@ -150,30 +160,30 @@ export function registerJournalFlow(bot: Telegraf<any>) {
     }
 
     if (data === "jr:title") {
-      await upsertDraft({ userId, chatId, awaiting: "title" });
+      await upsertDraft({ userId, chatId, tz, awaiting: "title" });
       await ctx.reply("Type a title (or type '-' to clear it).");
       return;
     }
 
     if (data === "jr:body") {
-      await upsertDraft({ userId, chatId, awaiting: "body" });
+      await upsertDraft({ userId, chatId, tz, awaiting: "body" });
       await ctx.reply("Send your journal entry body now.");
       return;
     }
 
     if (data === "jr:tags") {
-      await upsertDraft({ userId, chatId, awaiting: "tags" });
-      await ctx.reply("Type tags like: #tag-1 #tag-2 (you can include other text too -- I’ll extract the #tags).");
+      await upsertDraft({ userId, chatId, tz, awaiting: "tags" });
+      await ctx.reply("Type tags like: #tag-1 #tag-2 (you can include other text too; I’ll extract the #tags).");
       return;
     }
 
     if (data === "jr:preview") {
       const fresh = await getDraft(userId);
 
-      const title = fresh?.entry?.title ? String(fresh.entry.title) : "";
-      const body = fresh?.entry?.body ? String(fresh.entry.body) : "";
-      const tags = Array.isArray(fresh?.entry?.tags) ? fresh.entry.tags : [];
-      const entities = Array.isArray(fresh?.entry?.entities) ? fresh.entry.entities : undefined;
+      const title = fresh?.journal?.title ? String(fresh.journal.title) : "";
+      const body = fresh?.journal?.body ? String(fresh.journal.body) : "";
+      const tags = Array.isArray(fresh?.journal?.tags) ? fresh.journal.tags : [];
+      const entities = Array.isArray(fresh?.journal?.entities) ? fresh.journal.entities : undefined;
 
       const previewLines: string[] = [];
       if (title.trim()) previewLines.push(title.trim(), "");
@@ -195,35 +205,31 @@ export function registerJournalFlow(bot: Telegraf<any>) {
     if (data === "jr:save") {
       const fresh = await getDraft(userId);
 
-      const title = fresh?.entry?.title ? String(fresh.entry.title) : "";
-      const body = fresh?.entry?.body ? String(fresh.entry.body) : "";
-      const tags = Array.isArray(fresh?.entry?.tags) ? fresh.entry.tags : [];
-      const entities = Array.isArray(fresh?.entry?.entities) ? fresh.entry.entities : undefined;
+      const title = fresh?.journal?.title ? String(fresh.journal.title) : "";
+      const body = fresh?.journal?.body ? String(fresh.journal.body) : "";
+      const tags = Array.isArray(fresh?.journal?.tags) ? fresh.journal.tags : [];
+      const entities = Array.isArray(fresh?.journal?.entities) ? fresh.journal.entities : undefined;
 
       if (!body.trim()) {
         await ctx.reply("Body is not set yet. Tap Set body.");
         return;
       }
 
-      // Store chatId as the DM chat
       await JournalEntry.create({
         userId,
         chatId,
         title: title.trim() || "",
         body,
         tags,
-        entities: entities || []
+        entities: entities || [],
       });
 
       await clearDraft(userId);
       await ctx.reply("Saved journal entry.");
       return;
     }
-
-    // Unknown jr action: ignore
   });
 
-  // Typed input handler (only consumes when awaiting is set)
   bot.on("text", async (ctx, next) => {
     const text = ctx.message?.text || "";
     if (text.startsWith("/")) return next();
@@ -234,18 +240,14 @@ export function registerJournalFlow(bot: Telegraf<any>) {
 
     if (!isDM(ctx)) return next();
 
+    const tz = await getTimezone(userId);
+
     const d = await getDraft(userId);
     if (!d) return next();
 
-    const awaiting: Awaiting | undefined = d.entry?.awaiting;
+    const awaiting: Awaiting | undefined = d.journal?.awaiting;
     if (!awaiting) return next();
-     console.log("[JOURNAL] text handler hit", {
-  text,
-  awaiting,
-  userId,
-});
 
-    // Capture entities if present (lets you preserve custom emojis later if you want)
     const rawEntities = (ctx.message as any)?.entities;
     const entities = Array.isArray(rawEntities) ? rawEntities : undefined;
 
@@ -255,8 +257,9 @@ export function registerJournalFlow(bot: Telegraf<any>) {
       await upsertDraft({
         userId,
         chatId,
+        tz,
         patch: { title: val },
-        awaiting: undefined
+        awaiting: undefined,
       });
 
       const fresh = await getDraft(userId);
@@ -268,8 +271,9 @@ export function registerJournalFlow(bot: Telegraf<any>) {
       await upsertDraft({
         userId,
         chatId,
+        tz,
         patch: { body: text, entities },
-        awaiting: undefined
+        awaiting: undefined,
       });
 
       const fresh = await getDraft(userId);
@@ -283,8 +287,9 @@ export function registerJournalFlow(bot: Telegraf<any>) {
       await upsertDraft({
         userId,
         chatId,
+        tz,
         patch: { tags },
-        awaiting: undefined
+        awaiting: undefined,
       });
 
       const fresh = await getDraft(userId);
