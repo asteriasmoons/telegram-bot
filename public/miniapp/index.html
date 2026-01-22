@@ -757,6 +757,29 @@ body {
   word-break: break-word;
   opacity: 0.95;
 }
+
+/* Journal */
+.journal-body-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 4; /* preview lines */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  margin-right: 8px;
+  margin-top: 8px;
+}
   </style>
 </head>
 
@@ -993,25 +1016,80 @@ function JournalsView({ activeView }) {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+const [cursor, setCursor] = useState(null); // ISO string (createdAt of last)
+const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    if (activeView === "journal") {
-      loadEntries();
-    }
-  }, [activeView]);
+const [viewerEntry, setViewerEntry] = useState(null); // for read-only modal
 
-  const loadEntries = async () => {
-    try {
-      setLoading(true);
-      // Optional support if your API accepts limit.
-      const data = await apiCall(`/journal?limit=50`);
-      setEntries(data.entries || []);
-    } catch (error) {
-      tg.showAlert('Failed to load journal: ' + error.message);
-    } finally {
-      setLoading(false);
+const PAGE_SIZE = 10;
+
+useEffect(() => {
+  if (activeView === "journal") {
+    // reset + load first page every time you enter the Journal tab
+    loadFirstPage();
+  }
+}, [activeView]);
+
+const loadFirstPage = async () => {
+  try {
+    setLoading(true);
+
+    // reset pagination state
+    setEntries([]);
+    setCursor(null);
+    setHasMore(true);
+
+    const data = await apiCall(`/journal?limit=${PAGE_SIZE}`);
+    const list = data.entries || [];
+
+    setEntries(list);
+
+    if (list.length < PAGE_SIZE) {
+      setHasMore(false);
+      setCursor(null);
+    } else {
+      const last = list[list.length - 1];
+      setCursor(last?.createdAt || null);
     }
-  };
+  } catch (error) {
+    tg.showAlert("Failed to load journal: " + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const loadMore = async () => {
+  // guard rails
+  if (activeView !== "journal") return;
+  if (!hasMore) return;
+  if (loadingMore) return;
+  if (!cursor) return;
+
+  try {
+    setLoadingMore(true);
+
+    const data = await apiCall(
+      `/journal?limit=${PAGE_SIZE}&before=${encodeURIComponent(cursor)}`
+    );
+    const list = data.entries || [];
+
+    // append (do NOT overwrite)
+    setEntries((prev) => [...prev, ...list]);
+
+    if (list.length < PAGE_SIZE) {
+      setHasMore(false);
+      setCursor(null);
+    } else {
+      const last = list[list.length - 1];
+      setCursor(last?.createdAt || null);
+    }
+  } catch (error) {
+    tg.showAlert("Failed to load more: " + error.message);
+  } finally {
+    setLoadingMore(false);
+  }
+};
 
   const handleCreate = () => {
     setEditingEntry(null);
@@ -1073,7 +1151,7 @@ function JournalsView({ activeView }) {
           <div className="empty-state-icon">📓</div>
           <div className="empty-state-text">
             No journal entries yet.
-            {'\n'}Tap + New to create one.
+            {'\n'}Tap + to create one.
           </div>
         </div>
       ) : (
@@ -1086,7 +1164,26 @@ function JournalsView({ activeView }) {
           />
         ))
       )}
-
+      
+        {hasMore && (
+          <div className="load-more-container">
+            <button
+              className="btn btn-secondary load-more-btn"
+              onClick={loadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          </div>
+        )}
+      </>
+    )}
+   {viewerEntry && (
+  <JournalEntryModal
+    entry={viewerEntry}
+    onClose={() => setViewerEntry(null)}
+  />
+)}
       {showModal && (
         <JournalModal
           entry={editingEntry}
@@ -1095,6 +1192,49 @@ function JournalsView({ activeView }) {
           onDelete={handleDelete}
         />
       )}
+    </div>
+  );
+}
+
+// Journal Preview Modal
+function JournalEntryModal({ entry, onClose }) {
+  if (!entry) return null;
+
+  const created = entry.createdAt ? new Date(entry.createdAt) : null;
+  const dateStr = created
+    ? created.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "";
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{entry.title?.trim() ? entry.title : "Journal Entry"}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        {dateStr && (
+          <div style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 12 }}>
+            {dateStr}
+          </div>
+        )}
+
+        <div style={{ whiteSpace: "pre-line", lineHeight: 1.6, fontSize: 15 }}>
+          {entry.body}
+        </div>
+
+        {Array.isArray(entry.tags) && entry.tags.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            {entry.tags.map((t) => (
+              <span key={t} className="tag-chip">#{t}</span>
+            ))}
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
     </div>
   );
 }
