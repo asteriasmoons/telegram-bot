@@ -780,6 +780,16 @@ body {
   margin-right: 8px;
   margin-top: 8px;
 }
+
+.load-more-container {
+  margin: 16px;
+}
+
+.load-more-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+}
   </style>
 </head>
 
@@ -876,7 +886,7 @@ function formatShortDate(date) {
 }
 
 // Journal Card Component
-function JournalCard({ entry, onEdit, onDelete }) {
+function JournalCard({ entry, onView, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
 
   const title = entry.title?.trim() ? entry.title.trim() : '(untitled)';
@@ -886,7 +896,7 @@ function JournalCard({ entry, onEdit, onDelete }) {
   const preview = body.length > 260 ? body.slice(0, 260) + '…' : body;
 
   return (
-    <div className="card" onClick={() => setExpanded(!expanded)}>
+<div className="card" onClick={() => onView(entry)}>
       <div className="card-header">
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
@@ -1117,7 +1127,7 @@ const loadMore = async () => {
         tg.showAlert('Entry created!');
       }
       setShowModal(false);
-      loadEntries();
+      loadFirstPage();
     } catch (error) {
       tg.showAlert('Failed to save: ' + error.message);
     }
@@ -1127,7 +1137,7 @@ const loadMore = async () => {
     try {
       await apiCall(`/journal/${id}`, { method: 'DELETE' });
       tg.showPopup({ message: 'Entry deleted' });
-      loadEntries();
+      loadFirstPage();
     } catch (error) {
       tg.showAlert('Failed to delete: ' + error.message);
     }
@@ -1137,8 +1147,7 @@ const loadMore = async () => {
     <div>
       <div className="header">
         <h1>Journal</h1>
-        <div className="journal-header-actions">
-        </div>
+        <div className="journal-header-actions"></div>
       </div>
 
       {loading ? (
@@ -1151,39 +1160,42 @@ const loadMore = async () => {
           <div className="empty-state-icon">📓</div>
           <div className="empty-state-text">
             No journal entries yet.
-            {'\n'}Tap + to create one.
+            {"\n"}Tap + to create one.
           </div>
         </div>
       ) : (
-        entries.map(entry => (
-          <JournalCard
-            key={entry._id}
-            entry={entry}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ))
+        <>
+          {entries.map((entry) => (
+            <JournalCard
+  key={entry._id}
+  entry={entry}
+  onView={(e) => setViewerEntry(e)}
+  onEdit={handleEdit}
+  onDelete={handleDelete}
+/>
+          ))}
+
+          {hasMore && (
+            <div className="load-more-container">
+              <button
+                className="btn btn-secondary load-more-btn"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            </div>
+          )}
+        </>
       )}
-      
-        {hasMore && (
-          <div className="load-more-container">
-            <button
-              className="btn btn-secondary load-more-btn"
-              onClick={loadMore}
-              disabled={loadingMore}
-            >
-              {loadingMore ? "Loading…" : "Load more"}
-            </button>
-          </div>
-        )}
-      </>
-    )}
-   {viewerEntry && (
-  <JournalEntryModal
-    entry={viewerEntry}
-    onClose={() => setViewerEntry(null)}
-  />
-)}
+
+      {viewerEntry && (
+        <JournalEntryModal
+          entry={viewerEntry}
+          onClose={() => setViewerEntry(null)}
+        />
+      )}
+
       {showModal && (
         <JournalModal
           entry={editingEntry}
