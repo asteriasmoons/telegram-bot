@@ -1534,7 +1534,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
     }
 
     // Reminders View
-    function RemindersView() {
+    function RemindersView({ activeView }) {
       const [reminders, setReminders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showHistory, setShowHistory] = useState(false);
@@ -1543,9 +1543,11 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       const [filter, setFilter] = useState('all');
       const createReminderRef = useRef(null);
 
-      useEffect(() => {
-        loadReminders();
-      }, [showHistory]);
+useEffect(() => {
+  if (activeView === "reminders") {
+    loadReminders();
+  }
+}, [showHistory, activeView]);
 
       const loadReminders = async () => {
         try {
@@ -1738,7 +1740,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       return (
         <div>
           <div className={`view-container ${activeView === 'reminders' ? 'active' : ''}`} data-view="reminders">
-            <RemindersView ref={remindersViewRef} />
+            <RemindersView activeView={activeView} />
           </div>
 
           <div className={`view-container ${activeView === 'calendar' ? 'active' : ''}`} data-view="calendar">
