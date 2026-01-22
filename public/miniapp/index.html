@@ -767,6 +767,18 @@ body {
   white-space: pre-line;
 }
 
+/* Journal preview modal actions */
+.journal-preview-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.journal-preview-actions .btn {
+  width: 100%;
+  justify-content: center;
+}
+
 .tag-chip {
   display: inline-flex;
   align-items: center;
@@ -1189,12 +1201,17 @@ const loadMore = async () => {
         </>
       )}
 
-      {viewerEntry && (
-        <JournalEntryModal
-          entry={viewerEntry}
-          onClose={() => setViewerEntry(null)}
-        />
-      )}
+{viewerEntry && (
+  <JournalEntryModal
+    entry={viewerEntry}
+    onClose={() => setViewerEntry(null)}
+    onEdit={(entry) => {
+      setViewerEntry(null);
+      setEditingEntry(entry);
+      setShowModal(true);
+    }}
+  />
+)}
 
       {showModal && (
         <JournalModal
@@ -1209,7 +1226,7 @@ const loadMore = async () => {
 }
 
 // Journal Preview Modal
-function JournalEntryModal({ entry, onClose }) {
+function JournalEntryModal({ entry, onClose, onEdit }) {
   if (!entry) return null;
 
   const created = entry.createdAt ? new Date(entry.createdAt) : null;
@@ -1226,8 +1243,9 @@ function JournalEntryModal({ entry, onClose }) {
         </div>
 
         {dateStr && (
-          <div style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 12 }}>
-            {dateStr}
+          <div className="card-time" style={{ marginBottom: 12 }}>
+            <span>🗓️</span>
+            <span>{dateStr}</span>
           </div>
         )}
 
@@ -1236,15 +1254,20 @@ function JournalEntryModal({ entry, onClose }) {
         </div>
 
         {Array.isArray(entry.tags) && entry.tags.length > 0 && (
-          <div style={{ marginTop: 16 }}>
+          <div className="tag-row">
             {entry.tags.map((t) => (
-              <span key={t} className="tag-chip">#{t}</span>
+              <span key={t} className="tag-pill">#{t}</span>
             ))}
           </div>
         )}
 
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+        <div className="modal-actions journal-preview-actions">
+          <button className="btn btn-primary" onClick={() => onEdit(entry)}>
+            Edit
+          </button>
+          <button className="btn btn-secondary" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>
