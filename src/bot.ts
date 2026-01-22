@@ -13,6 +13,7 @@ import { register as registerEventEdit } from "./commands/event-edit";
 import { register as registerEventDelete } from "./commands/event-delete";
 
 import { registerJournalFlow } from "./commands/journal";
+import { registerJournalsFlow } from "./commands/journals";
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -128,8 +129,9 @@ export function createBot(token: string) {
     await ctx.reply("Deleted.");
   });
   
-    // Journal Create Command
+    // JOURNAL COMMANDS/FLOWS
   registerJournalFlow(bot);
+  registerJournalsFlow(bot);
 
   // 🔒 FLOWS (gated inside their own logic if needed)
   registerCreateRemindFlow(bot);

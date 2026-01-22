@@ -1,10 +1,16 @@
+// src/models/Draft.ts
 import mongoose, { Schema, Model, Types } from "mongoose";
 
 /* ––––––––––––––
 Draft core types
 ------------------– */
 
-export type DraftKind = "reminder" | "habit" | "reminder_edit" | "journal";
+export type DraftKind =
+  | "reminder"
+  | "habit"
+  | "reminder_edit"
+  | "journal"
+  | "journal_edit";
 
 export type DraftStep =
   | "choose_time"
@@ -25,11 +31,11 @@ export type ReminderDraftData = {
   dateISO?: string; // YYYY-MM-DD
   timeHHMM?: string; // HH:MM
 
-  text?: string; // reminder message
-  entities?: any[]; // Telegram entities
+  text?: string; // reminder message (you can include title + body)
+  entities?: any[]; // Telegram entities for custom emojis and formatting
 
   repeatKind?: "none" | "daily" | "weekly" | "interval";
-  daysOfWeek?: number[]; // Sun=0..Sat=6
+  daysOfWeek?: number[]; // Sun=0..Sat=6 (future-safe)
   intervalMinutes?: number;
 
   awaiting?: ReminderDraftAwaiting;
@@ -54,10 +60,10 @@ Reminder edit draft types
 ------------------– */
 
 export type ReminderEditDraft = {
-  awaiting?: ReminderDraftAwaiting;
+  awaiting?: ReminderDraftAwaiting; // what typed input we are waiting for
   editMode?: "none" | "message" | "date" | "time" | "frequency";
-  stagedText?: string;
-  stagedEntities?: any[];
+  stagedText?: string; // staged new message before save
+  stagedEntities?: any[]; // staged entities before save
 };
 
 /* ––––––––––––––
@@ -69,9 +75,17 @@ export type JournalDraftAwaiting = "title" | "body" | "tags";
 export type JournalDraftData = {
   title?: string;
   body?: string;
-  tags?: string[];      // stored without "#"
-  entities?: any[];     // entities for body (optional)
+  tags?: string[];
+  entities?: any[];
   awaiting?: JournalDraftAwaiting;
+};
+
+export type JournalEditDraft = {
+  awaiting?: JournalDraftAwaiting;
+  stagedTitle?: string;
+  stagedBody?: string;
+  stagedTags?: string[];
+  stagedEntities?: any[];
 };
 
 /* ––––––––––––––
@@ -92,12 +106,18 @@ export type DraftDoc = {
   // create drafts
   reminder?: ReminderDraftData;
   habit?: HabitDraftData;
-  journal?: JournalDraftData;
+
+  // journal create draft
+  entry?: JournalDraftData; // (kept compatible with your journal.ts which uses d.entry)
 
   // edit drafts
   targetReminderId?: string;
   page?: number;
   edit?: ReminderEditDraft;
+
+  // journal edit draft
+  targetJournalId?: string;
+  journalEdit?: JournalEditDraft;
 
   // TTL cleanup
   expiresAt: Date;
@@ -173,10 +193,18 @@ const JournalDraftSchema = new Schema<JournalDraftData>(
     body: { type: String },
     tags: { type: [String] },
     entities: { type: [Schema.Types.Mixed] },
-    awaiting: {
-      type: String,
-      enum: ["title", "body", "tags"],
-    },
+    awaiting: { type: String, enum: ["title", "body", "tags"] },
+  },
+  { _id: false }
+);
+
+const JournalEditDraftSchema = new Schema<JournalEditDraft>(
+  {
+    awaiting: { type: String, enum: ["title", "body", "tags"] },
+    stagedTitle: { type: String },
+    stagedBody: { type: String },
+    stagedTags: { type: [String] },
+    stagedEntities: { type: [Schema.Types.Mixed] },
   },
   { _id: false }
 );
@@ -189,7 +217,7 @@ const DraftSchema = new Schema<DraftDoc>(
     kind: {
       type: String,
       required: true,
-      enum: ["reminder", "habit", "reminder_edit", "journal"],
+      enum: ["reminder", "habit", "reminder_edit", "journal", "journal_edit"],
       index: true,
     },
 
@@ -197,14 +225,23 @@ const DraftSchema = new Schema<DraftDoc>(
 
     timezone: { type: String, required: true },
 
+    // create drafts
     reminder: { type: ReminderDraftSchema },
     habit: { type: HabitDraftSchema },
-    journal: { type: JournalDraftSchema },
 
+    // journal create draft (your journal.ts uses d.entry)
+    entry: { type: JournalDraftSchema },
+
+    // reminder edit draft
     targetReminderId: { type: String },
     page: { type: Number },
     edit: { type: ReminderEditDraftSchema },
 
+    // journal edit draft
+    targetJournalId: { type: String },
+    journalEdit: { type: JournalEditDraftSchema },
+
+    // TTL cleanup
     expiresAt: { type: Date, required: true },
   },
   { timestamps: true }
