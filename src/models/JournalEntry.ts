@@ -1,4 +1,5 @@
-import mongoose, { Schema } from "mongoose";
+// src/models/JournalEntry.ts
+import mongoose, { Schema, Model } from "mongoose";
 
 export type JournalEntryDoc = mongoose.Document & {
   userId: number;
@@ -25,15 +26,21 @@ const JournalEntrySchema = new Schema<JournalEntryDoc>(
     title: { type: String, default: "" },
     body: { type: String, required: true },
 
-    tags: { type: [String], default: [], index: true },
+    // Multikey array of strings
+    tags: { type: [String], default: [] },
 
-    entities: { type: Array, default: [] }
+    // Store Telegram entities safely (custom emoji, formatting, etc.)
+    entities: { type: [Schema.Types.Mixed], default: [] },
   },
   { timestamps: true }
 );
 
+// Common query pattern: "give me my newest entries"
 JournalEntrySchema.index({ userId: 1, createdAt: -1 });
 
-export const JournalEntry =
-  mongoose.models.JournalEntry ||
+// Common query pattern: "filter my entries by tag"
+JournalEntrySchema.index({ userId: 1, tags: 1 });
+
+export const JournalEntry: Model<JournalEntryDoc> =
+  (mongoose.models.JournalEntry as Model<JournalEntryDoc>) ||
   mongoose.model<JournalEntryDoc>("JournalEntry", JournalEntrySchema);
