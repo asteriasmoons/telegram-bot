@@ -155,7 +155,7 @@ function renderEntry(e: any, tz: string) {
   const when = fmtWhen(e.createdAt ? new Date(e.createdAt) : undefined, tz);
 
   const lines: string[] = [];
-  lines.push("Journal entry");
+  /* lines.push("Journal entry"); */
   lines.push("");
   if (title) lines.push(title, "");
   lines.push(body || "(empty)");
