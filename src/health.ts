@@ -1,61 +1,98 @@
 // src/health.ts
-// HTTP server with webhook and Mini App support
-
 import express from "express";
-import { Telegraf } from "telegraf";
 import path from "path";
-import miniappRouter from "./miniapp/api";
-import calendarRouter from "./miniapp/calendar-api";  // ✅ Add this
+import crypto from "crypto";
+import type { Telegraf } from "telegraf";
 
-export async function startServer(opts: { bot: Telegraf<any>; webhookPath: string }) {
+import miniappApiRouter from "./miniapp/api";
+import calendarApiRouter from "./miniapp/calendar-api";
+import journalApiRouter from "./miniapp/journal-api";
+
+type StartServerOpts = {
+  bot: Telegraf<any>;
+  webhookPath: string;
+};
+
+function validateTelegramWebAppData(initData: string, botToken: string): number | null {
+  const urlParams = new URLSearchParams(initData);
+  const hash = urlParams.get("hash");
+  urlParams.delete("hash");
+
+  if (!hash) return null;
+
+  const dataCheckString = Array.from(urlParams.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+
+  const secretKey = crypto
+    .createHmac("sha256", "WebAppData")
+    .update(botToken)
+    .digest();
+
+  const calculatedHash = crypto
+    .createHmac("sha256", secretKey)
+    .update(dataCheckString)
+    .digest("hex");
+
+  if (calculatedHash !== hash) return null;
+
+  const userParam = urlParams.get("user");
+  if (!userParam) return null;
+
+  const user = JSON.parse(userParam);
+  return user.id;
+}
+
+// Mini App auth middleware (sets req.userId)
+function miniAppAuth(req: any, res: any, next: any) {
+  const initData = req.headers["x-telegram-init-data"] as string;
+  const botToken = process.env.BOT_TOKEN;
+
+  if (!botToken) return res.status(500).json({ error: "Bot token not configured" });
+  if (!initData) return res.status(401).json({ error: "Missing Telegram init data" });
+
+  const userId = validateTelegramWebAppData(initData, botToken);
+  if (!userId) return res.status(401).json({ error: "Invalid Telegram data" });
+
+  req.userId = userId;
+  next();
+}
+
+export async function startServer({ bot, webhookPath }: StartServerOpts) {
   const app = express();
-  const port = process.env.PORT || 3000;
 
-  // Parse JSON bodies
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
 
-  // CORS for Mini App (if needed)
-  app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, X-Telegram-Init-Data");
-    next();
-  });
+  // Health
+  app.get("/health", (_req, res) => res.status(200).send("ok"));
 
   // Telegram webhook endpoint
-  app.post(opts.webhookPath, (req, res) => opts.bot.handleUpdate(req.body, res));
-
-  // Mini App API routes
-  app.use("/api/miniapp", miniappRouter);
-  app.use("/api/miniapp/calendar", calendarRouter);  // ✅ Add this
-
-  // Serve Mini App static files (HTML/CSS/JS)
-  app.use("/miniapp", express.static(path.join(__dirname, "../public/miniapp")));
-
-  // Health check endpoint
-  app.get("/health", (req, res) => {
-    res.json({ 
-      ok: true, 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
+  app.post(webhookPath, (req, res) => {
+    bot.handleUpdate(req.body, res).catch((err: any) => {
+      console.error("handleUpdate error:", err);
     });
   });
 
-  // Root endpoint
-  app.get("/", (req, res) => {
-    res.json({ 
-      message: "Lystaria Bot API",
-      endpoints: {
-        health: "/health",
-        webhook: opts.webhookPath,
-        miniapp: "/miniapp",
-        api: "/api/miniapp"
-      }
-    });
-  });
+  // ---- Mini App API mounting ----
+  // Your existing miniapp API router already has its own auth middleware inside api.ts,
+  // BUT we mount it behind miniAppAuth anyway so everything is consistent.
+  // This is safe because api.ts auth will just re-check; if you want only one check,
+  // we can remove auth from api.ts later.
+  app.use("/api/miniapp", miniAppAuth, miniappApiRouter);
 
+  // Calendar and Journal routers rely on req.userId, so they MUST be behind miniAppAuth.
+  app.use("/api/miniapp/calendar", miniAppAuth, calendarApiRouter);
+  app.use("/api/miniapp/journal", miniAppAuth, journalApiRouter);
+
+  // ---- Mini App static files (if you serve them here) ----
+  // If you already serve your mini app HTML somewhere else, keep your existing logic.
+  // This is a common pattern:
+  const publicDir = path.join(process.cwd(), "public");
+  app.use(express.static(publicDir));
+
+  const port = process.env.PORT || 3000;
   app.listen(port, () => {
-    console.log(`✅ Server running on port ${port}`);
-    console.log(`📱 Mini App: http://localhost:${port}/miniapp`);
-    console.log(`🔗 Webhook: ${opts.webhookPath}`);
+    console.log(`HTTP server running on port ${port}`);
   });
 }

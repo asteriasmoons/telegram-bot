@@ -721,6 +721,42 @@ body {
 .is-hidden {
   display: none !important;
 }
+
+/* -------- Journal View -------- */
+
+.journal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.journal-preview {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-line;
+  word-break: break-word;
+  opacity: 0.95;
+}
   </style>
 </head>
 
@@ -794,6 +830,277 @@ body {
       }
       return timeStr;
     }
+    
+    // Journal helpers
+function normalizeTagsFromText(input) {
+  const matches = String(input || '').match(/#[A-Za-z0-9_-]+/g) || [];
+  const tags = matches
+    .map(t => t.slice(1).trim())
+    .filter(Boolean)
+    .map(t => t.toLowerCase());
+  return Array.from(new Set(tags));
+}
+
+function tagsToDisplay(tags) {
+  const list = Array.isArray(tags) ? tags : [];
+  if (list.length === 0) return '';
+  return list.map(t => `#${t}`).join(' ');
+}
+
+function formatShortDate(date) {
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Journal Card Component
+function JournalCard({ entry, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const title = entry.title?.trim() ? entry.title.trim() : '(untitled)';
+  const tags = Array.isArray(entry.tags) ? entry.tags : [];
+  const body = entry.body || '';
+
+  const preview = body.length > 260 ? body.slice(0, 260) + '…' : body;
+
+  return (
+    <div className="card" onClick={() => setExpanded(!expanded)}>
+      <div className="card-header">
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+            {title}
+          </div>
+          <div className="card-time">
+            <span>🗓️</span>
+            <span>{formatShortDate(entry.createdAt)}</span>
+          </div>
+        </div>
+
+        <span className="card-badge" style={{ background: 'rgba(139,125,239,0.15)', color: '#8b7def' }}>
+          journal
+        </span>
+      </div>
+
+      <div className="journal-preview">{preview}</div>
+
+      {tags.length > 0 && (
+        <div className="tag-row">
+          {tags.map(t => (
+            <span key={t} className="tag-pill">#{t}</span>
+          ))}
+        </div>
+      )}
+
+      {expanded && (
+        <div className="card-actions" onClick={e => e.stopPropagation()} style={{ marginTop: 14 }}>
+          <button className="btn btn-primary" onClick={() => onEdit(entry)}>
+            ✏️ Edit
+          </button>
+          <button className="btn btn-danger" onClick={() => onDelete(entry._id)}>
+            🗑️
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Journal Modal
+function JournalModal({ entry, onClose, onSave, onDelete }) {
+  const [title, setTitle] = useState(entry?.title || '');
+  const [tagsText, setTagsText] = useState(tagsToDisplay(entry?.tags || []));
+  const [body, setBody] = useState(entry?.body || '');
+
+  const isEdit = !!entry?._id;
+
+  const handleSave = async () => {
+    if (!body.trim()) {
+      tg.showAlert('Please enter a journal body');
+      return;
+    }
+
+    const tags = normalizeTagsFromText(tagsText);
+
+    await onSave({
+      title: title.trim(),
+      body,
+      tags
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{isEdit ? 'Edit Entry' : 'New Entry'}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Title (optional)</label>
+          <input
+            type="text"
+            className="form-input"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Title..."
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Tags</label>
+          <input
+            type="text"
+            className="form-input"
+            value={tagsText}
+            onChange={e => setTagsText(e.target.value)}
+            placeholder="#tag-1 #tag-2"
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Body</label>
+          <textarea
+            className="form-textarea"
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            placeholder="Write your entry..."
+          />
+        </div>
+
+        <div className="modal-actions">
+          {isEdit ? (
+            <button className="btn btn-danger" onClick={() => onDelete(entry._id)}>
+              Delete
+            </button>
+          ) : (
+            <button className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+          )}
+
+          <button className="btn btn-primary" onClick={handleSave}>
+            {isEdit ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Journals View
+function JournalsView({ activeView }) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+
+  useEffect(() => {
+    if (activeView === "journal") {
+      loadEntries();
+    }
+  }, [activeView]);
+
+  const loadEntries = async () => {
+    try {
+      setLoading(true);
+      // Optional support if your API accepts limit.
+      const data = await apiCall(`/journal?limit=50`);
+      setEntries(data.entries || []);
+    } catch (error) {
+      tg.showAlert('Failed to load journal: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingEntry(null);
+    setShowModal(true);
+  };
+
+  const handleEdit = (entry) => {
+    setEditingEntry(entry);
+    setShowModal(true);
+  };
+
+  const handleSave = async (payload) => {
+    try {
+      if (editingEntry?._id) {
+        await apiCall(`/journal/${editingEntry._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+        tg.showAlert('Entry updated!');
+      } else {
+        await apiCall(`/journal`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        tg.showAlert('Entry created!');
+      }
+      setShowModal(false);
+      loadEntries();
+    } catch (error) {
+      tg.showAlert('Failed to save: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await apiCall(`/journal/${id}`, { method: 'DELETE' });
+      tg.showPopup({ message: 'Entry deleted' });
+      loadEntries();
+    } catch (error) {
+      tg.showAlert('Failed to delete: ' + error.message);
+    }
+  };
+
+  return (
+    <div>
+      <div className="header">
+        <h1>Journal</h1>
+        <div className="journal-header-actions">
+          <button className="btn btn-primary" onClick={handleCreate}>
+            + New
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading journal...</div>
+        </div>
+      ) : entries.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">📓</div>
+          <div className="empty-state-text">
+            No journal entries yet.
+            {'\n'}Tap + New to create one.
+          </div>
+        </div>
+      ) : (
+        entries.map(entry => (
+          <JournalCard
+            key={entry._id}
+            entry={entry}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ))
+      )}
+
+      {showModal && (
+        <JournalModal
+          entry={editingEntry}
+          onClose={() => setShowModal(false)}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
+      )}
+    </div>
+  );
+}
 
     // Reminder Card Component
     function ReminderCard({ reminder, onEdit, onSnooze, onDone, onDelete }) {
@@ -1724,18 +2031,19 @@ useEffect(() => {
       const remindersViewRef = useRef(null);
       const calendarViewRef = useRef(null);
 
-      const handleFabClick = () => {
-        if (activeView === 'reminders') {
-          // Find and click the hidden create reminder button
-          const btn = document.querySelector('[data-view="reminders"]')?.querySelector('button');
-          if (btn) btn.click();
-        } else if (activeView === 'calendar') {
-          // Trigger create event for today
-          const today = new Date();
-          const todayBtn = document.querySelector(`[data-date="${today.toDateString()}"]`);
-          if (todayBtn) todayBtn.click();
-        }
-      };
+const handleFabClick = () => {
+  if (activeView === 'reminders') {
+    const btn = document.querySelector('[data-view="reminders"]')?.querySelector('button');
+    if (btn) btn.click();
+  } else if (activeView === 'calendar') {
+    const today = new Date();
+    const todayBtn = document.querySelector(`[data-date="${today.toDateString()}"]`);
+    if (todayBtn) todayBtn.click();
+  } else if (activeView === 'journal') {
+    const btn = document.querySelector('[data-view="journal"]')?.querySelector('button.btn.btn-primary');
+    if (btn) btn.click();
+  }
+};
 
       return (
         <div>
@@ -1746,6 +2054,10 @@ useEffect(() => {
           <div className={`view-container ${activeView === 'calendar' ? 'active' : ''}`} data-view="calendar">
             <CalendarView ref={calendarViewRef} />
           </div>
+          
+          <div className={`view-container ${activeView === 'journal' ? 'active' : ''}`} data-view="journal">
+  <JournalsView activeView={activeView} />
+</div>
 
           <button className="fab" onClick={handleFabClick}>
             +
@@ -1766,6 +2078,13 @@ useEffect(() => {
               <div className="nav-item-icon">📅</div>
               <div className="nav-item-label">Calendar</div>
             </button>
+            <button
+  className={`nav-item ${activeView === 'journal' ? 'active' : ''}`}
+  onClick={() => setActiveView('journal')}
+>
+  <div className="nav-item-icon">📓</div>
+  <div className="nav-item-label">Journal</div>
+</button>
           </div>
         </div>
       );
