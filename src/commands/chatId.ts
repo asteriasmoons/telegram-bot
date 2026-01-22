@@ -25,7 +25,7 @@ export function registerChatIdCommand(bot: Telegraf<Context>) {
       ("caption" in post && typeof post.caption === "string" && post.caption.trim()) ||
       "";
 
-    if (!text) return;
+    if (!text) return next();
 
     // Match /chatid or /chatid@BotUsername
     if (!/^\/chatid(@\w+)?$/.test(text)) return;

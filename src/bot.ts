@@ -127,6 +127,9 @@ export function createBot(token: string) {
     await Reminder.updateOne({ _id: id }, { $set: { status: "deleted" } });
     await ctx.reply("Deleted.");
   });
+  
+    // Journal Create Command
+  registerJournalFlow(bot);
 
   // 🔒 FLOWS (gated inside their own logic if needed)
   registerCreateRemindFlow(bot);
@@ -142,9 +145,6 @@ export function createBot(token: string) {
   // ID COMMANDS
   registerUserIdCommand(bot);
   registerGroupIdCommand(bot);
-  
-  // Journal Create Command
-  registerJournalFlow(bot);
 
 
   bot.catch((err) => {
