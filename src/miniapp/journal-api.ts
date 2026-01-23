@@ -21,9 +21,9 @@ const FREE_JOURNAL_LIMIT = 5;
  * Add your Telegram user ID(s) here to bypass caps entirely.
  * Example userId is the one you've shown in your data before.
  */
-const CAP_BYPASS_USER_IDS = new Set<number>([
+/* const CAP_BYPASS_USER_IDS = new Set<number>([
   6382917923, // <-- replace/confirm this is YOUR Telegram user id
-]);
+]); */
 
 /**
  * Helper: is user premium right now?
