@@ -8,7 +8,7 @@ const PLAN_30D = {
   id: "premium_30d",
   title: "Lystaria Premium",
   description: "Unlock higher limits for 30 days.",
-  starsAmount: 499, // <- set your Stars price
+  starsAmount: 250, // <- set your Stars price
   days: 30,
 };
 
