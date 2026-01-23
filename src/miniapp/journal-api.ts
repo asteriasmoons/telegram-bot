@@ -5,6 +5,9 @@ import { Router } from "express";
 import { JournalEntry } from "../models/JournalEntry";
 import { Premium } from "../models/Premium";
 
+import { claimDailyPrompt } from "../services/promptQuota";
+import { generateJournalPrompt } from "../services/groq";
+
 const router = Router();
 
 /**
@@ -237,6 +240,36 @@ router.delete("/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting journal entry:", error);
     res.status(500).json({ error: "Failed to delete journal entry" });
+  }
+});
+
+// POST /api/miniapp/journal/prompt
+router.post("/prompt", async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const quota = await claimDailyPrompt(userId);
+
+    if (!quota.allowed) {
+      return res.status(429).json({
+        error: "DAILY_PROMPT_LIMIT_REACHED",
+        message: "You’ve used your 2 prompts for today. Try again tomorrow.",
+        remaining: quota.remaining,
+        dateKey: quota.dateKey,
+      });
+    }
+
+    const prompt = await generateJournalPrompt();
+
+    return res.json({
+      prompt,
+      remaining: quota.remaining,
+      dateKey: quota.dateKey,
+    });
+  } catch (error) {
+    console.error("Error generating journal prompt:", error);
+    return res.status(500).json({ error: "Failed to generate prompt" });
   }
 });
 

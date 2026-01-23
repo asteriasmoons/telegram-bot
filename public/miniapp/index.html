@@ -1069,6 +1069,11 @@ const [hasMore, setHasMore] = useState(true);
 
 const [viewerEntry, setViewerEntry] = useState(null); // for read-only modal
 
+const [promptModalOpen, setPromptModalOpen] = useState(false);
+const [dailyPrompt, setDailyPrompt] = useState("");
+const [promptRemaining, setPromptRemaining] = useState(null);
+const [promptLoading, setPromptLoading] = useState(false);
+
 const PAGE_SIZE = 10;
 
 useEffect(() => {
@@ -1179,12 +1184,45 @@ const loadMore = async () => {
       tg.showAlert('Failed to delete: ' + error.message);
     }
   };
+  
+const handleGeneratePrompt = async () => {
+  try {
+    setPromptLoading(true);
+    setDailyPrompt("");
+
+    const data = await apiCall(`/journal/prompt`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+
+    setDailyPrompt(data.prompt || "");
+    setPromptRemaining(
+      typeof data.remaining === "number" ? data.remaining : null
+    );
+  } catch (error) {
+    const msg = error?.message || "Failed to generate prompt";
+    tg.showAlert(msg);
+  } finally {
+    setPromptLoading(false);
+  }
+};
 
   return (
     <div>
       <div className="header">
         <h1>Journal</h1>
-        <div className="journal-header-actions"></div>
+<div className="journal-header-actions">
+  <button
+    className="btn btn-secondary"
+    type="button"
+    onClick={() => {
+      setPromptModalOpen(true);
+      handleGeneratePrompt(); // generates immediately when opened
+    }}
+  >
+    Prompt
+  </button>
+</div>
       </div>
 
       {loading ? (
@@ -1256,6 +1294,65 @@ const loadMore = async () => {
           onDelete={handleDelete}
         />
       )}
+      
+      {promptModalOpen && (
+  <div
+    className="modal-overlay"
+    onClick={() => setPromptModalOpen(false)}
+  >
+    <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h2>Prompt</h2>
+        <button
+          className="modal-close"
+          onClick={() => setPromptModalOpen(false)}
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+
+      {promptLoading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Generating…</div>
+        </div>
+      ) : dailyPrompt ? (
+        <>
+          <div className="journal-prompt-text">{dailyPrompt}</div>
+
+          {typeof promptRemaining === "number" && (
+            <div className="journal-prompt-meta">
+              Remaining today: {promptRemaining}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="empty-state-text">Tap Prompt to generate.</div>
+      )}
+
+      <div className="modal-actions">
+        <button
+          className="btn btn-secondary"
+          onClick={() => setPromptModalOpen(false)}
+          type="button"
+        >
+          Close
+        </button>
+
+        <button
+          className="btn btn-primary"
+          onClick={handleGeneratePrompt}
+          disabled={promptLoading}
+          type="button"
+        >
+          Generate Again
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+      
     </div>
   );
 }
