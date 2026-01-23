@@ -12,6 +12,31 @@ const PLAN_30D = {
   days: 30,
 };
 
+/**
+ * ===============================
+ * PUBLIC BASE URL (FOR INVOICE IMAGE)
+ * ===============================
+ * Invoices cannot upload local images.
+ * They ONLY support photo_url (public URL).
+ *
+ * Because your Express server serves /public as static,
+ * your banner at /public/assets/banner.png is reachable at:
+ *   https://YOUR-DOMAIN/assets/banner.png
+ *
+ * Put your Render URL here.
+ * (No env var required. Just change the string.)
+ */
+const PUBLIC_BASE_URL = "https://telegram-bot-yt3w.onrender.com";
+
+/**
+ * ===============================
+ * INVOICE BANNER URL
+ * ===============================
+ * Make sure this loads in a normal browser:
+ *   https://telegram-bot-yt3w.onrender.com/assets/banner.png
+ */
+const INVOICE_BANNER_URL = `${PUBLIC_BASE_URL}/assets/banner.png`;
+
 // Helpers
 function addDays(date: Date, days: number) {
   const d = new Date(date);
@@ -35,9 +60,8 @@ async function activatePremium(userId: number, planId: string, durationDays: num
   // If they’re already premium, extend from max(now, expiresAt)
   const existing = await Premium.findOne({ userId });
 
-  const base = existing?.expiresAt && existing.expiresAt.getTime() > Date.now()
-    ? existing.expiresAt
-    : new Date();
+  const base =
+    existing?.expiresAt && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : new Date();
 
   const newExpiry = addDays(base, durationDays);
 
@@ -67,25 +91,44 @@ export function registerPremium(bot: Telegraf) {
     const status = await getPremiumStatus(userId);
 
     const lines: string[] = [];
+
+    // Status section
     lines.push("Premium status:");
     if (status.active) {
-      lines.push(`Active`);
+      lines.push("Active");
       if (status.expiresAt) lines.push(`Expires: ${status.expiresAt.toLocaleString("en-US")}`);
     } else {
       lines.push("Not active");
     }
 
+    // Spacer
+    lines.push("");
+
+    /*
+      ===============================
+      ADD YOUR PREMIUM TEXT HERE
+      ===============================
+      This is a NORMAL MESSAGE (not a photo caption).
+      You can write as much as you want here.
+    */
+    lines.push(
+      "Premium exists because limits exist. If 5 people journal heavily everyday then the database I use will start charging for that storage."
+    );
+    lines.push("");
+    lines.push("- Unlimited Journal Entries");
+    lines.push("- Unlimited Reminders");
+    lines.push("");
+    lines.push("Plus supporting my vision! Thank you for your support. It really does make a difference.");
+
     const text = lines.join("\n");
 
     await ctx.reply(
       text,
-      Markup.inlineKeyboard([
-        Markup.button.callback("Buy Premium (30 days)", `buy:${PLAN_30D.id}`),
-      ])
+      Markup.inlineKeyboard([Markup.button.callback("Buy Premium (30 days)", `buy:${PLAN_30D.id}`)])
     );
   });
 
-  // 2) Button -> send invoice
+  // 2) Button -> send invoice (WITH PHOTO)
   bot.action(/^buy:premium_30d$/, async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
@@ -96,27 +139,38 @@ export function registerPremium(bot: Telegraf) {
     // Payload: keep it machine-readable
     const payload = `plan=${PLAN_30D.id}|user=${userId}|ts=${Date.now()}`;
 
-    // Stars invoice:
-    // - provider_token MUST be ""
-    // - currency MUST be "XTR"
-    // - prices must be a single item
+    /*
+      ===============================
+      INVOICE WITH PHOTO
+      ===============================
+      This is where the banner shows INSIDE the invoice.
+      Telegram only supports this via photo_url (public URL).
+    */
     await ctx.replyWithInvoice({
       title: PLAN_30D.title,
+
+      // NOTE: Invoice description should be relatively short.
+      // Your FULL message is already sent in /premium above.
       description: PLAN_30D.description,
+
       payload,
-      provider_token: "",
+      provider_token: "", // Stars requires empty string
       currency: STARS_CURRENCY,
       prices: [{ label: "Premium (30 days)", amount: PLAN_30D.starsAmount }],
+
+      // --- Banner on invoice ---
+      photo_url: INVOICE_BANNER_URL,
+      // These are optional, but help Telegram size it nicely:
+      photo_width: 1280,
+      photo_height: 720,
     });
   });
 
   // 3) Pre-checkout query (required)
   bot.on("pre_checkout_query", async (ctx) => {
     try {
-      // You can validate ctx.preCheckoutQuery.invoice_payload here if you want.
       await ctx.answerPreCheckoutQuery(true);
     } catch {
-      // If something goes wrong, fail checkout
       await ctx.answerPreCheckoutQuery(false, "Payment verification failed.");
     }
   });
@@ -130,21 +184,16 @@ export function registerPremium(bot: Telegraf) {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    // For Stars: sp.currency === "XTR"
-    // sp.total_amount is the Stars integer amount
     const payload: string = sp.invoice_payload || "";
 
     // Basic payload check
     if (!payload.includes(`plan=${PLAN_30D.id}`)) {
-      // Unknown plan -- don’t grant anything.
       await ctx.reply("Payment received, but the plan could not be verified. Please contact support.");
       return;
     }
 
     const newExpiry = await activatePremium(userId, PLAN_30D.id, PLAN_30D.days);
 
-    await ctx.reply(
-      `Premium activated!\nExpires: ${newExpiry.toLocaleString("en-US")}`
-    );
+    await ctx.reply(`Premium activated!\nExpires: ${newExpiry.toLocaleString("en-US")}`);
   });
 }
