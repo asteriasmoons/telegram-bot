@@ -3,8 +3,52 @@
 
 import { Router } from "express";
 import { JournalEntry } from "../models/JournalEntry";
+import { Premium } from "../models/Premium";
 
 const router = Router();
+
+/**
+ * =========================================================
+ * JOURNAL CAPS CONFIG
+ * =========================================================
+ */
+
+// CHANGE THIS to whatever free cap you want
+const FREE_JOURNAL_LIMIT = 5;
+
+/**
+ * CAP BYPASS (OWNER / ADMIN)
+ * Add your Telegram user ID(s) here to bypass caps entirely.
+ * Example userId is the one you've shown in your data before.
+ */
+const CAP_BYPASS_USER_IDS = new Set<number>([
+  6382917923, // <-- replace/confirm this is YOUR Telegram user id
+]);
+
+/**
+ * Helper: is user premium right now?
+ */
+async function isPremiumActive(userId: number) {
+  const now = new Date();
+
+  const doc = await Premium.findOne({
+    userId,
+    isActive: true,
+    $or: [
+      { expiresAt: null },
+      { expiresAt: { $gt: now } },
+    ],
+  }).lean();
+
+  return !!doc;
+}
+
+/**
+ * Helper: count user's journal entries
+ */
+async function countJournalEntries(userId: number) {
+  return JournalEntry.countDocuments({ userId });
+}
 
 function normalizeTags(input: any): string[] {
   const arr = Array.isArray(input) ? input : [];
@@ -93,11 +137,38 @@ router.post("/", async (req, res) => {
     const titleText = String(title || "").trim();
     const normalizedTags = normalizeTags(tags);
 
+    /**
+     * =========================================================
+     * CAPS ENFORCEMENT (WITH BYPASS)
+     * =========================================================
+     *
+     * Rules:
+     * - If userId is in CAP_BYPASS_USER_IDS => ignore caps.
+     * - Else if Premium is active => unlimited.
+     * - Else (free user) => cap at FREE_JOURNAL_LIMIT total entries.
+     */
+    const bypassCaps = CAP_BYPASS_USER_IDS.has(userId);
+
+    if (!bypassCaps) {
+      const premiumActive = await isPremiumActive(userId);
+
+      if (!premiumActive) {
+        const currentCount = await countJournalEntries(userId);
+
+        if (currentCount >= FREE_JOURNAL_LIMIT) {
+          return res.status(403).json({
+            error: "JOURNAL_LIMIT_REACHED",
+            message: `Free users can create up to ${FREE_JOURNAL_LIMIT} journal entries. Upgrade to Premium for unlimited journals.`,
+            limit: FREE_JOURNAL_LIMIT,
+            current: currentCount,
+          });
+        }
+      }
+    }
+
     // DM-only journaling right now:
     // We store chatId as the user's DM chat id.
     // The Mini App might not know DM chat id, so we store chatId as userId for now
-    // (your Telegram userId == DM chatId in most cases; and your bot already uses dmChatId in settings for reminders).
-    // If you later want, we can fetch settings.dmChatId here instead.
     const chatId = userId;
 
     const entry = await JournalEntry.create({
