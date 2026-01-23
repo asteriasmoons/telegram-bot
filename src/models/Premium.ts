@@ -18,7 +18,7 @@ const PremiumSchema = new Schema<PremiumDoc>(
   {
     userId: { type: Number, required: true, unique: true, index: true },
     isActive: { type: Boolean, default: false, index: true },
-    expiresAt: { type: Date, default: null, index: true },
+expiresAt: { type: Date, default: null },
 
     plan: { type: String, default: "" },
     lastPurchaseAt: { type: Date, default: null },
