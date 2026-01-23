@@ -22,7 +22,7 @@ const FREE_JOURNAL_LIMIT = 5;
  * Example userId is the one you've shown in your data before.
  */
   const CAP_BYPASS_USER_IDS = new Set<number>([
-  6382917923, // <-- replace/confirm this is YOUR Telegram user id
+  // 6382917923, // <-- replace/confirm this is YOUR Telegram user id
 ]);
 
 /**
