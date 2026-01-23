@@ -1213,6 +1213,16 @@ const loadMore = async () => {
   />
 )}
 
+<button
+  className="is-hidden"
+  data-create-journal="1"
+  onClick={() => {
+    setViewerEntry(null);      // optional but nice: closes preview if open
+    setEditingEntry(null);
+    setShowModal(true);
+  }}
+/>
+
       {showModal && (
         <JournalModal
           entry={editingEntry}
@@ -2205,14 +2215,22 @@ useEffect(() => {
 
 const handleFabClick = () => {
   if (activeView === 'reminders') {
-    const btn = document.querySelector('[data-view="reminders"]')?.querySelector('button');
+    const btn = document
+      .querySelector('[data-view="reminders"]')
+      ?.querySelector('button');
     if (btn) btn.click();
-  } else if (activeView === 'calendar') {
+  }
+
+  else if (activeView === 'calendar') {
     const today = new Date();
-    const todayBtn = document.querySelector(`[data-date="${today.toDateString()}"]`);
+    const todayBtn = document.querySelector(
+      `[data-date="${today.toDateString()}"]`
+    );
     if (todayBtn) todayBtn.click();
-  } else if (activeView === 'journal') {
-    const btn = document.querySelector('[data-view="journal"]')?.querySelector('button.btn.btn-primary');
+  }
+
+  else if (activeView === 'journal') {
+    const btn = document.querySelector('[data-create-journal="1"]');
     if (btn) btn.click();
   }
 };
