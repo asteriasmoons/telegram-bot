@@ -66,6 +66,9 @@ export async function startServer({ bot, webhookPath }: StartServerOpts) {
 
   // Health
   app.get("/health", (_req, res) => res.status(200).send("ok"));
+  
+  // Root (prevents "Cannot GET /" in logs)
+app.get("/", (_req, res) => res.status(200).send("ok"));
 
   // Telegram webhook endpoint
   app.post(webhookPath, (req, res) => {
