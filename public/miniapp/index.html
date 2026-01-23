@@ -797,6 +797,19 @@ body {
   margin: 16px;
 }
 
+.btn-prompt {
+  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%);
+  color: white;
+}
+
+.btn-prompt:hover {
+  filter: brightness(1.08);
+}
+
+.btn-prompt:active {
+  transform: scale(0.96);
+}
+
 .load-more-btn {
   width: 100%;
   justify-content: center;
@@ -1213,15 +1226,15 @@ const handleGeneratePrompt = async () => {
         <h1>Journal</h1>
 <div className="journal-header-actions">
   <button
-    className="btn btn-secondary"
-    type="button"
-    onClick={() => {
-      setPromptModalOpen(true);
-      handleGeneratePrompt(); // generates immediately when opened
-    }}
-  >
-    Prompt
-  </button>
+  className="btn btn-prompt"
+  type="button"
+  onClick={() => {
+    setPromptModalOpen(true);
+    handleGeneratePrompt();
+  }}
+>
+  Prompt
+</button>
 </div>
       </div>
 
