@@ -17,6 +17,12 @@ import { registerJournalsFlow } from "./commands/journals";
 
 import { registerPremium } from "./commands/premium";
 
+import { registerSupportCommand } from "./commands/support";
+import { registerSupportActions } from "./actions/supportActions";
+import { registerSupportRouter } from "./middleware/supportRouter";
+import { registerAdminReplyRouter } from "./middleware/adminReplyRouter";
+
+
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
 import { addMinutes } from "./utils/time";
@@ -152,6 +158,15 @@ export function createBot(token: string) {
   
   // PREMIUM COMMAND
   registerPremium(bot);
+  
+  // TICKET SUPPORT COMMANDS
+registerSupportCommand(bot);
+registerSupportActions(bot);
+
+// Order matters: user router first, admin router second is fine.
+// Both ignore what they shouldn't handle.
+registerSupportRouter(bot);
+registerAdminReplyRouter(bot);
 
 
   bot.catch((err) => {
