@@ -22,6 +22,8 @@ import { registerSupportActions } from "./actions/supportActions";
 import { registerSupportRouter } from "./middleware/supportRouter";
 import { registerAdminReplyRouter } from "./middleware/adminReplyRouter";
 
+import { registerPromptCommand } from "./commands/prompt";
+
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -167,6 +169,9 @@ registerSupportActions(bot);
 // Both ignore what they shouldn't handle.
 registerSupportRouter(bot);
 registerAdminReplyRouter(bot);
+
+// PROMPT COMMAND
+registerPromptCommand(bot);
 
 
   bot.catch((err) => {
