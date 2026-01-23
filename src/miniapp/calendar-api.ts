@@ -5,8 +5,40 @@ import { Router } from "express";
 import { Event } from "../models/Event";
 import { Reminder } from "../models/Reminder";
 import { UserSettings } from "../models/UserSettings";
+import { Premium } from "../models/Premium"; // ✅ needed for Premium bypass
 
 const router = Router();
+
+/**
+ * ===============================
+ * CAP SETTINGS + BYPASS
+ * ===============================
+ */
+const EVENT_REMINDER_CAP = 3;
+
+// ✅ OWNER / DEV BYPASS (hardcoded, no env vars)
+const CAP_BYPASS_USER_IDS = new Set<number>([
+  6382917923, // <-- replace/confirm this is YOUR Telegram user id
+]);
+
+function hasCapBypass(userId: number) {
+  return CAP_BYPASS_USER_IDS.has(Number(userId));
+}
+
+async function isPremiumActive(userId: number) {
+  const doc = await Premium.findOne({ userId }).lean();
+  if (!doc || !doc.isActive) return false;
+  if (doc.expiresAt && doc.expiresAt.getTime() <= Date.now()) return false;
+  return true;
+}
+
+async function countReminderEvents(userId: number) {
+  // Count how many events currently have a linked reminder
+  return Event.countDocuments({
+    userId,
+    reminderId: { $ne: null }
+  });
+}
 
 /**
  * Builds the default reminder text from an event.
@@ -280,6 +312,28 @@ router.post("/events", async (req, res) => {
         return res.status(400).json({ error: "Reminder time is in the past" });
       }
 
+      /**
+       * ===============================
+       * CAP CHECK (CREATE)
+       * - Only when they're trying to ENABLE a reminder
+       * - Only blocks creating a NEW linked reminder
+       * - Bypass if owner or premium
+       * ===============================
+       */
+      if (payload.enabled && nextRunAt) {
+        const userId = req.userId!;
+        const bypass = hasCapBypass(userId) || (await isPremiumActive(userId));
+
+        if (!bypass) {
+          const currentCount = await countReminderEvents(userId);
+          if (currentCount >= EVENT_REMINDER_CAP) {
+            return res.status(403).json({
+              error: `Event reminder cap reached (${EVENT_REMINDER_CAP}). Upgrade to Premium to unlock more.`
+            });
+          }
+        }
+      }
+
       const { reminderId } = await upsertEventReminder({
         userId: req.userId!,
         eventId: String(event._id),
@@ -365,6 +419,29 @@ router.put("/events/:id", async (req, res) => {
         return res.status(400).json({ error: "Reminder time is in the past" });
       }
 
+      /**
+       * ===============================
+       * CAP CHECK (UPDATE)
+       * Only blocks when:
+       * - They're enabling a reminder
+       * - AND this event does NOT already have one (event.reminderId is empty)
+       * - Bypass if owner or premium
+       * ===============================
+       */
+      if (payload.enabled && nextRunAt && !event.reminderId) {
+        const userId = req.userId!;
+        const bypass = hasCapBypass(userId) || (await isPremiumActive(userId));
+
+        if (!bypass) {
+          const currentCount = await countReminderEvents(userId);
+          if (currentCount >= EVENT_REMINDER_CAP) {
+            return res.status(403).json({
+              error: `Event reminder cap reached (${EVENT_REMINDER_CAP}). Upgrade to Premium to unlock more.`
+            });
+          }
+        }
+      }
+
       const { reminderId } = await upsertEventReminder({
         userId: req.userId!,
         eventId: String(event._id),
@@ -428,3 +505,12 @@ router.delete("/events/:id", async (req, res) => {
 });
 
 export default router;
+
+// Type augmentation for Express Request
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: number;
+    }
+  }
+}
