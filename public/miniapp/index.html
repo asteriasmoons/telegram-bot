@@ -811,10 +811,35 @@ body {
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    // Initialize Telegram Web App
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+// Telegram WebApp guard (browser vs Telegram)
+const tg = window.Telegram?.WebApp;
+
+const isTelegram =
+  !!tg &&
+  typeof tg.initData === "string" &&
+  tg.initData.length > 0;
+
+if (!isTelegram) {
+  const root = document.getElementById("root");
+  if (root) {
+    root.innerHTML = `
+      <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; text-align:center; color:#fff;">
+        <div style="max-width:520px;">
+          <h2 style="margin-bottom:12px;">Open in Telegram</h2>
+          <p style="opacity:.8; line-height:1.6;">
+            This mini app must be opened inside Telegram to access
+            your journal entries, reminders, and events.
+          </p>
+        </div>
+      </div>
+    `;
+  }
+  throw new Error("Not running inside Telegram WebApp");
+}
+
+// Initialize Telegram Web App.. Safe to init now
+tg.ready();
+tg.expand();
 
     // API base URL
     const API_BASE = window.location.origin + '/api/miniapp';
