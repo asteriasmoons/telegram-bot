@@ -7,36 +7,86 @@ import { UserSettings } from "../models/UserSettings";
 import crypto from "crypto";
 import { DateTime } from "luxon";
 
+// ✅ ADDED (for Premium unlimited)
+import { Premium } from "../models/Premium";
+
 const router = Router();
+
+/**
+ * =========================================================
+ * REMINDER CAPS CONFIG (ONLY ADDED -- NO LOGIC CHANGES)
+ * =========================================================
+ */
+
+// CHANGE THIS to whatever free cap you want
+const FREE_REMINDER_LIMIT = 10;
+
+/**
+ * CAP BYPASS (OWNER / ADMIN)
+ * Add your Telegram user ID(s) here to bypass caps entirely.
+ */
+const CAP_BYPASS_USER_IDS = new Set<number>([
+  6382917923, // <-- replace/confirm this is YOUR Telegram user id
+]);
+
+/**
+ * Helper: is user premium right now?
+ * Premium = unlimited reminders
+ */
+async function isPremiumActive(userId: number) {
+  const now = new Date();
+
+  const doc = await Premium.findOne({
+    userId,
+    isActive: true,
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+  }).lean();
+
+  return !!doc;
+}
+
+/**
+ * Helper: count reminders for cap enforcement
+ * NOTE: This does NOT change your reminder logic -- it only counts.
+ *
+ * We count "not deleted" reminders as "owned reminders" for cap purposes.
+ * That means: scheduled/sent/etc count, deleted does not.
+ */
+async function countNonDeletedReminders(userId: number) {
+  return Reminder.countDocuments({
+    userId,
+    status: { $ne: "deleted" },
+  });
+}
 
 // Middleware to validate Telegram Mini App init data
 function validateTelegramWebAppData(initData: string, botToken: string): number | null {
   const urlParams = new URLSearchParams(initData);
   const hash = urlParams.get("hash");
   urlParams.delete("hash");
-  
+
   if (!hash) return null;
-  
+
   const dataCheckString = Array.from(urlParams.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `${key}=${value}`)
     .join("\n");
-  
+
   const secretKey = crypto
     .createHmac("sha256", "WebAppData")
     .update(botToken)
     .digest();
-  
+
   const calculatedHash = crypto
     .createHmac("sha256", secretKey)
     .update(dataCheckString)
     .digest("hex");
-  
+
   if (calculatedHash !== hash) return null;
-  
+
   const userParam = urlParams.get("user");
   if (!userParam) return null;
-  
+
   const user = JSON.parse(userParam);
   return user.id;
 }
@@ -45,17 +95,17 @@ function validateTelegramWebAppData(initData: string, botToken: string): number 
 router.use((req, res, next) => {
   const initData = req.headers["x-telegram-init-data"] as string;
   const botToken = process.env.BOT_TOKEN;
-  
+
   if (!botToken) {
     return res.status(500).json({ error: "Bot token not configured" });
   }
-  
+
   const userId = validateTelegramWebAppData(initData, botToken);
-  
+
   if (!userId) {
     return res.status(401).json({ error: "Invalid Telegram data" });
   }
-  
+
   req.userId = userId;
   next();
 });
@@ -64,9 +114,9 @@ router.use((req, res, next) => {
 router.get("/reminders", async (req, res) => {
   try {
     const { status = "scheduled", includeHistory = "false" } = req.query;
-    
+
     const query: any = { userId: req.userId };
-    
+
     if (includeHistory === "true") {
       query.status = { $in: ["scheduled", "sent"] };
     } else {
@@ -83,17 +133,17 @@ router.get("/reminders", async (req, res) => {
         }
       ];
     }
-    
+
     const reminders = await Reminder.find(query)
       .sort({ nextRunAt: 1 })
       .lean();
-    
+
     // For display purposes, treat recurring "sent" reminders as "scheduled" if they're due soon
     const processedReminders = reminders.map(r => {
       if (r.status === "sent" && r.schedule && r.schedule.kind !== "once") {
         const nextRun = new Date(r.nextRunAt);
         const now = new Date();
-        
+
         // If nextRunAt is today or future, show it as scheduled
         if (nextRun >= now || nextRun.toDateString() === now.toDateString()) {
           return { ...r, displayStatus: "scheduled" };
@@ -101,7 +151,7 @@ router.get("/reminders", async (req, res) => {
       }
       return { ...r, displayStatus: r.status };
     });
-    
+
     res.json({ reminders: processedReminders });
   } catch (error) {
     console.error("Error fetching reminders:", error);
@@ -116,11 +166,11 @@ router.get("/reminders/:id", async (req, res) => {
       _id: req.params.id,
       userId: req.userId
     }).lean();
-    
+
     if (!reminder) {
       return res.status(404).json({ error: "Reminder not found" });
     }
-    
+
     res.json({ reminder });
   } catch (error) {
     console.error("Error fetching reminder:", error);
@@ -132,17 +182,47 @@ router.get("/reminders/:id", async (req, res) => {
 router.post("/reminders", async (req, res) => {
   try {
     const { text, nextRunAt, schedule, timezone } = req.body;
-    
+
     if (!text || !nextRunAt || !timezone) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    
+
+    /**
+     * =========================================================
+     * CAPS ENFORCEMENT (ONLY ADDED -- NO EXISTING LOGIC CHANGED)
+     * =========================================================
+     *
+     * Rules:
+     * - If userId is in CAP_BYPASS_USER_IDS => ignore caps.
+     * - Else if Premium is active => unlimited.
+     * - Else (free user) => cap at FREE_REMINDER_LIMIT reminders.
+     */
+    const userId = req.userId;
+    const bypassCaps = CAP_BYPASS_USER_IDS.has(userId);
+
+    if (!bypassCaps) {
+      const premiumActive = await isPremiumActive(userId);
+
+      if (!premiumActive) {
+        const currentCount = await countNonDeletedReminders(userId);
+
+        if (currentCount >= FREE_REMINDER_LIMIT) {
+          return res.status(403).json({
+            error: "REMINDER_LIMIT_REACHED",
+            message: `Free users can create up to ${FREE_REMINDER_LIMIT} reminders. Upgrade to Premium for unlimited reminders.`,
+            limit: FREE_REMINDER_LIMIT,
+            current: currentCount,
+          });
+        }
+      }
+    }
+
     const settings = await UserSettings.findOne({ userId: req.userId }).lean();
-    
+
     if (!settings?.dmChatId) {
       return res.status(400).json({ error: "DM chat not configured" });
     }
-    
+
     const reminder = await Reminder.create({
       userId: req.userId,
       chatId: settings.dmChatId,
@@ -153,7 +233,7 @@ router.post("/reminders", async (req, res) => {
       timezone,
       lock: {}
     });
-    
+
     res.json({ reminder });
   } catch (error) {
     console.error("Error creating reminder:", error);
@@ -165,23 +245,23 @@ router.post("/reminders", async (req, res) => {
 router.put("/reminders/:id", async (req, res) => {
   try {
     const { text, nextRunAt, schedule, status } = req.body;
-    
+
     const update: any = {};
     if (text !== undefined) update.text = text;
     if (nextRunAt !== undefined) update.nextRunAt = new Date(nextRunAt);
     if (schedule !== undefined) update.schedule = schedule;
     if (status !== undefined) update.status = status;
-    
+
     const reminder = await Reminder.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
       { $set: update },
       { new: true }
     ).lean();
-    
+
     if (!reminder) {
       return res.status(404).json({ error: "Reminder not found" });
     }
-    
+
     res.json({ reminder });
   } catch (error) {
     console.error("Error updating reminder:", error);
@@ -193,19 +273,19 @@ router.put("/reminders/:id", async (req, res) => {
 router.post("/reminders/:id/snooze", async (req, res) => {
   try {
     const { minutes = 15 } = req.body;
-    
+
     const newTime = new Date(Date.now() + minutes * 60 * 1000);
-    
+
     const reminder = await Reminder.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
       { $set: { nextRunAt: newTime, status: "scheduled" } },
       { new: true }
     ).lean();
-    
+
     if (!reminder) {
       return res.status(404).json({ error: "Reminder not found" });
     }
-    
+
     res.json({ reminder });
   } catch (error) {
     console.error("Error snoozing reminder:", error);
@@ -322,11 +402,11 @@ router.delete("/reminders/:id", async (req, res) => {
       { $set: { status: "deleted" } },
       { new: true }
     ).lean();
-    
+
     if (!reminder) {
       return res.status(404).json({ error: "Reminder not found" });
     }
-    
+
     res.json({ reminder });
   } catch (error) {
     console.error("Error deleting reminder:", error);
@@ -338,7 +418,7 @@ router.delete("/reminders/:id", async (req, res) => {
 router.get("/settings", async (req, res) => {
   try {
     const settings = await UserSettings.findOne({ userId: req.userId }).lean();
-    
+
     res.json({ settings });
   } catch (error) {
     console.error("Error fetching settings:", error);
