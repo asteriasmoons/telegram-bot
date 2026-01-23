@@ -21,9 +21,9 @@ const FREE_JOURNAL_LIMIT = 5;
  * Add your Telegram user ID(s) here to bypass caps entirely.
  * Example userId is the one you've shown in your data before.
  */
-/* const CAP_BYPASS_USER_IDS = new Set<number>([
+  const CAP_BYPASS_USER_IDS = new Set<number>([
   6382917923, // <-- replace/confirm this is YOUR Telegram user id
-]); */
+]);
 
 /**
  * Helper: is user premium right now?
@@ -147,10 +147,10 @@ router.post("/", async (req, res) => {
      * - Else if Premium is active => unlimited.
      * - Else (free user) => cap at FREE_JOURNAL_LIMIT total entries.
      */
-    /* const bypassCaps = CAP_BYPASS_USER_IDS.has(userId);
+    const bypassCaps = CAP_BYPASS_USER_IDS.has(userId);
 
     if (!bypassCaps) {
-      const premiumActive = await isPremiumActive(userId); */
+      const premiumActive = await isPremiumActive(userId);
 
       if (!premiumActive) {
         const currentCount = await countJournalEntries(userId);
