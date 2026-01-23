@@ -147,10 +147,10 @@ router.post("/", async (req, res) => {
      * - Else if Premium is active => unlimited.
      * - Else (free user) => cap at FREE_JOURNAL_LIMIT total entries.
      */
-    const bypassCaps = CAP_BYPASS_USER_IDS.has(userId);
+    /* const bypassCaps = CAP_BYPASS_USER_IDS.has(userId);
 
     if (!bypassCaps) {
-      const premiumActive = await isPremiumActive(userId);
+      const premiumActive = await isPremiumActive(userId); */
 
       if (!premiumActive) {
         const currentCount = await countJournalEntries(userId);
