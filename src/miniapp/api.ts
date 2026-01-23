@@ -19,7 +19,7 @@ const router = Router();
  */
 
 // CHANGE THIS to whatever free cap you want
-const FREE_REMINDER_LIMIT = 10;
+const FREE_REMINDER_LIMIT = 3;
 
 /**
  * CAP BYPASS (OWNER / ADMIN)
@@ -197,7 +197,7 @@ router.post("/reminders", async (req, res) => {
      * - Else if Premium is active => unlimited.
      * - Else (free user) => cap at FREE_REMINDER_LIMIT reminders.
      */
-    const userId = req.userId;
+    const userId = req.userId!; // ✅ FIX: req.userId is guaranteed by middleware; this removes TS "possibly undefined"
     const bypassCaps = CAP_BYPASS_USER_IDS.has(userId);
 
     if (!bypassCaps) {
