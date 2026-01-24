@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Lystaria</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -52,8 +52,8 @@ body {
 }
 
 #root {
-  height: 100%;
-  min-height: 0; /* important: don't force viewport height */
+  height: var(--tg-viewport-height, 100vh);
+  min-height: 0;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
@@ -67,6 +67,11 @@ body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+
+  /* THIS is what stops the header from being under the notch */
+  padding-top: env(safe-area-inset-top);
+
+  /* keep content above bottom nav + iOS home indicator */
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
@@ -881,18 +886,19 @@ tg.ready();
 
 // --- Telegram real viewport height fix (standalone fullscreen vs chat sheet) ---
 function syncTelegramViewportHeight() {
-  try {
-    const h = tg.viewportHeight; // Telegram's real usable height
-    if (h && Number.isFinite(h)) {
-      document.documentElement.style.setProperty("--tg-viewport-height", `${h}px`);
-    }
-  } catch (e) {
-    // ignore
-  }
+  const h = tg?.viewportHeight;
+  const stable = tg?.viewportStableHeight;
+
+  const height = (h && Number.isFinite(h)) ? h : window.innerHeight;
+  const stableHeight = (stable && Number.isFinite(stable)) ? stable : height;
+
+  document.documentElement.style.setProperty("--tg-viewport-height", `${height}px`);
+  document.documentElement.style.setProperty("--tg-viewport-stable-height", `${stableHeight}px`);
 }
 
 syncTelegramViewportHeight();
 tg.onEvent("viewportChanged", syncTelegramViewportHeight);
+window.addEventListener("resize", syncTelegramViewportHeight);
 // ---------------------------------------------------------------------------
 
     // API base URL
