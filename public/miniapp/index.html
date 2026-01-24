@@ -360,6 +360,15 @@ body {
   min-height: 0;
 }
 
+/* Prevent background scroll when modal is open */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+
 .modal-actions {
   display: flex;
   gap: 12px;
@@ -1046,6 +1055,13 @@ function JournalModal({ entry, onClose, onSave, onDelete }) {
   const [body, setBody] = useState(entry?.body || '');
 
   const isEdit = !!entry?._id;
+  
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
 
   const handleSave = async () => {
     if (!body.trim()) {
@@ -1364,63 +1380,13 @@ const handleGeneratePrompt = async () => {
       )}
       
       {promptModalOpen && (
-  <div
-    className="modal-overlay"
-    onClick={() => setPromptModalOpen(false)}
-  >
-    <div className="modal" onClick={(e) => e.stopPropagation()}>
-      <div className="modal-header">
-        <h2>Prompt</h2>
-        <button
-          className="modal-close"
-          onClick={() => setPromptModalOpen(false)}
-          type="button"
-        >
-          ×
-        </button>
-      </div>
-
-      <div className="modal-body">
-        {promptLoading ? (
-          <div className="loading">
-            <div className="spinner" />
-            <div>Generating…</div>
-          </div>
-        ) : dailyPrompt ? (
-          <>
-            <div className="journal-prompt-text">{dailyPrompt}</div>
-
-            {typeof promptRemaining === "number" && (
-              <div className="journal-prompt-meta">
-                Remaining today: {promptRemaining}
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="empty-state-text">Tap Prompt to generate.</div>
-        )}
-      </div>
-
-      <div className="modal-actions">
-        <button
-          className="btn btn-secondary"
-          onClick={() => setPromptModalOpen(false)}
-          type="button"
-        >
-          Close
-        </button>
-
-        <button
-          className="btn btn-primary"
-          onClick={handleGeneratePrompt}
-          disabled={promptLoading}
-          type="button"
-        >
-          Generate Again
-        </button>
-      </div>
-    </div>
-  </div>
+  <PromptModal 
+    onClose={() => setPromptModalOpen(false)}
+    onGenerate={handleGeneratePrompt}
+    prompt={dailyPrompt}
+    remaining={promptRemaining}
+    loading={promptLoading}
+  />
 )}
       
     </div>
@@ -1430,6 +1396,13 @@ const handleGeneratePrompt = async () => {
 // Journal Preview Modal
 function JournalEntryModal({ entry, onClose, onEdit }) {
   if (!entry) return null;
+  
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
 
   const created = entry.createdAt ? new Date(entry.createdAt) : null;
   const dateStr = created
@@ -1477,6 +1450,74 @@ function JournalEntryModal({ entry, onClose, onEdit }) {
     </div>
   );
 }
+
+// Prompt Modal
+function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Prompt</h2>
+          <button
+            className="modal-close"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="modal-body">
+          {loading ? (
+            <div className="loading">
+              <div className="spinner" />
+              <div>Generating…</div>
+            </div>
+          ) : prompt ? (
+            <>
+              <div className="journal-prompt-text">{prompt}</div>
+
+              {typeof remaining === "number" && (
+                <div className="journal-prompt-meta">
+                  Remaining today: {remaining}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="empty-state-text">Tap Prompt to generate.</div>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={onClose}
+            type="button"
+          >
+            Close
+          </button>
+
+          <button
+            className="btn btn-primary"
+            onClick={onGenerate}
+            disabled={loading}
+            type="button"
+          >
+            Generate Again
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 
     // Reminder Card Component
@@ -1532,6 +1573,13 @@ function JournalEntryModal({ entry, onClose, onEdit }) {
   const [time, setTime] = useState('');
   const [scheduleKind, setScheduleKind] = useState(reminder?.schedule?.kind || 'once');
   const [intervalMinutes, setIntervalMinutes] = useState(reminder?.schedule?.intervalMinutes || 30);
+  
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
 
   useEffect(() => {
     if (reminder) {
@@ -1665,6 +1713,13 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
   const [offsetMinutes, setOffsetMinutes] = useState(10);
   const [customReminderDate, setCustomReminderDate] = useState('');
   const [customReminderTime, setCustomReminderTime] = useState('');
+  
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
 
   useEffect(() => {
     // Base event fields
