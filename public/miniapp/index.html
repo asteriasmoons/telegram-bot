@@ -868,6 +868,89 @@ body.modal-open .app-content {
   justify-content: center;
   padding: 12px;
 }
+
+/* ---------------- Icon System (SVG icons replacing emojis) ---------------- */
+
+/* Global sanity */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Inline icon sizing + alignment */
+.card-time img,
+.btn img,
+.nav-item-icon img,
+.empty-state-icon img,
+.calendar-add-icon-btn img,
+.calendar-event-location img,
+.calendar-event-delete img {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
+  object-fit: contain;
+}
+
+/* --- Card time (date / time rows) --- */
+.card-time {
+  gap: 8px;
+}
+.card-time img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
+}
+
+/* --- Buttons with icons --- */
+.btn img {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Bottom navigation icons --- */
+.nav-item-icon {
+  font-size: 0; /* removes emoji-era baseline spacing */
+  line-height: 0;
+}
+.nav-item-icon img {
+  width: 24px;
+  height: 24px;
+  opacity: 0.9;
+}
+
+.nav-item.active .nav-item-icon img {
+  opacity: 1;
+}
+
+/* --- Empty states --- */
+.empty-state-icon img {
+  width: 64px;
+  height: 64px;
+  opacity: 0.3;
+}
+
+/* --- Calendar --- */
+.calendar-add-icon-btn img {
+  width: 18px;
+  height: 18px;
+}
+
+.calendar-event-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.calendar-event-location img {
+  width: 14px;
+  height: 14px;
+  opacity: 0.85;
+}
+
+.calendar-event-delete img {
+  width: 18px;
+  height: 18px;
+}
   </style>
 </head>
 
