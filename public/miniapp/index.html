@@ -43,9 +43,30 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html, body {
+  height: 100%;
+}
+
+body {
+  overflow: hidden; /* prevent the page from trying to scroll the whole viewport */
+}
+
 #root {
-  min-height: var(--tg-viewport-height, 100vh);
-  padding-top: env(safe-area-inset-top);
+  height: 100%;
+  min-height: 0; /* important: don't force viewport height */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.app-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
@@ -856,7 +877,7 @@ if (!isTelegram) {
 
 // Initialize Telegram Web App.. Safe to init now
 tg.ready();
-tg.expand();
+// tg.expand();
 
 // --- Telegram real viewport height fix (standalone fullscreen vs chat sheet) ---
 function syncTelegramViewportHeight() {
@@ -2390,49 +2411,62 @@ const handleFabClick = () => {
   }
 };
 
-      return (
-        <div>
-          <div className={`view-container ${activeView === 'reminders' ? 'active' : ''}`} data-view="reminders">
-            <RemindersView activeView={activeView} />
-          </div>
+return (
+  <div className="app-shell">
+    <div className="app-content">
+      <div
+        className={`view-container ${activeView === 'reminders' ? 'active' : ''}`}
+        data-view="reminders"
+      >
+        <RemindersView activeView={activeView} />
+      </div>
 
-          <div className={`view-container ${activeView === 'calendar' ? 'active' : ''}`} data-view="calendar">
-            <CalendarView ref={calendarViewRef} />
-          </div>
-          
-          <div className={`view-container ${activeView === 'journal' ? 'active' : ''}`} data-view="journal">
-  <JournalsView activeView={activeView} />
-</div>
+      <div
+        className={`view-container ${activeView === 'calendar' ? 'active' : ''}`}
+        data-view="calendar"
+      >
+        <CalendarView ref={calendarViewRef} />
+      </div>
 
-          <button className="fab" onClick={handleFabClick}>
-            +
-          </button>
+      <div
+        className={`view-container ${activeView === 'journal' ? 'active' : ''}`}
+        data-view="journal"
+      >
+        <JournalsView activeView={activeView} />
+      </div>
+    </div>
 
-          <div className="bottom-nav">
-            <button
-              className={`nav-item ${activeView === 'reminders' ? 'active' : ''}`}
-              onClick={() => setActiveView('reminders')}
-            >
-              <div className="nav-item-icon">📋</div>
-              <div className="nav-item-label">Reminders</div>
-            </button>
-            <button
-              className={`nav-item ${activeView === 'calendar' ? 'active' : ''}`}
-              onClick={() => setActiveView('calendar')}
-            >
-              <div className="nav-item-icon">📅</div>
-              <div className="nav-item-label">Calendar</div>
-            </button>
-            <button
-  className={`nav-item ${activeView === 'journal' ? 'active' : ''}`}
-  onClick={() => setActiveView('journal')}
->
-  <div className="nav-item-icon">📓</div>
-  <div className="nav-item-label">Journal</div>
-</button>
-          </div>
-        </div>
-      );
+    <button className="fab" onClick={handleFabClick}>
+      +
+    </button>
+
+    <div className="bottom-nav">
+      <button
+        className={`nav-item ${activeView === 'reminders' ? 'active' : ''}`}
+        onClick={() => setActiveView('reminders')}
+      >
+        <div className="nav-item-icon">📋</div>
+        <div className="nav-item-label">Reminders</div>
+      </button>
+
+      <button
+        className={`nav-item ${activeView === 'calendar' ? 'active' : ''}`}
+        onClick={() => setActiveView('calendar')}
+      >
+        <div className="nav-item-icon">📅</div>
+        <div className="nav-item-label">Calendar</div>
+      </button>
+
+      <button
+        className={`nav-item ${activeView === 'journal' ? 'active' : ''}`}
+        onClick={() => setActiveView('journal')}
+      >
+        <div className="nav-item-icon">📓</div>
+        <div className="nav-item-label">Journal</div>
+      </button>
+    </div>
+  </div>
+);
     }
 
     ReactDOM.render(<App />, document.getElementById('root'));
