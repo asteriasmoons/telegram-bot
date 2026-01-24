@@ -1451,6 +1451,7 @@ const handleGeneratePrompt = async () => {
       setEditingEntry(entry);
       setShowModal(true);
     }}
+    onDelete={handleDelete}
   />
 )}
 
@@ -1488,7 +1489,7 @@ const handleGeneratePrompt = async () => {
 }
 
 // Journal Preview Modal
-function JournalEntryModal({ entry, onClose, onEdit }) {
+function JournalEntryModal({ entry, onClose, onEdit, onDelete }) {
   if (!entry) return null;
   
   useEffect(() => {
@@ -1533,13 +1534,26 @@ function JournalEntryModal({ entry, onClose, onEdit }) {
         </div>
 
         <div className="modal-actions journal-preview-actions">
-          <button className="btn btn-primary" onClick={() => onEdit(entry)}>
-            Edit
-          </button>
-          <button className="btn btn-secondary" onClick={onClose}>
-            Close
-          </button>
-        </div>
+  <button className="btn btn-primary" onClick={() => onEdit(entry)}>
+    Edit
+  </button>
+
+  <button className="btn btn-secondary" onClick={onClose}>
+    Close
+  </button>
+
+  <button
+    className="btn btn-danger"
+    type="button"
+    onClick={() => {
+      if (!entry?._id) return;
+      onDelete(entry._id);
+      onClose(); // close the preview modal immediately after delete
+    }}
+  >
+    Delete
+  </button>
+</div>
       </div>
     </div>
   );
