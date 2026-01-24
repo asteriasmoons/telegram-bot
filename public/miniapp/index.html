@@ -342,7 +342,31 @@ body {
   overflow-y: auto;
   border: 1px solid var(--border);
   animation: slideUp 0.3s;
+  display: flex;
+  flex-direction: column;
 }
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  flex-shrink: 0;
+}
+
 
 @keyframes slideUp {
   from {
@@ -353,13 +377,6 @@ body {
     transform: translateY(0);
     opacity: 1;
   }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
 }
 
 .modal-header h2 {
@@ -453,12 +470,6 @@ body {
   outline: none;
   border-color: var(--accent);
   background: rgba(255, 255, 255, 0.08);
-}
-
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
 }
 
 .modal-actions .btn {
@@ -1059,36 +1070,38 @@ function JournalModal({ entry, onClose, onSave, onDelete }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="form-group">
-          <label className="form-label">Title (optional)</label>
-          <input
-            type="text"
-            className="form-input"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Title..."
-          />
-        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Title (optional)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Title..."
+            />
+          </div>
 
-        <div className="form-group">
-          <label className="form-label">Tags</label>
-          <input
-            type="text"
-            className="form-input"
-            value={tagsText}
-            onChange={e => setTagsText(e.target.value)}
-            placeholder="#tag-1 #tag-2"
-          />
-        </div>
+          <div className="form-group">
+            <label className="form-label">Tags</label>
+            <input
+              type="text"
+              className="form-input"
+              value={tagsText}
+              onChange={e => setTagsText(e.target.value)}
+              placeholder="#tag-1 #tag-2"
+            />
+          </div>
 
-        <div className="form-group">
-          <label className="form-label">Body</label>
-          <textarea
-            className="form-textarea"
-            value={body}
-            onChange={e => setBody(e.target.value)}
-            placeholder="Write your entry..."
-          />
+          <div className="form-group">
+            <label className="form-label">Body</label>
+            <textarea
+              className="form-textarea"
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="Write your entry..."
+            />
+          </div>
         </div>
 
         <div className="modal-actions">
@@ -1110,6 +1123,7 @@ function JournalModal({ entry, onClose, onSave, onDelete }) {
     </div>
   );
 }
+
 
 // Journals View
 function JournalsView({ activeView }) {
@@ -1366,24 +1380,26 @@ const handleGeneratePrompt = async () => {
         </button>
       </div>
 
-      {promptLoading ? (
-        <div className="loading">
-          <div className="spinner" />
-          <div>Generating…</div>
-        </div>
-      ) : dailyPrompt ? (
-        <>
-          <div className="journal-prompt-text">{dailyPrompt}</div>
+      <div className="modal-body">
+        {promptLoading ? (
+          <div className="loading">
+            <div className="spinner" />
+            <div>Generating…</div>
+          </div>
+        ) : dailyPrompt ? (
+          <>
+            <div className="journal-prompt-text">{dailyPrompt}</div>
 
-          {typeof promptRemaining === "number" && (
-            <div className="journal-prompt-meta">
-              Remaining today: {promptRemaining}
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="empty-state-text">Tap Prompt to generate.</div>
-      )}
+            {typeof promptRemaining === "number" && (
+              <div className="journal-prompt-meta">
+                Remaining today: {promptRemaining}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="empty-state-text">Tap Prompt to generate.</div>
+        )}
+      </div>
 
       <div className="modal-actions">
         <button
@@ -1428,24 +1444,26 @@ function JournalEntryModal({ entry, onClose, onEdit }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        {dateStr && (
-          <div className="card-time" style={{ marginBottom: 12 }}>
-            <span>🗓️</span>
-            <span>{dateStr}</span>
-          </div>
-        )}
+        <div className="modal-body">
+          {dateStr && (
+            <div className="card-time" style={{ marginBottom: 12 }}>
+              <span>🗓️</span>
+              <span>{dateStr}</span>
+            </div>
+          )}
 
-        <div style={{ whiteSpace: "pre-line", lineHeight: 1.6, fontSize: 15 }}>
-          {entry.body}
+          <div style={{ whiteSpace: "pre-line", lineHeight: 1.6, fontSize: 15 }}>
+            {entry.body}
+          </div>
+
+          {Array.isArray(entry.tags) && entry.tags.length > 0 && (
+            <div className="tag-row">
+              {entry.tags.map((t) => (
+                <span key={t} className="tag-pill">#{t}</span>
+              ))}
+            </div>
+          )}
         </div>
-
-        {Array.isArray(entry.tags) && entry.tags.length > 0 && (
-          <div className="tag-row">
-            {entry.tags.map((t) => (
-              <span key={t} className="tag-pill">#{t}</span>
-            ))}
-          </div>
-        )}
 
         <div className="modal-actions journal-preview-actions">
           <button className="btn btn-primary" onClick={() => onEdit(entry)}>
@@ -1459,6 +1477,7 @@ function JournalEntryModal({ entry, onClose, onEdit }) {
     </div>
   );
 }
+
 
     // Reminder Card Component
     function ReminderCard({ reminder, onEdit, onSnooze, onDone, onDelete }) {
@@ -1508,124 +1527,127 @@ function JournalEntryModal({ entry, onClose, onEdit }) {
 
     // Reminder Modal
     function ReminderModal({ reminder, onClose, onSave }) {
-      const [text, setText] = useState(reminder?.text || '');
-      const [date, setDate] = useState('');
-      const [time, setTime] = useState('');
-      const [scheduleKind, setScheduleKind] = useState(reminder?.schedule?.kind || 'once');
-      const [intervalMinutes, setIntervalMinutes] = useState(reminder?.schedule?.intervalMinutes || 30);
+  const [text, setText] = useState(reminder?.text || '');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [scheduleKind, setScheduleKind] = useState(reminder?.schedule?.kind || 'once');
+  const [intervalMinutes, setIntervalMinutes] = useState(reminder?.schedule?.intervalMinutes || 30);
 
-      useEffect(() => {
-        if (reminder) {
-          const d = new Date(reminder.nextRunAt);
-          setDate(d.toISOString().split('T')[0]);
-          setTime(d.toTimeString().slice(0, 5));
-        } else {
-          const now = new Date();
-          setDate(now.toISOString().split('T')[0]);
-          setTime('09:00');
-        }
-      }, [reminder]);
+  useEffect(() => {
+    if (reminder) {
+      const d = new Date(reminder.nextRunAt);
+      setDate(d.toISOString().split('T')[0]);
+      setTime(d.toTimeString().slice(0, 5));
+    } else {
+      const now = new Date();
+      setDate(now.toISOString().split('T')[0]);
+      setTime('09:00');
+    }
+  }, [reminder]);
 
-      const handleSave = async () => {
-        if (!text.trim()) {
-          tg.showAlert('Please enter a message');
-          return;
-        }
+  const handleSave = async () => {
+    if (!text.trim()) {
+      tg.showAlert('Please enter a message');
+      return;
+    }
 
-        const nextRunAt = new Date(`${date}T${time}`);
+    const nextRunAt = new Date(`${date}T${time}`);
 
-        const schedule = scheduleKind === 'once'
-          ? { kind: 'once' }
-          : scheduleKind === 'interval'
-          ? { kind: 'interval', intervalMinutes }
-          : { kind: scheduleKind, timeOfDay: time };
+    const schedule = scheduleKind === 'once'
+      ? { kind: 'once' }
+      : scheduleKind === 'interval'
+      ? { kind: 'interval', intervalMinutes }
+      : { kind: scheduleKind, timeOfDay: time };
 
-        await onSave({
-          text,
-          nextRunAt: nextRunAt.toISOString(),
-          schedule,
-          timezone: 'America/Chicago',
-        });
-      };
+    await onSave({
+      text,
+      nextRunAt: nextRunAt.toISOString(),
+      schedule,
+      timezone: 'America/Chicago',
+    });
+  };
 
-      return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{reminder ? 'Edit Reminder' : 'New Reminder'}</h2>
-              <button className="modal-close" onClick={onClose}>×</button>
-            </div>
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{reminder ? 'Edit Reminder' : 'New Reminder'}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
 
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Message</label>
+            <textarea
+              className="form-textarea"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="What do you want to be reminded about?"
+            />
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Message</label>
-              <textarea
-                className="form-textarea"
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder="What do you want to be reminded about?"
+              <label className="form-label">Date</label>
+              <input
+                type="date"
+                className="form-input"
+                value={date}
+                onChange={e => setDate(e.target.value)}
               />
             </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Date</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Time</label>
-                <input
-                  type="time"
-                  className="form-input"
-                  value={time}
-                  onChange={e => setTime(e.target.value)}
-                />
-              </div>
-            </div>
-
             <div className="form-group">
-              <label className="form-label">Repeat</label>
-              <select
-                className="form-select"
-                value={scheduleKind}
-                onChange={e => setScheduleKind(e.target.value)}
-              >
-                <option value="once">Once</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="interval">Custom Interval</option>
-              </select>
-            </div>
-
-            {scheduleKind === 'interval' && (
-              <div className="form-group">
-                <label className="form-label">Interval (minutes)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={intervalMinutes}
-                  onChange={e => setIntervalMinutes(Number(e.target.value))}
-                  min="1"
-                />
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={onClose}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" onClick={handleSave}>
-                {reminder ? 'Update' : 'Create'}
-              </button>
+              <label className="form-label">Time</label>
+              <input
+                type="time"
+                className="form-input"
+                value={time}
+                onChange={e => setTime(e.target.value)}
+              />
             </div>
           </div>
+
+          <div className="form-group">
+            <label className="form-label">Repeat</label>
+            <select
+              className="form-select"
+              value={scheduleKind}
+              onChange={e => setScheduleKind(e.target.value)}
+            >
+              <option value="once">Once</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="interval">Custom Interval</option>
+            </select>
+          </div>
+
+          {scheduleKind === 'interval' && (
+            <div className="form-group">
+              <label className="form-label">Interval (minutes)</label>
+              <input
+                type="number"
+                className="form-input"
+                value={intervalMinutes}
+                onChange={e => setIntervalMinutes(Number(e.target.value))}
+                min="1"
+              />
+            </div>
+          )}
         </div>
-      );
-    }
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            {reminder ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
     // Event Modal
 function EventModal({ event, selectedDate, onClose, onSave }) {
@@ -1639,7 +1661,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
 
   // Reminder UI state (default OFF)
   const [reminderEnabled, setReminderEnabled] = useState(false);
-  const [reminderMode, setReminderMode] = useState('at_event'); // 'at_event' | 'offset' | 'custom'
+  const [reminderMode, setReminderMode] = useState('at_event');
   const [offsetMinutes, setOffsetMinutes] = useState(10);
   const [customReminderDate, setCustomReminderDate] = useState('');
   const [customReminderTime, setCustomReminderTime] = useState('');
@@ -1689,8 +1711,6 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
     setCustomReminderDate(now.toISOString().split('T')[0]);
     setCustomReminderTime('09:00');
 
-    // If editing and backend returned a linked reminder, initialize UI from it
-    // (calendar-api.ts should be returning event.reminder or null)
     if (event && event.reminder && event.reminder.nextRunAt) {
       const rNext = new Date(event.reminder.nextRunAt);
       const eStart = new Date(event.startDate);
@@ -1700,16 +1720,13 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       const diffMs = eStart.getTime() - rNext.getTime();
       const diffMinutes = Math.round(diffMs / 60000);
 
-      // Same time (or within 1 minute) => at_event
       if (Math.abs(diffMinutes) <= 1) {
         setReminderMode('at_event');
       }
-      // Reminder before start => offset
       else if (diffMinutes > 0) {
         setReminderMode('offset');
         setOffsetMinutes(Math.max(1, diffMinutes));
       }
-      // Reminder after start or weird case => custom
       else {
         setReminderMode('custom');
         setCustomReminderDate(rNext.toISOString().split('T')[0]);
@@ -1724,7 +1741,6 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       return;
     }
 
-    // Event dates
     const startDate = allDay
       ? new Date(`${date}T00:00:00`)
       : new Date(`${date}T${time}`);
@@ -1734,11 +1750,9 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
         ? new Date(`${date}T${endTime}`)
         : null;
 
-    // Reminder payload for backend
     let reminderPayload = { enabled: false };
 
     if (reminderEnabled) {
-      // If all-day, force custom reminder time (otherwise it would be 00:00)
       if (allDay && reminderMode !== 'custom') {
         tg.showAlert('For all-day events, please use Custom reminder time.');
         return;
@@ -1749,7 +1763,6 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       } else if (reminderMode === 'offset') {
         reminderPayload = { enabled: true, mode: 'offset', offsetMinutes };
       } else {
-        // custom
         if (!customReminderDate || !customReminderTime) {
           tg.showAlert('Please choose a custom reminder date and time.');
           return;
@@ -1810,147 +1823,144 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="form-group">
-          <label className="form-label">Title</label>
-          <input
-            type="text"
-            className="form-input"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Event title"
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Description</label>
-          <textarea
-            className="form-textarea form-textarea--sm"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Add details..."
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Date</label>
-          <input
-            type="date"
-            className="form-input"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="checkbox-row">
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Title</label>
             <input
-              type="checkbox"
-              checked={allDay}
-              onChange={e => setAllDay(e.target.checked)}
+              type="text"
+              className="form-input"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Event title"
             />
-            <span>All day event</span>
-          </label>
-        </div>
-
-        {!allDay && (
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Start Time</label>
-              <input
-                type="time"
-                className="form-input"
-                value={time}
-                onChange={e => setTime(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">End Time</label>
-              <input
-                type="time"
-                className="form-input"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-              />
-            </div>
           </div>
-        )}
 
-        <div className="form-group">
-          <label className="form-label">Location</label>
-          <input
-            type="text"
-            className="form-input"
-            value={location}
-            onChange={e => setLocation(e.target.value)}
-            placeholder="Add location"
-          />
-        </div>
-
-        {/* Reminder section */}
-        <div className="form-group">
-          <label className="form-label">Reminder</label>
-
-          <label className="checkbox-row" style={{ marginBottom: 12 }}>
-            <input
-              type="checkbox"
-              checked={reminderEnabled}
-              onChange={e => setReminderEnabled(e.target.checked)}
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <textarea
+              className="form-textarea form-textarea--sm"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Add details..."
             />
-            <span>Enable reminder</span>
-          </label>
+          </div>
 
-          {reminderEnabled && (
-            <div>
-              {/* Mode buttons */}
-              <div className="card-actions" style={{ marginBottom: 12 }}>
-                <ReminderModeButton value="at_event" label="At event time" />
-                <ReminderModeButton value="offset" label="Before event" />
-                <ReminderModeButton value="custom" label="Custom time" />
+          <div className="form-group">
+            <label className="form-label">Date</label>
+            <input
+              type="date"
+              className="form-input"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={allDay}
+                onChange={e => setAllDay(e.target.checked)}
+              />
+              <span>All day event</span>
+            </label>
+          </div>
+
+          {!allDay && (
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Start Time</label>
+                <input
+                  type="time"
+                  className="form-input"
+                  value={time}
+                  onChange={e => setTime(e.target.value)}
+                />
               </div>
-
-              {/* Offset presets */}
-              {reminderMode === 'offset' && (
-                <div className="card-actions" style={{ marginBottom: 12 }}>
-                  <OffsetButton minutes={5} />
-                  <OffsetButton minutes={10} />
-                  <OffsetButton minutes={15} />
-                  <OffsetButton minutes={30} />
-                  <OffsetButton minutes={60} />
-                </div>
-              )}
-
-              {/* Custom date/time */}
-              {reminderMode === 'custom' && (
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Reminder Date</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={customReminderDate}
-                      onChange={e => setCustomReminderDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Reminder Time</label>
-                    <input
-                      type="time"
-                      className="form-input"
-                      value={customReminderTime}
-                      onChange={e => setCustomReminderTime(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* All-day hint */}
-              {allDay && reminderMode !== 'custom' && (
-                <div style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.4 }}>
-                  For all-day events, use Custom reminder time.
-                </div>
-              )}
+              <div className="form-group">
+                <label className="form-label">End Time</label>
+                <input
+                  type="time"
+                  className="form-input"
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                />
+              </div>
             </div>
           )}
+
+          <div className="form-group">
+            <label className="form-label">Location</label>
+            <input
+              type="text"
+              className="form-input"
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder="Add location"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Reminder</label>
+
+            <label className="checkbox-row" style={{ marginBottom: 12 }}>
+              <input
+                type="checkbox"
+                checked={reminderEnabled}
+                onChange={e => setReminderEnabled(e.target.checked)}
+              />
+              <span>Enable reminder</span>
+            </label>
+
+            {reminderEnabled && (
+              <div>
+                <div className="card-actions" style={{ marginBottom: 12 }}>
+                  <ReminderModeButton value="at_event" label="At event time" />
+                  <ReminderModeButton value="offset" label="Before event" />
+                  <ReminderModeButton value="custom" label="Custom time" />
+                </div>
+
+                {reminderMode === 'offset' && (
+                  <div className="card-actions" style={{ marginBottom: 12 }}>
+                    <OffsetButton minutes={5} />
+                    <OffsetButton minutes={10} />
+                    <OffsetButton minutes={15} />
+                    <OffsetButton minutes={30} />
+                    <OffsetButton minutes={60} />
+                  </div>
+                )}
+
+                {reminderMode === 'custom' && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Reminder Date</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={customReminderDate}
+                        onChange={e => setCustomReminderDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Reminder Time</label>
+                      <input
+                        type="time"
+                        className="form-input"
+                        value={customReminderTime}
+                        onChange={e => setCustomReminderTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {allDay && reminderMode !== 'custom' && (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.4 }}>
+                    For all-day events, use Custom reminder time.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="modal-actions">
@@ -1965,6 +1975,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
     </div>
   );
 }
+
 
     // Calendar View - Day List Style
     function CalendarView() {
