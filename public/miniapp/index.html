@@ -1022,9 +1022,9 @@ function JournalCard({ entry, onView, onEdit, onDelete }) {
             {title}
           </div>
           <div className="card-time">
-            <span>🗓️</span>
-            <span>{formatShortDate(entry.createdAt)}</span>
-          </div>
+  <img src="/icons/cal.svg" alt="" />
+  <span>{formatShortDate(entry.createdAt)}</span>
+</div>
         </div>
 
         <span className="card-badge" style={{ background: 'rgba(139,125,239,0.15)', color: '#8b7def' }}>
@@ -1045,11 +1045,12 @@ function JournalCard({ entry, onView, onEdit, onDelete }) {
       {expanded && (
         <div className="card-actions" onClick={e => e.stopPropagation()} style={{ marginTop: 14 }}>
           <button className="btn btn-primary" onClick={() => onEdit(entry)}>
-            ✏️ Edit
-          </button>
+  <img src="/icons/pencil.svg" alt="" />
+  Edit
+</button>
           <button className="btn btn-danger" onClick={() => onDelete(entry._id)}>
-            🗑️
-          </button>
+  <img src="/icons/trash.svg" alt="" />
+</button>
         </div>
       )}
     </div>
@@ -1324,7 +1325,9 @@ const handleGeneratePrompt = async () => {
         </div>
       ) : entries.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">📓</div>
+          <div className="empty-state-icon">
+  <img src="/icons/edit.svg" alt="" />
+</div>
           <div className="empty-state-text">
             No journal entries yet.
             {"\n"}Tap + to create one.
@@ -1428,9 +1431,9 @@ function JournalEntryModal({ entry, onClose, onEdit }) {
         <div className="modal-body">
           {dateStr && (
             <div className="card-time" style={{ marginBottom: 12 }}>
-              <span>🗓️</span>
-              <span>{dateStr}</span>
-            </div>
+  <img src="/icons/cal.svg" alt="" />
+  <span>{dateStr}</span>
+</div>
           )}
 
           <div style={{ whiteSpace: "pre-line", lineHeight: 1.6, fontSize: 15 }}>
@@ -1539,9 +1542,9 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
         <div className="card" onClick={() => setExpanded(!expanded)}>
           <div className="card-header">
             <div className="card-time">
-              <span>⏰</span>
-              <span>{formatDateTime(reminder.nextRunAt)}</span>
-            </div>
+  <img src="/icons/alarm.svg" alt="" />
+  <span>{formatDateTime(reminder.nextRunAt)}</span>
+</div>
             <span className={getBadgeClass()}>
               {reminder.schedule?.kind || 'once'}
             </span>
@@ -1552,20 +1555,24 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
           {expanded && (
             <div className="card-actions" onClick={e => e.stopPropagation()}>
               <button className="btn btn-primary" onClick={() => onEdit(reminder)}>
-                ✏️ Edit
-              </button>
+  <img src="/icons/pencil.svg" alt="" />
+  Edit
+</button>
               <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 15)}>
-                ⏰ 15m
-              </button>
+  <img src="/icons/alarm.svg" alt="" />
+  15m
+</button>
               <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 60)}>
-                ⏰ 1h
-              </button>
+  <img src="/icons/alarm.svg" alt="" />
+  1h
+</button>
               <button className="btn btn-success" onClick={() => onDone(reminder._id)}>
-                ✓ Done
-              </button>
+  <img src="/icons/check.svg" alt="" />
+  Done
+</button>
               <button className="btn btn-danger" onClick={() => onDelete(reminder._id)}>
-                🗑️
-              </button>
+  <img src="/icons/trash.svg" alt="" />
+</button>
             </div>
           )}
         </div>
@@ -2196,12 +2203,12 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
                           <div className="calendar-no-events">
                             <span>No events</span>
                             <button
-                              ref={el => createEventRefs.current[date.toISOString()] = el}
-                              onClick={() => handleCreateEvent(date)}
-                              className="calendar-add-icon-btn"
-                            >
-                              +
-                            </button>
+  ref={el => createEventRefs.current[date.toISOString()] = el}
+  onClick={() => handleCreateEvent(date)}
+  className="calendar-add-icon-btn"
+>
+  <img src="/icons/plus.svg" alt="" />
+</button>
                           </div>
                         ) : (
                           <div>
@@ -2228,16 +2235,17 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
                                     )}
                                     {event.location && (
                                       <div className="calendar-event-location">
-                                        📍 {event.location}
-                                      </div>
+  <img src="/icons/location.svg" alt="" />
+  {event.location}
+</div>
                                     )}
                                   </div>
                                   <button
-                                    onClick={(e) => handleDeleteEvent(event._id, e)}
-                                    className="calendar-event-delete"
-                                  >
-                                    🗑️
-                                  </button>
+  onClick={(e) => handleDeleteEvent(event._id, e)}
+  className="calendar-event-delete"
+>
+  <img src="/icons/trash.svg" alt="" />
+</button>
                                 </div>
                               </div>
                             ))}
@@ -2425,7 +2433,9 @@ useEffect(() => {
             </div>
           ) : filteredReminders.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-state-icon">📝</div>
+              <div className="empty-state-icon">
+  <img src="/icons/journal.svg" alt="" />
+</div>
               <div className="empty-state-text">
                 {filter === 'all'
                   ? 'No reminders yet.\nTap the + button to create one!'
@@ -2520,7 +2530,9 @@ return (
         className={`nav-item ${activeView === 'reminders' ? 'active' : ''}`}
         onClick={() => setActiveView('reminders')}
       >
-        <div className="nav-item-icon">📋</div>
+        <div className="nav-item-icon">
+  <img src="/icons/bell.svg" alt="" />
+</div>
         <div className="nav-item-label">Reminders</div>
       </button>
 
@@ -2528,7 +2540,9 @@ return (
         className={`nav-item ${activeView === 'calendar' ? 'active' : ''}`}
         onClick={() => setActiveView('calendar')}
       >
-        <div className="nav-item-icon">📅</div>
+        <div className="nav-item-icon">
+  <img src="/icons/calendar.svg" alt="" />
+</div>
         <div className="nav-item-label">Calendar</div>
       </button>
 
@@ -2536,7 +2550,9 @@ return (
         className={`nav-item ${activeView === 'journal' ? 'active' : ''}`}
         onClick={() => setActiveView('journal')}
       >
-        <div className="nav-item-icon">📓</div>
+        <div className="nav-item-icon">
+  <img src="/icons/page.svg" alt="" />
+</div>
         <div className="nav-item-label">Journal</div>
       </button>
     </div>
