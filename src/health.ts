@@ -81,7 +81,6 @@ app.post(webhookPath, async (req, res) => {
     if (!res.headersSent) res.sendStatus(200);
   }
 });
-  });
 
   // ---- Mini App API mounting ----
   // Your existing miniapp API router already has its own auth middleware inside api.ts,
