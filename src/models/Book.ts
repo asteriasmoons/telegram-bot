@@ -15,6 +15,11 @@ const BookSchema = new Schema(
       default: "tbr",
       index: true,
     },
+
+    // ---- Progress (only meaningful for "reading") ----
+    // Optional so existing docs + non-reading statuses don't break.
+    totalPages: { type: Number, default: null, min: 0 },
+    currentPage: { type: Number, default: null, min: 0 },
   },
   { timestamps: true }
 );

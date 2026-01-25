@@ -244,6 +244,44 @@ body {
   flex-wrap: wrap;
 }
 
+/* -------- Reading Progress -------- */
+.progress-wrap {
+  margin-top: 14px;
+}
+
+.progress-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.progress-pct {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
 /* Buttons */
 .btn {
   padding: 8px 16px;
@@ -1112,6 +1150,26 @@ function BookCard({ book, onEdit, onDelete }) {
   const author = book.author?.trim() ? book.author.trim() : "";
   const badge = badgeForStatus(book.status);
 
+  const isReading = String(book.status || "").toLowerCase() === "reading";
+
+  const totalPages =
+    typeof book.totalPages === "number" && Number.isFinite(book.totalPages)
+      ? book.totalPages
+      : null;
+
+  const currentPage =
+    typeof book.currentPage === "number" && Number.isFinite(book.currentPage)
+      ? book.currentPage
+      : null;
+
+  const hasProgress = isReading && totalPages && totalPages > 0;
+
+  const safeCurrent = hasProgress
+    ? Math.min(Math.max(currentPage || 0, 0), totalPages)
+    : 0;
+
+  const pct = hasProgress ? Math.round((safeCurrent / totalPages) * 100) : null;
+
   return (
     <div className="card" onClick={() => setExpanded(!expanded)}>
       <div className="card-header">
@@ -1132,6 +1190,21 @@ function BookCard({ book, onEdit, onDelete }) {
           {badge.text}
         </span>
       </div>
+
+      {hasProgress && (
+        <div className="progress-wrap" onClick={(e) => e.stopPropagation()}>
+          <div className="progress-top">
+            <div>
+              {safeCurrent} / {totalPages} pages
+            </div>
+            <div className="progress-pct">{pct}%</div>
+          </div>
+
+          <div className="progress-bar" aria-label="Reading progress">
+            <div className="progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
 
       {expanded && (
         <div className="card-actions" onClick={(e) => e.stopPropagation()}>
@@ -1157,10 +1230,28 @@ function BookModal({ book, onClose, onSave, onDelete }) {
   const [author, setAuthor] = useState(book?.author || "");
   const [status, setStatus] = useState(book?.status || "tbr");
 
+  // New: progress fields (optional)
+  const [totalPages, setTotalPages] = useState(
+    typeof book?.totalPages === "number" ? String(book.totalPages) : ""
+  );
+  const [currentPage, setCurrentPage] = useState(
+    typeof book?.currentPage === "number" ? String(book.currentPage) : ""
+  );
+
+  const isReading = String(status || "").toLowerCase() === "reading";
+
   useEffect(() => {
     document.body.classList.add("modal-open");
     return () => document.body.classList.remove("modal-open");
   }, []);
+
+  // If user changes away from reading, clear progress (keeps UI consistent)
+  useEffect(() => {
+    if (!isReading) {
+      setTotalPages("");
+      setCurrentPage("");
+    }
+  }, [isReading]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -1168,11 +1259,41 @@ function BookModal({ book, onClose, onSave, onDelete }) {
       return;
     }
 
-    await onSave({
+    // Build payload
+    const payload = {
       title: title.trim(),
       author: author.trim(),
       status: statusLabelToValue(status),
-    });
+    };
+
+    // Only include progress if reading
+    if (isReading) {
+      const tp = totalPages === "" ? null : Number(totalPages);
+      const cp = currentPage === "" ? null : Number(currentPage);
+
+      if (tp !== null && (!Number.isFinite(tp) || tp < 1)) {
+        tg.showAlert("Total pages must be a positive number.");
+        return;
+      }
+
+      if (cp !== null && (!Number.isFinite(cp) || cp < 0)) {
+        tg.showAlert("Current page must be 0 or more.");
+        return;
+      }
+
+      // Clamp if both provided
+      let safeTp = tp;
+      let safeCp = cp;
+
+      if (safeTp !== null && safeTp > 0 && safeCp !== null) {
+        safeCp = Math.min(Math.max(safeCp, 0), safeTp);
+      }
+
+      payload.totalPages = safeTp;
+      payload.currentPage = safeCp;
+    }
+
+    await onSave(payload);
   };
 
   return (
@@ -1216,6 +1337,34 @@ function BookModal({ book, onClose, onSave, onDelete }) {
               <option value="finished">Finished</option>
             </select>
           </div>
+
+          {isReading && (
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Total Pages</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={totalPages}
+                  min="1"
+                  onChange={(e) => setTotalPages(e.target.value)}
+                  placeholder="e.g. 384"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Current Page</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={currentPage}
+                  min="0"
+                  onChange={(e) => setCurrentPage(e.target.value)}
+                  placeholder="e.g. 120"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="modal-actions">
