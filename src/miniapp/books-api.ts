@@ -33,7 +33,7 @@ function clampShortSummary(v: any) {
   // If you want a different max, change 280 here.
   const s = String(v || "").trim();
   if (!s) return "";
-  return s.slice(0, 280);
+  return s.slice(0, 800);
 }
 
 function normalizeProgress(
