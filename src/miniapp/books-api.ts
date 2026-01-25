@@ -135,169 +135,126 @@ router.post("/summary", async (req: any, res) => {
     const userId = req.userId as number;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const titleRaw = String(req.body?.title || "").trim();
-    const authorRaw = String(req.body?.author || "").trim();
+    const rawTitle = String(req.body?.title || "").trim();
+    const rawAuthor = String(req.body?.author || "").trim();
+    if (!rawTitle) return res.status(400).json({ error: "Title is required" });
 
-    if (!titleRaw) return res.status(400).json({ error: "Title is required" });
+    // Build "fuzzy-ish" query variants (no extra libs)
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s:.-]/gu, "") // keep letters/numbers/spaces/basic punctuation
+        .replace(/\s+/g, " ")
+        .trim();
 
-    // ---------- matching helpers ----------
-const norm = (s: any) => {
-  let out = String(s || "").toLowerCase().trim();
+    const stripSubtitle = (t: string) => t.split(":")[0].trim();
 
-  // Remove punctuation (NO character-class dashes here)
-  out = out.replace(/[:"'’(),.!?]/g, "");
+    const titleNorm = normalize(rawTitle);
+    const titleShort = normalize(stripSubtitle(rawTitle));
+    const authorNorm = normalize(rawAuthor);
 
-  // Remove all dash variants safely
-  out = out.replace(/\u2014/g, ""); // em dash --
-  out = out.replace(/\u2013/g, ""); // en dash –
-  out = out.replace(/-/g, "");      // hyphen -
+    const queries: string[] = [];
 
-  // Collapse whitespace
-  out = out.replace(/\s+/g, " ");
+    // Most specific → least specific
+    if (rawAuthor) queries.push(`intitle:${rawTitle} inauthor:${rawAuthor}`);
+    if (rawAuthor) queries.push(`${rawTitle} ${rawAuthor}`);
+    if (rawAuthor && titleShort !== titleNorm) queries.push(`intitle:${stripSubtitle(rawTitle)} inauthor:${rawAuthor}`);
+    queries.push(`intitle:${rawTitle}`);
+    if (titleShort !== titleNorm) queries.push(`intitle:${stripSubtitle(rawTitle)}`);
+    queries.push(rawTitle);
 
-  return out;
-};
+    // De-dupe
+    const qList = Array.from(new Set(queries.map(q => q.trim()).filter(Boolean)));
 
-    const score = (candidateTitle: string, candidateAuthor: string, wantTitle: string, wantAuthor: string) => {
-      const ct = norm(candidateTitle);
-      const ca = norm(candidateAuthor);
-      const wt = norm(wantTitle);
-      const wa = norm(wantAuthor);
+    // 1) Google Books (try multiple queries, take best description/snippet)
+    for (const q of qList) {
+      try {
+        const gbUrl =
+          "https://www.googleapis.com/books/v1/volumes?q=" +
+          encodeURIComponent(q) +
+          "&maxResults=5";
+        const gbResp = await fetch(gbUrl);
 
-      let s = 0;
+        if (!gbResp.ok) continue;
 
-      // title weighting
-      if (ct === wt) s += 100;
-      else if (ct.includes(wt) || wt.includes(ct)) s += 60;
-
-      // author weighting (optional)
-      if (wantAuthor) {
-        if (ca.includes(wa) || wa.includes(ca)) s += 40;
-      }
-
-      return s;
-    };
-
-    // ---------- 1) Google Books (prefer, often has description) ----------
-    // Use intitle/inauthor to get better results than a raw q string.
-    try {
-      const qParts = [`intitle:${titleRaw}`];
-      if (authorRaw) qParts.push(`inauthor:${authorRaw}`);
-      const gbUrl =
-        "https://www.googleapis.com/books/v1/volumes?q=" +
-        encodeURIComponent(qParts.join(" ")) +
-        "&maxResults=10";
-
-      const gbResp = await fetch(gbUrl);
-      if (gbResp.ok) {
         const gb = await gbResp.json();
         const items = Array.isArray(gb?.items) ? gb.items : [];
 
-        // pick best-scoring item that actually has a description
-        let best: any = null;
-        let bestScore = -1;
-
         for (const item of items) {
           const info = item?.volumeInfo || {};
-          const foundTitle = String(info?.title || "");
-          const foundAuthors = Array.isArray(info?.authors) ? info.authors.join(", ") : "";
-          const desc = info?.description;
+          const foundTitle = info?.title || rawTitle;
+          const foundAuthors = Array.isArray(info?.authors) ? info.authors.join(", ") : (rawAuthor || "");
 
-          if (!desc || !String(desc).trim()) continue;
+          const desc = typeof info?.description === "string" ? info.description.trim() : "";
+          const snippet = typeof item?.searchInfo?.textSnippet === "string" ? item.searchInfo.textSnippet.trim() : "";
 
-          const s = score(foundTitle, foundAuthors, titleRaw, authorRaw);
-          if (s > bestScore) {
-            bestScore = s;
-            best = { foundTitle, foundAuthors, desc: String(desc).trim() };
+          const summary = desc || snippet;
+
+          if (summary) {
+            return res.json({
+              source: "google_books",
+              title: foundTitle,
+              author: foundAuthors,
+              summary,
+            });
           }
         }
-
-        // If we found something reasonable, return it.
-        if (best && bestScore >= 40) {
-          return res.json({
-            found: true,
-            source: "google_books",
-            title: best.foundTitle || titleRaw,
-            author: best.foundAuthors || authorRaw,
-            summary: best.desc,
-          });
-        }
+      } catch {
+        // try next query
       }
-    } catch {
-      // ignore and fallback
     }
 
-    // ---------- 2) Open Library fallback ----------
-    try {
-      // Search more than 1, then pick best match.
-      const t = encodeURIComponent(titleRaw);
-      const a = encodeURIComponent(authorRaw);
+    // 2) Open Library (try multiple queries; use first work with description)
+    for (const q of qList) {
+      try {
+        const olSearchUrl =
+          "https://openlibrary.org/search.json?limit=5&q=" + encodeURIComponent(q);
 
-      const olUrl = authorRaw
-        ? `https://openlibrary.org/search.json?title=${t}&author=${a}&limit=10`
-        : `https://openlibrary.org/search.json?title=${t}&limit=10`;
+        const olResp = await fetch(olSearchUrl);
+        if (!olResp.ok) continue;
 
-      const olResp = await fetch(olUrl);
-      if (olResp.ok) {
         const ol = await olResp.json();
         const docs = Array.isArray(ol?.docs) ? ol.docs : [];
 
-        let bestDoc: any = null;
-        let bestScore = -1;
-
         for (const doc of docs) {
-          const foundTitle = String(doc?.title || "");
-          const foundAuthor = Array.isArray(doc?.author_name) ? String(doc.author_name[0] || "") : "";
-          const s = score(foundTitle, foundAuthor, titleRaw, authorRaw);
-          if (s > bestScore) {
-            bestScore = s;
-            bestDoc = doc;
+          const workKey = doc?.key; // "/works/OLxxxxW"
+          if (!workKey) continue;
+
+          const foundTitle = doc?.title || rawTitle;
+          const foundAuthor = Array.isArray(doc?.author_name) ? doc.author_name[0] : (rawAuthor || "");
+
+          const workUrl = `https://openlibrary.org${workKey}.json`;
+          const workResp = await fetch(workUrl);
+          if (!workResp.ok) continue;
+
+          const work = await workResp.json();
+          const desc = work?.description;
+
+          const summary =
+            typeof desc === "string"
+              ? desc
+              : typeof desc?.value === "string"
+              ? desc.value
+              : "";
+
+          if (summary && summary.trim()) {
+            return res.json({
+              source: "open_library",
+              title: foundTitle,
+              author: foundAuthor,
+              summary: summary.trim(),
+            });
           }
         }
-
-        const workKey = bestDoc?.key; // "/works/OLxxxxW"
-        if (workKey && bestScore >= 40) {
-          const workResp = await fetch(`https://openlibrary.org${workKey}.json`);
-          if (workResp.ok) {
-            const work = await workResp.json();
-            const desc = work?.description;
-
-            const summary =
-              typeof desc === "string"
-                ? desc
-                : typeof desc?.value === "string"
-                ? desc.value
-                : "";
-
-            if (summary && String(summary).trim()) {
-              const foundTitle = String(bestDoc?.title || "");
-              const foundAuthor = Array.isArray(bestDoc?.author_name) ? String(bestDoc.author_name[0] || "") : "";
-
-              return res.json({
-                found: true,
-                source: "open_library",
-                title: foundTitle || titleRaw,
-                author: foundAuthor || authorRaw,
-                summary: String(summary).trim(),
-              });
-            }
-          }
-        }
+      } catch {
+        // try next query
       }
-    } catch {
-      // ignore
     }
 
-    // IMPORTANT: return 200 so frontend doesn't treat this as a "crash"
-    return res.json({
-      found: false,
-      source: "none",
-      title: titleRaw,
-      author: authorRaw,
-      summary: "",
-      message: "No summary found. Try adding the author or adjusting the title.",
+    return res.status(404).json({
+      error: "No summary found. Try adjusting the title or adding the author.",
     });
-  } catch (err: any) {
+  } catch {
     return res.status(500).json({ error: "Failed to fetch summary" });
   }
 });
