@@ -7,6 +7,7 @@ import type { Telegraf } from "telegraf";
 import miniappApiRouter from "./miniapp/api";
 import calendarApiRouter from "./miniapp/calendar-api";
 import journalApiRouter from "./miniapp/journal-api";
+import booksApiRouter from "./miniapp/books-api";
 
 type StartServerOpts = {
   bot: Telegraf<any>;
@@ -85,8 +86,9 @@ app.get("/", (_req, res) => res.status(200).send("ok"));
   app.use("/api/miniapp", miniAppAuth, miniappApiRouter);
 
   // Calendar and Journal routers rely on req.userId, so they MUST be behind miniAppAuth.
-  app.use("/api/miniapp/calendar", miniAppAuth, calendarApiRouter);
-  app.use("/api/miniapp/journal", miniAppAuth, journalApiRouter);
+app.use("/api/miniapp/calendar", miniAppAuth, calendarApiRouter);
+app.use("/api/miniapp/journal", miniAppAuth, journalApiRouter);
+app.use("/api/miniapp/books", miniAppAuth, booksApiRouter);
 
   // ---- Mini App static files (if you serve them here) ----
   // If you already serve your mini app HTML somewhere else, keep your existing logic.

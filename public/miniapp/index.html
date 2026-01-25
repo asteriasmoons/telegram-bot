@@ -1087,6 +1087,420 @@ function formatShortDate(date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function badgeForStatus(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "tbr") return { text: "TBR", bg: "rgba(255,152,0,0.15)", fg: "#ff9800" };
+  if (s === "reading") return { text: "READING", bg: "rgba(76,175,80,0.15)", fg: "#4caf50" };
+  if (s === "finished") return { text: "FINISHED", bg: "rgba(91,141,239,0.15)", fg: "#5b8def" };
+  return { text: "BOOK", bg: "rgba(255,255,255,0.08)", fg: "#ffffff" };
+}
+
+function statusLabelToValue(input) {
+  const s = String(input || "").toLowerCase().trim();
+  if (s === "tbr") return "tbr";
+  if (s === "reading" || s === "active") return "reading";
+  if (s === "finished" || s === "done") return "finished";
+  return "tbr";
+}
+
+
+// Book Card Component
+function BookCard({ book, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const title = book.title?.trim() ? book.title.trim() : "(untitled)";
+  const author = book.author?.trim() ? book.author.trim() : "";
+  const badge = badgeForStatus(book.status);
+
+  return (
+    <div className="card" onClick={() => setExpanded(!expanded)}>
+      <div className="card-header">
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+            {title}
+          </div>
+
+          {author && (
+            <div className="card-time">
+              <img src="/icons/user.svg" alt="" />
+              <span>{author}</span>
+            </div>
+          )}
+        </div>
+
+        <span className="card-badge" style={{ background: badge.bg, color: badge.fg }}>
+          {badge.text}
+        </span>
+      </div>
+
+      {expanded && (
+        <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+          <button className="btn btn-primary" onClick={() => onEdit(book)}>
+            <img src="/icons/pencil.svg" alt="" />
+            Edit
+          </button>
+
+          <button className="btn btn-danger" onClick={() => onDelete(book._id)}>
+            <img src="/icons/trash.svg" alt="" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Book Create & Edit Modal
+function BookModal({ book, onClose, onSave, onDelete }) {
+  const isEdit = !!book?._id;
+
+  const [title, setTitle] = useState(book?.title || "");
+  const [author, setAuthor] = useState(book?.author || "");
+  const [status, setStatus] = useState(book?.status || "tbr");
+
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      tg.showAlert("Please enter a title");
+      return;
+    }
+
+    await onSave({
+      title: title.trim(),
+      author: author.trim(),
+      status: statusLabelToValue(status),
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{isEdit ? "Edit Book" : "New Book"}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Title</label>
+            <input
+              className="form-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Book title..."
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Author (optional)</label>
+            <input
+              className="form-input"
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Author name..."
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select
+              className="form-select"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="tbr">TBR</option>
+              <option value="reading">Reading/Active</option>
+              <option value="finished">Finished</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          {isEdit ? (
+            <button className="btn btn-danger" onClick={() => onDelete(book._id)}>
+              Delete
+            </button>
+          ) : (
+            <button className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+          )}
+
+          <button className="btn btn-primary" onClick={handleSave}>
+            {isEdit ? "Update" : "Create"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Book Summary Modal
+function SummaryModal({ onClose, title, author, loading, summary, source, error, onSearchAgain }) {
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const headerTitle = "Summary";
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{headerTitle}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body">
+          <div style={{ marginBottom: 12, opacity: 0.85, lineHeight: 1.4 }}>
+            <div style={{ fontWeight: 700 }}>{title || "Untitled"}</div>
+            {author ? <div style={{ color: "var(--text-secondary)" }}>{author}</div> : null}
+          </div>
+
+          {loading ? (
+            <div className="loading">
+              <div className="spinner" />
+              <div>Searching…</div>
+            </div>
+          ) : error ? (
+            <div className="empty-state-text">{error}</div>
+          ) : summary ? (
+            <div style={{ whiteSpace: "pre-line", lineHeight: 1.6, fontSize: 15 }}>
+              {summary}
+              {source ? (
+                <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-secondary)" }}>
+                  Source: {source}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="empty-state-text">No summary to show.</div>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Close
+          </button>
+
+          <button className="btn btn-primary" onClick={onSearchAgain} disabled={loading}>
+            Search Again
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Reading View
+function ReadingView({ activeView }) {
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [filter, setFilter] = useState("all"); // all | tbr | reading | finished
+
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [editingBook, setEditingBook] = useState(null);
+
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryText, setSummaryText] = useState("");
+  const [summarySource, setSummarySource] = useState("");
+  const [summaryError, setSummaryError] = useState("");
+  const [summaryTitle, setSummaryTitle] = useState("");
+  const [summaryAuthor, setSummaryAuthor] = useState("");
+
+  useEffect(() => {
+    if (activeView === "reading") {
+      loadBooks();
+    }
+  }, [activeView, filter]);
+
+  const loadBooks = async () => {
+    try {
+      setLoading(true);
+      const data = await apiCall(`/books?status=${encodeURIComponent(filter)}`);
+      setBooks(Array.isArray(data.books) ? data.books : []);
+    } catch (error) {
+      tg.showAlert("Failed to load books: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingBook(null);
+    setShowBookModal(true);
+  };
+
+  const handleEdit = (book) => {
+    setEditingBook(book);
+    setShowBookModal(true);
+  };
+
+  const handleSave = async (payload) => {
+    try {
+      if (editingBook?._id) {
+        await apiCall(`/books/${editingBook._id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        tg.showAlert("Book updated!");
+      } else {
+        await apiCall(`/books`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        tg.showAlert("Book added!");
+      }
+
+      setShowBookModal(false);
+      loadBooks();
+    } catch (error) {
+      tg.showAlert("Failed to save: " + error.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await apiCall(`/books/${id}`, { method: "DELETE" });
+      tg.showPopup({ message: "Book deleted" });
+      loadBooks();
+    } catch (error) {
+      tg.showAlert("Failed to delete: " + error.message);
+    }
+  };
+
+  const promptSummarySearch = async () => {
+    const t = window.prompt("Book title:");
+    if (!t || !t.trim()) return;
+
+    const a = window.prompt("Author (optional):") || "";
+
+    await runSummarySearch(t.trim(), a.trim());
+  };
+
+  const runSummarySearch = async (title, author) => {
+    try {
+      setSummaryTitle(title);
+      setSummaryAuthor(author);
+
+      setSummaryOpen(true);
+      setSummaryLoading(true);
+      setSummaryText("");
+      setSummarySource("");
+      setSummaryError("");
+
+      const data = await apiCall(`/books/summary`, {
+        method: "POST",
+        body: JSON.stringify({ title, author }),
+      });
+
+      setSummaryText(String(data.summary || ""));
+      setSummarySource(String(data.source || ""));
+    } catch (error) {
+      setSummaryError(error.message || "No summary found.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="header">
+        <h1>Reading</h1>
+
+        <div className="journal-header-actions">
+          <button className="btn btn-prompt" type="button" onClick={promptSummarySearch}>
+            Summary
+          </button>
+        </div>
+      </div>
+
+      <div className="quick-actions">
+        <div
+          className={`quick-action ${filter === "all" ? "active" : ""}`}
+          onClick={() => setFilter("all")}
+        >
+          All
+        </div>
+        <div
+          className={`quick-action ${filter === "tbr" ? "active" : ""}`}
+          onClick={() => setFilter("tbr")}
+        >
+          TBR
+        </div>
+        <div
+          className={`quick-action ${filter === "reading" ? "active" : ""}`}
+          onClick={() => setFilter("reading")}
+        >
+          Reading
+        </div>
+        <div
+          className={`quick-action ${filter === "finished" ? "active" : ""}`}
+          onClick={() => setFilter("finished")}
+        >
+          Finished
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading books...</div>
+        </div>
+      ) : books.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <img src="/icons/book.svg" alt="" />
+          </div>
+          <div className="empty-state-text">
+            No books yet.
+            {"\n"}Tap + to add one.
+          </div>
+        </div>
+      ) : (
+        books.map((book) => (
+          <BookCard key={book._id} book={book} onEdit={handleEdit} onDelete={handleDelete} />
+        ))
+      )}
+
+      {/* Hidden FAB hook */}
+      <button
+        className="is-hidden"
+        data-create-book="1"
+        onClick={handleCreate}
+      />
+
+      {showBookModal && (
+        <BookModal
+          book={editingBook}
+          onClose={() => setShowBookModal(false)}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {summaryOpen && (
+        <SummaryModal
+          onClose={() => setSummaryOpen(false)}
+          title={summaryTitle}
+          author={summaryAuthor}
+          loading={summaryLoading}
+          summary={summaryText}
+          source={summarySource}
+          error={summaryError}
+          onSearchAgain={promptSummarySearch}
+        />
+      )}
+    </div>
+  );
+}
+
 // Journal Card Component
 function JournalCard({ entry, onView, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
@@ -2591,6 +3005,10 @@ const handleFabClick = () => {
     const btn = document.querySelector('[data-create-journal="1"]');
     if (btn) btn.click();
   }
+  else if (activeView === 'reading') {
+  const btn = document.querySelector('[data-create-book="1"]');
+  if (btn) btn.click();
+}
 };
 
 return (
@@ -2616,6 +3034,13 @@ return (
       >
         <JournalsView activeView={activeView} />
       </div>
+      
+      <div
+  className={`view-container ${activeView === 'reading' ? 'active' : ''}`}
+  data-view="reading"
+>
+  <ReadingView activeView={activeView} />
+</div>
     </div>
 
     <button className="fab" onClick={handleFabClick}>
@@ -2652,6 +3077,16 @@ return (
 </div>
         <div className="nav-item-label">Journal</div>
       </button>
+      
+      <button
+  className={`nav-item ${activeView === 'reading' ? 'active' : ''}`}
+  onClick={() => setActiveView('reading')}
+>
+  <div className="nav-item-icon">
+    <img src="/icons/book.svg" alt="" />
+  </div>
+  <div className="nav-item-label">Reading</div>
+</button>
     </div>
   </div>
 );
