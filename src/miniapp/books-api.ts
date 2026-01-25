@@ -187,23 +187,20 @@ router.post("/summary", async (req: any, res) => {
       return rawAuthor ? (t * 0.7 + a * 0.3) : t;
     };
 
-    // MUCH lower thresholds - be more permissive
-    const PASS_THRESHOLD = rawAuthor ? 0.30 : 0.40;
-    const MIN_AUTHOR_IF_PROVIDED = rawAuthor ? 0.08 : 0;
+    const PASS_THRESHOLD = rawAuthor ? 0.25 : 0.35;
+    const MIN_AUTHOR_IF_PROVIDED = rawAuthor ? 0.05 : 0;
 
     console.log("📚 Search input:", { rawTitle, rawAuthor });
 
     // ---------- 1) Google Books ----------
     try {
-      const qParts: string[] = [];
-      qParts.push(`intitle:${rawTitle}`);
-      if (rawAuthor) qParts.push(`inauthor:${rawAuthor}`);
-      const q = qParts.join(" ");
+      // Build simpler query - Google Books is very picky
+      let q = rawTitle;
+      if (rawAuthor) {
+        q = `${rawTitle} ${rawAuthor}`;
+      }
 
-      const gbUrl =
-        "https://www.googleapis.com/books/v1/volumes?q=" +
-        encodeURIComponent(q) +
-        "&maxResults=10&printType=books";
+      const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books&langRestrict=en`;
 
       console.log("🔍 Google Books URL:", gbUrl);
 
@@ -271,19 +268,17 @@ router.post("/summary", async (req: any, res) => {
 
     // ---------- 2) Open Library ----------
     try {
-      const base = new URL("https://openlibrary.org/search.json");
-      base.searchParams.set("limit", "10");
-
+      // Use simple q= parameter for both cases - more reliable
+      let q = rawTitle;
       if (rawAuthor) {
-        base.searchParams.set("title", rawTitle);
-        base.searchParams.set("author", rawAuthor);
-      } else {
-        base.searchParams.set("q", rawTitle);
+        q = `${rawTitle} ${rawAuthor}`;
       }
 
-      console.log("🔍 Open Library URL:", base.toString());
+      const olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20`;
 
-      const olResp = await fetch(base.toString());
+      console.log("🔍 Open Library URL:", olUrl);
+
+      const olResp = await fetch(olUrl);
       if (olResp.ok) {
         const ol = await olResp.json();
         const docs = Array.isArray(ol?.docs) ? ol.docs : [];
@@ -297,11 +292,14 @@ router.post("/summary", async (req: any, res) => {
             const key = String(doc?.key || "").trim();
             const s = candTitle ? totalScore(candTitle, candAuthor) : 0;
             const aScore = scoreAuthor(candAuthor);
+            const tScore = scoreTitle(candTitle);
             
             console.log({
               olCandidate: candTitle,
               author: candAuthor,
-              score: s.toFixed(3),
+              titleScore: tScore.toFixed(3),
+              authorScore: aScore.toFixed(3),
+              totalScore: s.toFixed(3),
               key
             });
 
@@ -309,23 +307,38 @@ router.post("/summary", async (req: any, res) => {
           })
           .filter((x: any) => x.key && x.candTitle)
           .sort((a: any, b: any) => b.s - a.s)
-          .slice(0, 5);
+          .slice(0, 8);
 
-        if (!scored.length || scored[0].s < PASS_THRESHOLD) {
-          console.log("❌ No Open Library match passed threshold");
+        if (!scored.length) {
+          console.log("❌ No Open Library results to score");
+          return res.status(404).json({
+            error: "No results found. Try checking the title spelling.",
+          });
+        }
+
+        console.log("Top Open Library candidate:", scored[0]);
+
+        if (scored[0].s < PASS_THRESHOLD) {
+          console.log(`❌ Best match score ${scored[0].s.toFixed(3)} below threshold ${PASS_THRESHOLD}`);
           return res.status(404).json({
             error: "No strong match found. Try adjusting the title or adding the author.",
           });
         }
 
         for (const cand of scored) {
-          if (rawAuthor && cand.aScore < MIN_AUTHOR_IF_PROVIDED) continue;
+          if (rawAuthor && cand.aScore < MIN_AUTHOR_IF_PROVIDED) {
+            console.log(`⏭️ Skipping ${cand.candTitle} - author mismatch`);
+            continue;
+          }
 
           console.log(`🔍 Fetching work details for: ${cand.candTitle}`);
 
           const workUrl = `https://openlibrary.org${cand.key}.json`;
           const workResp = await fetch(workUrl);
-          if (!workResp.ok) continue;
+          if (!workResp.ok) {
+            console.log(`❌ Failed to fetch work: ${workUrl}`);
+            continue;
+          }
 
           const work = await workResp.json();
           const desc = work?.description;
@@ -346,15 +359,21 @@ router.post("/summary", async (req: any, res) => {
               summary: summary.trim(),
               matchScore: Number(cand.s.toFixed(3)),
             });
+          } else {
+            console.log(`⏭️ ${cand.candTitle} has no description`);
           }
         }
+
+        console.log("❌ No Open Library results had descriptions");
+      } else {
+        console.log("❌ Open Library request failed:", olResp.status);
       }
     } catch (err) {
       console.error("Open Library error:", err);
     }
 
     return res.status(404).json({
-      error: "No summary found for a strong match. Try adding the author or simplifying the title.",
+      error: "No summary found. The book may not be in these databases.",
     });
   } catch (err) {
     console.error("Summary endpoint error:", err);
