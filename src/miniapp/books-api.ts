@@ -143,8 +143,8 @@ router.post("/summary", async (req: any, res) => {
     const normalize = (s: string) =>
       s
         .toLowerCase()
-        .replace(/['’]/g, "") // normalize apostrophes
-        .replace(/[^a-z0-9\s]/g, " ") // keep simple ascii (fine for your use-case)
+        .replace(/['']/g, "") // normalize apostrophes
+        .replace(/[^a-z0-9\s]/g, " ") // keep simple ascii
         .replace(/\s+/g, " ")
         .trim();
 
@@ -152,12 +152,13 @@ router.post("/summary", async (req: any, res) => {
 
     const tokens = (s: string) => new Set(normalize(s).split(" ").filter(Boolean));
 
-    const jaccard = (a: Set<string>, b: Set<string>) => {
+    // Overlap coefficient - much better for book title matching
+    const overlap = (a: Set<string>, b: Set<string>) => {
       if (!a.size || !b.size) return 0;
       let inter = 0;
       for (const x of a) if (b.has(x)) inter++;
-      const union = a.size + b.size - inter;
-      return union ? inter / union : 0;
+      const minSize = Math.min(a.size, b.size);
+      return minSize ? inter / minSize : 0;
     };
 
     const titleA = rawTitle;
@@ -170,39 +171,33 @@ router.post("/summary", async (req: any, res) => {
 
     const scoreTitle = (candidateTitle: string) => {
       const cTok = tokens(candidateTitle);
-      const full = jaccard(titleTokensFull, cTok);
-      const short = jaccard(titleTokensShort, cTok);
+      const full = overlap(titleTokensFull, cTok);
+      const short = overlap(titleTokensShort, cTok);
       return Math.max(full, short);
     };
 
     const scoreAuthor = (candidateAuthor: string) => {
-      if (!rawAuthor) return 0; // no author given; don't penalize, but don't boost either
+      if (!rawAuthor) return 0;
       const cTok = tokens(candidateAuthor);
-      return jaccard(authorTokens, cTok);
+      return overlap(authorTokens, cTok);
     };
 
     // weighted total score
     const totalScore = (candTitle: string, candAuthor: string) => {
       const t = scoreTitle(candTitle);
       const a = scoreAuthor(candAuthor);
-      // If author is provided, we require it to matter.
-      // If not provided, title does all the work.
       return rawAuthor ? (t * 0.75 + a * 0.25) : t;
     };
 
-    // threshold tuning:
-    // - with author: require a very solid title match + at least some author alignment
-    // - without author: require stronger title match
-    const PASS_THRESHOLD = rawAuthor ? 0.62 : 0.72;
-    const MIN_AUTHOR_IF_PROVIDED = rawAuthor ? 0.18 : 0; // avoids "wrong book by different author"
+    // Much lower thresholds for overlap coefficient
+    const PASS_THRESHOLD = rawAuthor ? 0.45 : 0.55;
+    const MIN_AUTHOR_IF_PROVIDED = rawAuthor ? 0.12 : 0;
 
     // ---------- 1) Google Books ----------
-    // We still try Google first, but score candidates instead of "first description wins".
     try {
       const qParts: string[] = [];
       qParts.push(`intitle:${rawTitle}`);
       if (rawAuthor) qParts.push(`inauthor:${rawAuthor}`);
-      // If subtitle confuses results, the API still has the full query; scoring handles it.
       const q = qParts.join(" ");
 
       const gbUrl =
@@ -229,7 +224,6 @@ router.post("/summary", async (req: any, res) => {
           const tScore = scoreTitle(candTitle);
           const s = totalScore(candTitle, candAuthors);
 
-          // only consider candidates that have something usable
           const desc = typeof info?.description === "string" ? info.description.trim() : "";
           const snippet = typeof item?.searchInfo?.textSnippet === "string" ? item.searchInfo.textSnippet.trim() : "";
           const summary = desc || snippet;
@@ -259,7 +253,6 @@ router.post("/summary", async (req: any, res) => {
     }
 
     // ---------- 2) Open Library ----------
-    // Use structured params when possible (way more accurate than q=).
     try {
       const base = new URL("https://openlibrary.org/search.json");
       base.searchParams.set("limit", "10");
@@ -276,28 +269,25 @@ router.post("/summary", async (req: any, res) => {
         const ol = await olResp.json();
         const docs = Array.isArray(ol?.docs) ? ol.docs : [];
 
-        // Score docs first before fetching work JSON (saves requests + avoids wrong-book descriptions)
         const scored = docs
           .map((doc: any) => {
             const candTitle = String(doc?.title || "").trim();
             const candAuthor = Array.isArray(doc?.author_name) ? String(doc.author_name[0] || "").trim() : "";
-            const key = String(doc?.key || "").trim(); // "/works/OLxxxxW"
+            const key = String(doc?.key || "").trim();
             const s = candTitle ? totalScore(candTitle, candAuthor) : 0;
             const aScore = scoreAuthor(candAuthor);
             return { candTitle, candAuthor, key, s, aScore };
           })
           .filter((x: any) => x.key && x.candTitle)
           .sort((a: any, b: any) => b.s - a.s)
-          .slice(0, 5); // top 5 candidates only
+          .slice(0, 5);
 
-        // If the best candidate is weak, do not fetch anything.
         if (!scored.length || scored[0].s < PASS_THRESHOLD) {
           return res.status(404).json({
             error: "No strong match found. Try adjusting the title or adding the author.",
           });
         }
 
-        // Fetch work JSON for top candidates until we find a description.
         for (const cand of scored) {
           if (rawAuthor && cand.aScore < MIN_AUTHOR_IF_PROVIDED) continue;
 
@@ -337,5 +327,6 @@ router.post("/summary", async (req: any, res) => {
     return res.status(500).json({ error: "Failed to fetch summary" });
   }
 });
+
 
 export default router;
