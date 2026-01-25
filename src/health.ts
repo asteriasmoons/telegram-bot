@@ -96,8 +96,9 @@ app.use("/api/miniapp/books", miniAppAuth, booksApiRouter);
   const publicDir = path.join(process.cwd(), "public");
   app.use(express.static(publicDir));
 
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => {
-    console.log(`HTTP server running on port ${port}`);
-  });
+const PORT = Number(process.env.PORT) || 3000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`HTTP server running on port ${PORT}`);
+});
 }
