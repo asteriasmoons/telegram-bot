@@ -283,6 +283,17 @@ body {
   transition: width 0.2s ease;
 }
 
+.book-summary {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 10px 0 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* Buttons */
 .btn {
   padding: 8px 16px;
@@ -1191,6 +1202,12 @@ function BookCard({ book, onEdit, onDelete }) {
           {badge.text}
         </span>
       </div>
+      
+      {book.shortSummary && (
+  <div className="book-summary">
+    {book.shortSummary}
+  </div>
+)}
 
       {hasProgress && (
         <div className="progress-wrap" onClick={(e) => e.stopPropagation()}>
@@ -1230,6 +1247,7 @@ function BookModal({ book, onClose, onSave, onDelete }) {
   const [title, setTitle] = useState(book?.title || "");
   const [author, setAuthor] = useState(book?.author || "");
   const [status, setStatus] = useState(book?.status || "tbr");
+  const [shortSummary, setShortSummary] = useState(book?.shortSummary || "");
 
   // New: progress fields (optional)
   const [totalPages, setTotalPages] = useState(
@@ -1266,6 +1284,11 @@ function BookModal({ book, onClose, onSave, onDelete }) {
       author: author.trim(),
       status: statusLabelToValue(status),
     };
+    
+       // Add Summary
+        if (shortSummary.trim()) {
+  payload.shortSummary = shortSummary.trim();
+}
 
     // Only include progress if reading
     if (isReading) {
@@ -1325,6 +1348,17 @@ function BookModal({ book, onClose, onSave, onDelete }) {
               placeholder="Author name..."
             />
           </div>
+          
+          <div className="form-group">
+  <label className="form-label">Short Summary (optional)</label>
+  <textarea
+    className="form-textarea form-textarea--sm"
+    value={shortSummary}
+    onChange={(e) => setShortSummary(e.target.value)}
+    placeholder="One or two short sentences about this book…"
+    maxLength={180}
+  />
+</div>
 
           <div className="form-group">
             <label className="form-label">Status</label>

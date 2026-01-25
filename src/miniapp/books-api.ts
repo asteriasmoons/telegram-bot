@@ -86,9 +86,15 @@ router.post("/", async (req: any, res) => {
     const userId = req.userId as number;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const title = String(req.body?.title || "").trim();
-    const author = String(req.body?.author || "").trim();
-    const status = normalizeStatus(req.body?.status);
+const title = String(req.body?.title || "").trim();
+const author = String(req.body?.author || "").trim();
+
+// clamp summary HERE
+const shortSummary = String(req.body?.shortSummary || "")
+  .trim()
+  .slice(0, 280);
+
+const status = normalizeStatus(req.body?.status);
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!status) return res.status(400).json({ error: "Invalid status" });
@@ -104,6 +110,7 @@ router.post("/", async (req: any, res) => {
       userId,
       title,
       author,
+      shortSummary,
       status,
       totalPages,
       currentPage,
@@ -127,9 +134,15 @@ router.put("/:id", async (req: any, res) => {
     const id = String(req.params.id || "").trim();
     if (!id) return res.status(400).json({ error: "Missing id" });
 
-    const title = String(req.body?.title || "").trim();
-    const author = String(req.body?.author || "").trim();
-    const status = normalizeStatus(req.body?.status);
+const title = String(req.body?.title || "").trim();
+const author = String(req.body?.author || "").trim();
+
+// clamp summary HERE
+const shortSummary = String(req.body?.shortSummary || "")
+  .trim()
+  .slice(0, 280);
+
+const status = normalizeStatus(req.body?.status);
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!status) return res.status(400).json({ error: "Invalid status" });
@@ -143,7 +156,7 @@ router.put("/:id", async (req: any, res) => {
 
     const updated = await Book.findOneAndUpdate(
       { _id: id, userId },
-      { title, author, status, totalPages, currentPage },
+      { title, author, shortSummary, status, totalPages, currentPage },
       { new: true }
     ).lean();
 

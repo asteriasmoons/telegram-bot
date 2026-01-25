@@ -7,6 +7,9 @@ const BookSchema = new Schema(
     title: { type: String, required: true, trim: true, maxlength: 200 },
     author: { type: String, default: "", trim: true, maxlength: 200 },
 
+    // NEW: short card summary (1–2 sentences)
+    shortSummary: { type: String, default: "", trim: true, maxlength: 280 },
+
     // Only 3 statuses, exactly as requested
     status: {
       type: String,
@@ -17,7 +20,6 @@ const BookSchema = new Schema(
     },
 
     // ---- Progress (only meaningful for "reading") ----
-    // Optional so existing docs + non-reading statuses don't break.
     totalPages: { type: Number, default: null, min: 0 },
     currentPage: { type: Number, default: null, min: 0 },
   },
