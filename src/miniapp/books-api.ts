@@ -141,12 +141,22 @@ router.post("/summary", async (req: any, res) => {
     if (!titleRaw) return res.status(400).json({ error: "Title is required" });
 
     // ---------- matching helpers ----------
-const norm = (s: any) =>
-  String(s || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[:"'’(),.!?--–-]/g, "") // <- safe: hyphen at end + explicit dashes
-    .replace(/\s+/g, " ");
+const norm = (s: any) => {
+  let out = String(s || "").toLowerCase().trim();
+
+  // Remove punctuation (NO character-class dashes here)
+  out = out.replace(/[:"'’(),.!?]/g, "");
+
+  // Remove all dash variants safely
+  out = out.replace(/\u2014/g, ""); // em dash --
+  out = out.replace(/\u2013/g, ""); // en dash –
+  out = out.replace(/-/g, "");      // hyphen -
+
+  // Collapse whitespace
+  out = out.replace(/\s+/g, " ");
+
+  return out;
+};
 
     const score = (candidateTitle: string, candidateAuthor: string, wantTitle: string, wantAuthor: string) => {
       const ct = norm(candidateTitle);
