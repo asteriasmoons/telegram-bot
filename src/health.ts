@@ -72,10 +72,15 @@ export async function startServer({ bot, webhookPath }: StartServerOpts) {
 app.get("/", (_req, res) => res.status(200).send("ok"));
 
   // Telegram webhook endpoint
-  app.post(webhookPath, (req, res) => {
-    bot.handleUpdate(req.body, res).catch((err: any) => {
-      console.error("handleUpdate error:", err);
-    });
+app.post(webhookPath, async (req, res) => {
+  try {
+    await bot.handleUpdate(req.body, res);
+    if (!res.headersSent) res.sendStatus(200);
+  } catch (err) {
+    console.error("handleUpdate error:", err);
+    if (!res.headersSent) res.sendStatus(200);
+  }
+});
   });
 
   // ---- Mini App API mounting ----
