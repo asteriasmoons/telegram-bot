@@ -8,7 +8,7 @@ const BookSchema = new Schema(
     author: { type: String, default: "", trim: true, maxlength: 200 },
 
     // NEW: short card summary (1–2 sentences)
-    shortSummary: { type: String, default: "", trim: true, maxlength: 280 },
+    shortSummary: { type: String, default: "", trim: true, maxlength: 800 },
 
     // Only 3 statuses, exactly as requested
     status: {
