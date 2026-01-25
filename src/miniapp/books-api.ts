@@ -4,6 +4,14 @@ import { Book } from "../models/Book";
 
 const router = Router();
 
+// Ensure every book returned to the client has a stable string `id`
+function withId<T extends { _id?: any }>(doc: T) {
+  return {
+    ...doc,
+    id: doc?._id ? String(doc._id) : undefined,
+  };
+}
+
 function normalizeStatus(input: any) {
   const s = String(input || "").toLowerCase().trim();
   if (s === "tbr") return "tbr";
@@ -18,6 +26,14 @@ function toIntOrNull(v: any) {
   if (!Number.isFinite(n)) return null;
   const i = Math.floor(n);
   return i >= 0 ? i : null;
+}
+
+function clampShortSummary(v: any) {
+  // One to two short sentences is the UI goal, but enforce a safe max length.
+  // If you want a different max, change 280 here.
+  const s = String(v || "").trim();
+  if (!s) return "";
+  return s.slice(0, 280);
 }
 
 function normalizeProgress(
@@ -71,7 +87,8 @@ router.get("/", async (req: any, res) => {
       .limit(500)
       .lean();
 
-    return res.json({ books });
+    // IMPORTANT: `.lean()` does NOT include virtual `id`, so add it.
+    return res.json({ books: books.map(withId) });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to load books" });
   }
@@ -79,22 +96,17 @@ router.get("/", async (req: any, res) => {
 
 /**
  * POST /api/miniapp/books
- * body: { title, author?, status }
+ * body: { title, author?, status, shortSummary?, totalPages?, currentPage? }
  */
 router.post("/", async (req: any, res) => {
   try {
     const userId = req.userId as number;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-const title = String(req.body?.title || "").trim();
-const author = String(req.body?.author || "").trim();
-
-// clamp summary HERE
-const shortSummary = String(req.body?.shortSummary || "")
-  .trim()
-  .slice(0, 280);
-
-const status = normalizeStatus(req.body?.status);
+    const title = String(req.body?.title || "").trim();
+    const author = String(req.body?.author || "").trim();
+    const shortSummary = clampShortSummary(req.body?.shortSummary);
+    const status = normalizeStatus(req.body?.status);
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!status) return res.status(400).json({ error: "Invalid status" });
@@ -116,7 +128,9 @@ const status = normalizeStatus(req.body?.status);
       currentPage,
     });
 
-    return res.json({ book: created.toObject() });
+    // Ensure response has `id` even if client expects `book.id`
+    const obj: any = created.toObject();
+    return res.json({ book: { ...obj, id: String(obj._id) } });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to create book" });
   }
@@ -124,7 +138,7 @@ const status = normalizeStatus(req.body?.status);
 
 /**
  * PUT /api/miniapp/books/:id
- * body: { title, author?, status }
+ * body: { title, author?, status, shortSummary?, totalPages?, currentPage? }
  */
 router.put("/:id", async (req: any, res) => {
   try {
@@ -132,17 +146,14 @@ router.put("/:id", async (req: any, res) => {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const id = String(req.params.id || "").trim();
-    if (!id) return res.status(400).json({ error: "Missing id" });
+    if (!id || id === "undefined" || id === "null") {
+      return res.status(400).json({ error: "Missing id" });
+    }
 
-const title = String(req.body?.title || "").trim();
-const author = String(req.body?.author || "").trim();
-
-// clamp summary HERE
-const shortSummary = String(req.body?.shortSummary || "")
-  .trim()
-  .slice(0, 280);
-
-const status = normalizeStatus(req.body?.status);
+    const title = String(req.body?.title || "").trim();
+    const author = String(req.body?.author || "").trim();
+    const shortSummary = clampShortSummary(req.body?.shortSummary);
+    const status = normalizeStatus(req.body?.status);
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!status) return res.status(400).json({ error: "Invalid status" });
@@ -162,7 +173,8 @@ const status = normalizeStatus(req.body?.status);
 
     if (!updated) return res.status(404).json({ error: "Book not found" });
 
-    return res.json({ book: updated });
+    // Add `id` for client consistency
+    return res.json({ book: withId(updated) });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to update book" });
   }
@@ -177,7 +189,9 @@ router.delete("/:id", async (req: any, res) => {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const id = String(req.params.id || "").trim();
-    if (!id) return res.status(400).json({ error: "Missing id" });
+    if (!id || id === "undefined" || id === "null") {
+      return res.status(400).json({ error: "Missing id" });
+    }
 
     const deleted = await Book.findOneAndDelete({ _id: id, userId }).lean();
     if (!deleted) return res.status(404).json({ error: "Book not found" });
@@ -250,7 +264,7 @@ router.post("/summary", async (req: any, res) => {
     const totalScore = (candTitle: string, candAuthor: string) => {
       const t = scoreTitle(candTitle);
       const a = scoreAuthor(candAuthor);
-      return rawAuthor ? (t * 0.7 + a * 0.3) : t;
+      return rawAuthor ? t * 0.7 + a * 0.3 : t;
     };
 
     const PASS_THRESHOLD = rawAuthor ? 0.25 : 0.35;
@@ -260,13 +274,12 @@ router.post("/summary", async (req: any, res) => {
 
     // ---------- 1) Google Books ----------
     try {
-      // Build simpler query - Google Books is very picky
       let q = rawTitle;
-      if (rawAuthor) {
-        q = `${rawTitle} ${rawAuthor}`;
-      }
+      if (rawAuthor) q = `${rawTitle} ${rawAuthor}`;
 
-      const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books&langRestrict=en`;
+      const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+        q
+      )}&maxResults=20&printType=books&langRestrict=en`;
 
       console.log("🔍 Google Books URL:", gbUrl);
 
@@ -292,7 +305,10 @@ router.post("/summary", async (req: any, res) => {
           const s = totalScore(candTitle, candAuthors);
 
           const desc = typeof info?.description === "string" ? info.description.trim() : "";
-          const snippet = typeof item?.searchInfo?.textSnippet === "string" ? item.searchInfo.textSnippet.trim() : "";
+          const snippet =
+            typeof item?.searchInfo?.textSnippet === "string"
+              ? item.searchInfo.textSnippet.trim()
+              : "";
           const summary = desc || snippet;
 
           console.log({
@@ -303,7 +319,7 @@ router.post("/summary", async (req: any, res) => {
             totalScore: s.toFixed(3),
             threshold: PASS_THRESHOLD,
             hasSummary: !!summary,
-            passes: s >= PASS_THRESHOLD && !!summary
+            passes: s >= PASS_THRESHOLD && !!summary,
           });
 
           if (!summary) continue;
@@ -334,11 +350,8 @@ router.post("/summary", async (req: any, res) => {
 
     // ---------- 2) Open Library ----------
     try {
-      // Use simple q= parameter for both cases - more reliable
       let q = rawTitle;
-      if (rawAuthor) {
-        q = `${rawTitle} ${rawAuthor}`;
-      }
+      if (rawAuthor) q = `${rawTitle} ${rawAuthor}`;
 
       const olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20`;
 
@@ -354,19 +367,21 @@ router.post("/summary", async (req: any, res) => {
         const scored = docs
           .map((doc: any) => {
             const candTitle = String(doc?.title || "").trim();
-            const candAuthor = Array.isArray(doc?.author_name) ? String(doc.author_name[0] || "").trim() : "";
+            const candAuthor = Array.isArray(doc?.author_name)
+              ? String(doc.author_name[0] || "").trim()
+              : "";
             const key = String(doc?.key || "").trim();
             const s = candTitle ? totalScore(candTitle, candAuthor) : 0;
             const aScore = scoreAuthor(candAuthor);
             const tScore = scoreTitle(candTitle);
-            
+
             console.log({
               olCandidate: candTitle,
               author: candAuthor,
               titleScore: tScore.toFixed(3),
               authorScore: aScore.toFixed(3),
               totalScore: s.toFixed(3),
-              key
+              key,
             });
 
             return { candTitle, candAuthor, key, s, aScore };
@@ -385,7 +400,9 @@ router.post("/summary", async (req: any, res) => {
         console.log("Top Open Library candidate:", scored[0]);
 
         if (scored[0].s < PASS_THRESHOLD) {
-          console.log(`❌ Best match score ${scored[0].s.toFixed(3)} below threshold ${PASS_THRESHOLD}`);
+          console.log(
+            `❌ Best match score ${scored[0].s.toFixed(3)} below threshold ${PASS_THRESHOLD}`
+          );
           return res.status(404).json({
             error: "No strong match found. Try adjusting the title or adding the author.",
           });
