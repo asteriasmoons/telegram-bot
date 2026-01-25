@@ -143,8 +143,8 @@ router.post("/summary", async (req: any, res) => {
     const normalize = (s: string) =>
       s
         .toLowerCase()
-        .replace(/['']/g, "") // normalize apostrophes
-        .replace(/[^a-z0-9\s]/g, " ") // keep simple ascii
+        .replace(/['']/g, "")
+        .replace(/[^a-z0-9\s]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
 
@@ -152,7 +152,6 @@ router.post("/summary", async (req: any, res) => {
 
     const tokens = (s: string) => new Set(normalize(s).split(" ").filter(Boolean));
 
-    // Overlap coefficient - much better for book title matching
     const overlap = (a: Set<string>, b: Set<string>) => {
       if (!a.size || !b.size) return 0;
       let inter = 0;
@@ -182,16 +181,17 @@ router.post("/summary", async (req: any, res) => {
       return overlap(authorTokens, cTok);
     };
 
-    // weighted total score
     const totalScore = (candTitle: string, candAuthor: string) => {
       const t = scoreTitle(candTitle);
       const a = scoreAuthor(candAuthor);
-      return rawAuthor ? (t * 0.75 + a * 0.25) : t;
+      return rawAuthor ? (t * 0.7 + a * 0.3) : t;
     };
 
-    // Much lower thresholds for overlap coefficient
-    const PASS_THRESHOLD = rawAuthor ? 0.45 : 0.55;
-    const MIN_AUTHOR_IF_PROVIDED = rawAuthor ? 0.12 : 0;
+    // MUCH lower thresholds - be more permissive
+    const PASS_THRESHOLD = rawAuthor ? 0.30 : 0.40;
+    const MIN_AUTHOR_IF_PROVIDED = rawAuthor ? 0.08 : 0;
+
+    console.log("📚 Search input:", { rawTitle, rawAuthor });
 
     // ---------- 1) Google Books ----------
     try {
@@ -205,10 +205,14 @@ router.post("/summary", async (req: any, res) => {
         encodeURIComponent(q) +
         "&maxResults=10&printType=books";
 
+      console.log("🔍 Google Books URL:", gbUrl);
+
       const gbResp = await fetch(gbUrl);
       if (gbResp.ok) {
         const gb = await gbResp.json();
         const items = Array.isArray(gb?.items) ? gb.items : [];
+
+        console.log(`📖 Google Books returned ${items.length} results`);
 
         let best: any = null;
         let bestScore = 0;
@@ -227,9 +231,19 @@ router.post("/summary", async (req: any, res) => {
           const desc = typeof info?.description === "string" ? info.description.trim() : "";
           const snippet = typeof item?.searchInfo?.textSnippet === "string" ? item.searchInfo.textSnippet.trim() : "";
           const summary = desc || snippet;
-          if (!summary) continue;
 
-          // if author provided, avoid totally different authors
+          console.log({
+            candidate: candTitle,
+            author: candAuthors,
+            titleScore: tScore.toFixed(3),
+            authorScore: aScore.toFixed(3),
+            totalScore: s.toFixed(3),
+            threshold: PASS_THRESHOLD,
+            hasSummary: !!summary,
+            passes: s >= PASS_THRESHOLD && !!summary
+          });
+
+          if (!summary) continue;
           if (rawAuthor && aScore < MIN_AUTHOR_IF_PROVIDED) continue;
 
           if (s > bestScore) {
@@ -239,6 +253,7 @@ router.post("/summary", async (req: any, res) => {
         }
 
         if (best && bestScore >= PASS_THRESHOLD) {
+          console.log("✅ Google Books match found:", bestScore.toFixed(3));
           return res.json({
             source: "google_books",
             title: best.candTitle || rawTitle,
@@ -246,10 +261,12 @@ router.post("/summary", async (req: any, res) => {
             summary: best.summary,
             matchScore: Number(bestScore.toFixed(3)),
           });
+        } else {
+          console.log("❌ No Google Books match passed threshold. Best score:", bestScore.toFixed(3));
         }
       }
-    } catch {
-      // fall through
+    } catch (err) {
+      console.error("Google Books error:", err);
     }
 
     // ---------- 2) Open Library ----------
@@ -264,10 +281,14 @@ router.post("/summary", async (req: any, res) => {
         base.searchParams.set("q", rawTitle);
       }
 
+      console.log("🔍 Open Library URL:", base.toString());
+
       const olResp = await fetch(base.toString());
       if (olResp.ok) {
         const ol = await olResp.json();
         const docs = Array.isArray(ol?.docs) ? ol.docs : [];
+
+        console.log(`📚 Open Library returned ${docs.length} results`);
 
         const scored = docs
           .map((doc: any) => {
@@ -276,6 +297,14 @@ router.post("/summary", async (req: any, res) => {
             const key = String(doc?.key || "").trim();
             const s = candTitle ? totalScore(candTitle, candAuthor) : 0;
             const aScore = scoreAuthor(candAuthor);
+            
+            console.log({
+              olCandidate: candTitle,
+              author: candAuthor,
+              score: s.toFixed(3),
+              key
+            });
+
             return { candTitle, candAuthor, key, s, aScore };
           })
           .filter((x: any) => x.key && x.candTitle)
@@ -283,6 +312,7 @@ router.post("/summary", async (req: any, res) => {
           .slice(0, 5);
 
         if (!scored.length || scored[0].s < PASS_THRESHOLD) {
+          console.log("❌ No Open Library match passed threshold");
           return res.status(404).json({
             error: "No strong match found. Try adjusting the title or adding the author.",
           });
@@ -290,6 +320,8 @@ router.post("/summary", async (req: any, res) => {
 
         for (const cand of scored) {
           if (rawAuthor && cand.aScore < MIN_AUTHOR_IF_PROVIDED) continue;
+
+          console.log(`🔍 Fetching work details for: ${cand.candTitle}`);
 
           const workUrl = `https://openlibrary.org${cand.key}.json`;
           const workResp = await fetch(workUrl);
@@ -306,6 +338,7 @@ router.post("/summary", async (req: any, res) => {
               : "";
 
           if (summary && summary.trim()) {
+            console.log("✅ Open Library match found:", cand.s.toFixed(3));
             return res.json({
               source: "open_library",
               title: cand.candTitle || rawTitle,
@@ -316,17 +349,17 @@ router.post("/summary", async (req: any, res) => {
           }
         }
       }
-    } catch {
-      // fall through
+    } catch (err) {
+      console.error("Open Library error:", err);
     }
 
     return res.status(404).json({
       error: "No summary found for a strong match. Try adding the author or simplifying the title.",
     });
-  } catch {
+  } catch (err) {
+    console.error("Summary endpoint error:", err);
     return res.status(500).json({ error: "Failed to fetch summary" });
   }
 });
-
 
 export default router;
