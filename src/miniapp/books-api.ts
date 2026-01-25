@@ -20,21 +20,33 @@ function toIntOrNull(v: any) {
   return i >= 0 ? i : null;
 }
 
-function normalizeProgress(status: string, totalPages: number | null, currentPage: number | null) {
-  // If not reading, we wipe progress (keeps data consistent)
+function normalizeProgress(
+  status: "tbr" | "reading" | "finished",
+  totalPages: number | null,
+  currentPage: number | null
+) {
+  // Not actively reading → no progress allowed
   if (status !== "reading") {
-    return { totalPages: null, currentPage: null };
+    return {
+      totalPages: null,
+      currentPage: null,
+    };
   }
 
-  // Reading: allow nulls, but clamp if both exist
-  if (totalPages !== null && totalPages > 0 && currentPage !== null) {
+  // totalPages of 0 or less is meaningless → treat as unknown
+  if (totalPages !== null && totalPages <= 0) {
+    totalPages = null;
+  }
+
+  // Clamp currentPage only if we have a known total
+  if (totalPages !== null && currentPage !== null) {
     currentPage = Math.min(Math.max(currentPage, 0), totalPages);
   }
 
-  // If totalPages is 0, treat like unknown
-  if (totalPages === 0) totalPages = null;
-
-  return { totalPages, currentPage };
+  return {
+    totalPages,
+    currentPage,
+  };
 }
 
 /**
@@ -77,16 +89,16 @@ router.post("/", async (req: any, res) => {
     const title = String(req.body?.title || "").trim();
     const author = String(req.body?.author || "").trim();
     const status = normalizeStatus(req.body?.status);
-    
-        let totalPages = toIntOrNull(req.body?.totalPages);
+
+    if (!title) return res.status(400).json({ error: "Title is required" });
+    if (!status) return res.status(400).json({ error: "Invalid status" });
+
+    let totalPages = toIntOrNull(req.body?.totalPages);
     let currentPage = toIntOrNull(req.body?.currentPage);
 
     const prog = normalizeProgress(status, totalPages, currentPage);
     totalPages = prog.totalPages;
     currentPage = prog.currentPage;
-
-    if (!title) return res.status(400).json({ error: "Title is required" });
-    if (!status) return res.status(400).json({ error: "Invalid status" });
 
     const created = await Book.create({
       userId,
@@ -118,20 +130,20 @@ router.put("/:id", async (req: any, res) => {
     const title = String(req.body?.title || "").trim();
     const author = String(req.body?.author || "").trim();
     const status = normalizeStatus(req.body?.status);
-    
-        let totalPages = toIntOrNull(req.body?.totalPages);
+
+    if (!title) return res.status(400).json({ error: "Title is required" });
+    if (!status) return res.status(400).json({ error: "Invalid status" });
+
+    let totalPages = toIntOrNull(req.body?.totalPages);
     let currentPage = toIntOrNull(req.body?.currentPage);
 
     const prog = normalizeProgress(status, totalPages, currentPage);
     totalPages = prog.totalPages;
     currentPage = prog.currentPage;
 
-    if (!title) return res.status(400).json({ error: "Title is required" });
-    if (!status) return res.status(400).json({ error: "Invalid status" });
-
     const updated = await Book.findOneAndUpdate(
       { _id: id, userId },
-            { title, author, status, totalPages, currentPage },
+      { title, author, status, totalPages, currentPage },
       { new: true }
     ).lean();
 
