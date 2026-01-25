@@ -128,64 +128,126 @@ router.delete("/:id", async (req: any, res) => {
  *
  * Summaries are NOT saved.
  * Uses Google Books + Open Library (fallback).
+ * Returns 200 with found=false if no match.
  */
 router.post("/summary", async (req: any, res) => {
   try {
     const userId = req.userId as number;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const title = String(req.body?.title || "").trim();
-    const author = String(req.body?.author || "").trim();
-    if (!title) return res.status(400).json({ error: "Title is required" });
+    const titleRaw = String(req.body?.title || "").trim();
+    const authorRaw = String(req.body?.author || "").trim();
 
-    const q = author ? `${title} ${author}` : title;
+    if (!titleRaw) return res.status(400).json({ error: "Title is required" });
 
-    // 1) Google Books
+    // ---------- matching helpers ----------
+    const norm = (s: any) =>
+      String(s || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[:\-–--()"'’.,!?]/g, "")
+        .replace(/\s+/g, " ");
+
+    const score = (candidateTitle: string, candidateAuthor: string, wantTitle: string, wantAuthor: string) => {
+      const ct = norm(candidateTitle);
+      const ca = norm(candidateAuthor);
+      const wt = norm(wantTitle);
+      const wa = norm(wantAuthor);
+
+      let s = 0;
+
+      // title weighting
+      if (ct === wt) s += 100;
+      else if (ct.includes(wt) || wt.includes(ct)) s += 60;
+
+      // author weighting (optional)
+      if (wantAuthor) {
+        if (ca.includes(wa) || wa.includes(ca)) s += 40;
+      }
+
+      return s;
+    };
+
+    // ---------- 1) Google Books (prefer, often has description) ----------
+    // Use intitle/inauthor to get better results than a raw q string.
     try {
+      const qParts = [`intitle:${titleRaw}`];
+      if (authorRaw) qParts.push(`inauthor:${authorRaw}`);
       const gbUrl =
         "https://www.googleapis.com/books/v1/volumes?q=" +
-        encodeURIComponent(q) +
-        "&maxResults=1";
+        encodeURIComponent(qParts.join(" ")) +
+        "&maxResults=10";
+
       const gbResp = await fetch(gbUrl);
       if (gbResp.ok) {
         const gb = await gbResp.json();
-        const item = gb?.items?.[0];
-        const desc = item?.volumeInfo?.description;
+        const items = Array.isArray(gb?.items) ? gb.items : [];
 
-        const foundTitle = item?.volumeInfo?.title;
-        const foundAuthors = Array.isArray(item?.volumeInfo?.authors)
-          ? item.volumeInfo.authors.join(", ")
-          : "";
+        // pick best-scoring item that actually has a description
+        let best: any = null;
+        let bestScore = -1;
 
-        if (desc && String(desc).trim()) {
+        for (const item of items) {
+          const info = item?.volumeInfo || {};
+          const foundTitle = String(info?.title || "");
+          const foundAuthors = Array.isArray(info?.authors) ? info.authors.join(", ") : "";
+          const desc = info?.description;
+
+          if (!desc || !String(desc).trim()) continue;
+
+          const s = score(foundTitle, foundAuthors, titleRaw, authorRaw);
+          if (s > bestScore) {
+            bestScore = s;
+            best = { foundTitle, foundAuthors, desc: String(desc).trim() };
+          }
+        }
+
+        // If we found something reasonable, return it.
+        if (best && bestScore >= 40) {
           return res.json({
+            found: true,
             source: "google_books",
-            title: foundTitle || title,
-            author: foundAuthors || author,
-            summary: String(desc).trim(),
+            title: best.foundTitle || titleRaw,
+            author: best.foundAuthors || authorRaw,
+            summary: best.desc,
           });
         }
       }
     } catch {
-      // ignore, fallback
+      // ignore and fallback
     }
 
-    // 2) Open Library
+    // ---------- 2) Open Library fallback ----------
     try {
-      const olSearchUrl =
-        "https://openlibrary.org/search.json?limit=1&q=" + encodeURIComponent(q);
-      const olResp = await fetch(olSearchUrl);
+      // Search more than 1, then pick best match.
+      const t = encodeURIComponent(titleRaw);
+      const a = encodeURIComponent(authorRaw);
+
+      const olUrl = authorRaw
+        ? `https://openlibrary.org/search.json?title=${t}&author=${a}&limit=10`
+        : `https://openlibrary.org/search.json?title=${t}&limit=10`;
+
+      const olResp = await fetch(olUrl);
       if (olResp.ok) {
         const ol = await olResp.json();
-        const doc = ol?.docs?.[0];
-        const workKey = doc?.key; // "/works/OLxxxxW"
+        const docs = Array.isArray(ol?.docs) ? ol.docs : [];
 
-        const foundTitle = doc?.title;
-        const foundAuthor = Array.isArray(doc?.author_name) ? doc.author_name[0] : "";
+        let bestDoc: any = null;
+        let bestScore = -1;
 
-        if (workKey) {
-          const workUrl = `https://openlibrary.org${workKey}.json`;
-          const workResp = await fetch(workUrl);
+        for (const doc of docs) {
+          const foundTitle = String(doc?.title || "");
+          const foundAuthor = Array.isArray(doc?.author_name) ? String(doc.author_name[0] || "") : "";
+          const s = score(foundTitle, foundAuthor, titleRaw, authorRaw);
+          if (s > bestScore) {
+            bestScore = s;
+            bestDoc = doc;
+          }
+        }
+
+        const workKey = bestDoc?.key; // "/works/OLxxxxW"
+        if (workKey && bestScore >= 40) {
+          const workResp = await fetch(`https://openlibrary.org${workKey}.json`);
           if (workResp.ok) {
             const work = await workResp.json();
             const desc = work?.description;
@@ -198,10 +260,14 @@ router.post("/summary", async (req: any, res) => {
                 : "";
 
             if (summary && String(summary).trim()) {
+              const foundTitle = String(bestDoc?.title || "");
+              const foundAuthor = Array.isArray(bestDoc?.author_name) ? String(bestDoc.author_name[0] || "") : "";
+
               return res.json({
+                found: true,
                 source: "open_library",
-                title: foundTitle || title,
-                author: foundAuthor || author,
+                title: foundTitle || titleRaw,
+                author: foundAuthor || authorRaw,
                 summary: String(summary).trim(),
               });
             }
@@ -212,8 +278,14 @@ router.post("/summary", async (req: any, res) => {
       // ignore
     }
 
-    return res.status(404).json({
-      error: "No summary found. Try adding the author or adjusting the title.",
+    // IMPORTANT: return 200 so frontend doesn't treat this as a "crash"
+    return res.json({
+      found: false,
+      source: "none",
+      title: titleRaw,
+      author: authorRaw,
+      summary: "",
+      message: "No summary found. Try adding the author or adjusting the title.",
     });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to fetch summary" });
