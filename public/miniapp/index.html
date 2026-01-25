@@ -847,9 +847,13 @@ body.modal-open .app-content {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
+
+  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%);
+  color: white;
+  border: 1px solid rgba(91, 141, 239, 0.45);
+
+  /* optional: makes them pop slightly like the UI accent */
+  box-shadow: 0 4px 10px rgba(91, 141, 239, 0.18);
 }
 
 .journal-preview {
@@ -889,11 +893,15 @@ body.modal-open .app-content {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
+
+  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%);
+  color: white;
+  border: 1px solid rgba(91, 141, 239, 0.45);
+
   margin-right: 8px;
   margin-top: 8px;
+
+  box-shadow: 0 4px 10px rgba(91, 141, 239, 0.18);
 }
 
 .load-more-container {
