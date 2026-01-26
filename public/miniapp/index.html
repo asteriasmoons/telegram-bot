@@ -3511,7 +3511,12 @@ useEffect(() => {
             ))
           )}
 
-          <button ref={createReminderRef} onClick={handleCreate} className="is-hidden" />
+<button
+  ref={createReminderRef}
+  data-create-reminder="1"
+  onClick={handleCreate}
+  className="is-hidden"
+/>
 
           {showModal && (
   <ReminderModal
@@ -3657,12 +3662,10 @@ function App() {
       const calendarViewRef = useRef(null);
 
 const handleFabClick = () => {
-  if (activeView === 'reminders') {
-    const btn = document
-      .querySelector('[data-view="reminders"]')
-      ?.querySelector('button');
-    if (btn) btn.click();
-  }
+if (activeView === 'reminders') {
+  const btn = document.querySelector('[data-create-reminder="1"]');
+  if (btn) btn.click();
+}
 
   else if (activeView === 'calendar') {
     const today = new Date();
