@@ -820,6 +820,36 @@ body.modal-open .app-content {
   opacity: 0.9;
 }
 
+.calendar-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.icon-btn img {
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
 /* Utility */
 .is-hidden {
   display: none !important;
@@ -2287,7 +2317,7 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
     }
 
     // Reminder Modal
-    function ReminderModal({ reminder, onClose, onSave }) {
+function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
   const [text, setText] = useState(reminder?.text || '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -2334,7 +2364,7 @@ useEffect(() => {
       text,
       nextRunAt: nextRunAt.toISOString(),
       schedule,
-      timezone: 'America/Chicago',
+      timezone: userTimezone,
     });
   };
 
@@ -3033,7 +3063,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
 
 
     // Calendar View - Day List Style
-    function CalendarView() {
+function CalendarView({ onOpenSettings }) {
       const [currentMonth, setCurrentMonth] = useState(new Date());
       const [events, setEvents] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -3161,12 +3191,24 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       return (
         <div>
           <div className="calendar-header">
-            <div className="calendar-month">
-              <button className="calendar-nav-btn" onClick={handlePrevMonth}>‹</button>
-              <span>{monthName}</span>
-              <button className="calendar-nav-btn" onClick={handleNextMonth}>›</button>
-            </div>
-          </div>
+  <div className="calendar-month">
+    <button className="calendar-nav-btn" onClick={handlePrevMonth}>‹</button>
+    <span>{monthName}</span>
+    <button className="calendar-nav-btn" onClick={handleNextMonth}>›</button>
+  </div>
+
+  <div className="calendar-header-right">
+    <button
+      className="icon-btn"
+      type="button"
+      onClick={() => onOpenSettings && onOpenSettings()}
+      aria-label="Settings"
+      title="Settings"
+    >
+      <img src="/icons/cog.svg" alt="" />
+    </button>
+  </div>
+</div>
 
           {loading ? (
             <div className="loading">
@@ -3278,7 +3320,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
     }
 
     // Reminders View
-    function RemindersView({ activeView }) {
+function RemindersView({ activeView, userTimezone }) {
       const [reminders, setReminders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showHistory, setShowHistory] = useState(false);
@@ -3454,19 +3496,145 @@ useEffect(() => {
           <button ref={createReminderRef} onClick={handleCreate} className="is-hidden" />
 
           {showModal && (
-            <ReminderModal
-              reminder={editingReminder}
-              onClose={() => setShowModal(false)}
-              onSave={handleSave}
-            />
-          )}
+  <ReminderModal
+    reminder={editingReminder}
+    onClose={() => setShowModal(false)}
+    onSave={handleSave}
+    userTimezone={userTimezone}
+  />
+)}
         </div>
       );
     }
+    
+    // SETTINGS VIEW
+function SettingsView({ onBack }) {
+  const [loading, setLoading] = useState(true);
+  const [timezone, setTimezone] = useState("America/Chicago");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.remove("modal-open"); // safety
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await apiCall(`/settings`);
+        if (data?.settings?.timezone) setTimezone(String(data.settings.timezone));
+      } catch (e) {
+        tg.showAlert("Failed to load settings: " + (e.message || "Unknown error"));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      await apiCall(`/settings`, {
+        method: "PUT",
+        body: JSON.stringify({ timezone }),
+      });
+      tg.showPopup({ message: "Settings saved" });
+    } catch (e) {
+      tg.showAlert("Failed to save: " + (e.message || "Unknown error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="header">
+        <h1>Settings</h1>
+
+        <div className="journal-header-actions">
+          <button className="btn btn-secondary" type="button" onClick={onBack}>
+            Back
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading settings...</div>
+        </div>
+      ) : (
+        <>
+          <div className="card" style={{ cursor: "default" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+              Timezone
+            </div>
+
+            <div style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.4, marginBottom: 12 }}>
+              Use an IANA timezone like <b>Asia/Jakarta</b>. Offsets like <b>+7</b> can be mapped by the bot command too,
+              but the stored value should be IANA.
+            </div>
+
+            <input
+              className="form-input"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              placeholder="e.g. Asia/Jakarta"
+            />
+
+            <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+              <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
     // Main App Component
-    function App() {
-      const [activeView, setActiveView] = useState('reminders');
+function App() {
+  // --------------------
+  // VIEW STATE
+  // --------------------
+  const [activeView, setActiveView] = useState("reminders");
+  const [previousView, setPreviousView] = useState("reminders");
+
+  // --------------------
+  // USER SETTINGS STATE (NEW)
+  // --------------------
+  const [userTimezone, setUserTimezone] = useState("America/Chicago");
+
+  // --------------------
+  // LOAD USER SETTINGS (NEW)
+  // --------------------
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiCall("/settings");
+        if (data?.settings?.timezone) {
+          setUserTimezone(String(data.settings.timezone));
+        }
+      } catch (e) {
+        // intentionally silent – app still works with default
+      }
+    })();
+  }, []);
+
+  // --------------------
+  // NAVIGATION HELPERS
+  // --------------------
+  function goTo(view) {
+    setPreviousView(activeView);
+    setActiveView(view);
+  }
+
+  function goBack() {
+    setActiveView(previousView || "reminders");
+  }
+
       const remindersViewRef = useRef(null);
       const calendarViewRef = useRef(null);
 
@@ -3503,14 +3671,14 @@ return (
         className={`view-container ${activeView === 'reminders' ? 'active' : ''}`}
         data-view="reminders"
       >
-        <RemindersView activeView={activeView} />
+        <RemindersView activeView={activeView} userTimezone={userTimezone} />
       </div>
 
       <div
         className={`view-container ${activeView === 'calendar' ? 'active' : ''}`}
         data-view="calendar"
       >
-        <CalendarView ref={calendarViewRef} />
+        <CalendarView onOpenSettings={() => goTo("settings")} />
       </div>
 
       <div
@@ -3525,6 +3693,13 @@ return (
   data-view="reading"
 >
   <ReadingView activeView={activeView} />
+</div>
+
+<div
+  className={`view-container ${activeView === 'settings' ? 'active' : ''}`}
+  data-view="settings"
+>
+  <SettingsView onBack={goBack} />
 </div>
     </div>
 
