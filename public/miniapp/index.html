@@ -9,6 +9,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/luxon@3/build/global/luxon.min.js"></script>
 
   <!-- Paste your FULL CSS here (the styles block we separated out) -->
   <style>
@@ -1047,6 +1048,7 @@ img {
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
+    const { DateTime } = luxon;
 
 // Telegram WebApp guard (browser vs Telegram)
 const tg = window.Telegram?.WebApp;
@@ -2352,7 +2354,10 @@ useEffect(() => {
       return;
     }
 
-    const nextRunAt = new Date(`${date}T${time}`);
+const nextRunAt = DateTime
+  .fromISO(`${date}T${time}`, { zone: userTimezone })
+  .toUTC()
+  .toISO();
 
     const schedule = scheduleKind === 'once'
       ? { kind: 'once' }
@@ -2362,7 +2367,7 @@ useEffect(() => {
 
     await onSave({
       text,
-      nextRunAt: nextRunAt.toISOString(),
+      nextRunAt,
       schedule,
       timezone: userTimezone,
     });
@@ -2452,7 +2457,7 @@ useEffect(() => {
 
     // Event Modal
 // Event Modal
-function EventModal({ event, selectedDate, onClose, onSave }) {
+function EventModal({ event, selectedDate, userTimezone, onClose, onSave }) {
   const [title, setTitle] = useState(event?.title || '');
   const [description, setDescription] = useState(event?.description || '');
   const [date, setDate] = useState('');
@@ -2613,14 +2618,18 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       return;
     }
 
-    const startDate = allDay
-      ? new Date(`${date}T00:00:00`)
-      : new Date(`${date}T${time}`);
+const zone = userTimezone || "America/Chicago";
 
-    const endDate =
-      endTime && !allDay
-        ? new Date(`${date}T${endTime}`)
-        : null;
+// Build start in USER timezone, then convert to UTC ISO
+const startISO = allDay
+  ? DateTime.fromISO(date, { zone }).startOf("day").toUTC().toISO()
+  : DateTime.fromISO(`${date}T${time}`, { zone }).toUTC().toISO();
+
+// Build end in USER timezone, then convert to UTC ISO
+const endISO =
+  endTime && !allDay
+    ? DateTime.fromISO(`${date}T${endTime}`, { zone }).toUTC().toISO()
+    : null;
 
     // -----------------------------
     // Reminder payload
@@ -2642,12 +2651,16 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
           tg.showAlert('Please choose a custom reminder date and time.');
           return;
         }
-        const customDT = new Date(`${customReminderDate}T${customReminderTime}`);
-        reminderPayload = {
-          enabled: true,
-          mode: 'custom',
-          customDateTime: customDT.toISOString(),
-        };
+const customISO = DateTime
+  .fromISO(`${customReminderDate}T${customReminderTime}`, { zone })
+  .toUTC()
+  .toISO();
+
+reminderPayload = {
+  enabled: true,
+  mode: 'custom',
+  customDateTime: customISO,
+};
       }
     }
 
@@ -2680,13 +2693,13 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
           tg.showAlert('Choose an "until" date for repeating events.');
           return;
         }
-        const until = new Date(`${repeatUntilDate}T23:59:59`);
-        if (isNaN(until.getTime())) {
-          tg.showAlert('Invalid "until" date.');
-          return;
-        }
-        end = { kind: 'until', until: until.toISOString() };
-      }
+        const untilISO = DateTime
+  .fromISO(repeatUntilDate, { zone })
+  .endOf("day")
+  .toUTC()
+  .toISO();
+
+end = { kind: "until", until: untilISO };
 
       if (repeatEndKind === 'count') {
         const c = Math.max(1, Number(repeatCount || 1));
@@ -2704,8 +2717,8 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
     await onSave({
       title,
       description,
-      startDate: startDate.toISOString(),
-      endDate: endDate ? endDate.toISOString() : undefined,
+      startDate: startISO,
+endDate: endISO || undefined,
       allDay,
       location,
       reminder: reminderPayload,
@@ -3063,7 +3076,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
 
 
     // Calendar View - Day List Style
-function CalendarView({ onOpenSettings }) {
+function CalendarView({ onOpenSettings, userTimezone }) {
       const [currentMonth, setCurrentMonth] = useState(new Date());
       const [events, setEvents] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -3080,11 +3093,11 @@ function CalendarView({ onOpenSettings }) {
         try {
           setLoading(true);
           const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-          const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+const endExclusive = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
 
-          const data = await apiCall(
-            `/calendar/events?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}`
-          );
+const data = await apiCall(
+  `/calendar/events?startDate=${startOfMonth.toISOString()}&endDate=${endExclusive.toISOString()}`
+);
           setEvents(data.events);
         } catch (error) {
           tg.showAlert('Failed to load events: ' + error.message);
@@ -3306,14 +3319,15 @@ function CalendarView({ onOpenSettings }) {
 
           {showEventModal && (
             <EventModal
-              event={editingEvent}
-              selectedDate={selectedDate}
-              onClose={() => {
-                setShowEventModal(false);
-                setSelectedDate(null);
-              }}
-              onSave={handleSaveEvent}
-            />
+  event={editingEvent}
+  selectedDate={selectedDate}
+  userTimezone={userTimezone}
+  onClose={() => {
+    setShowEventModal(false);
+    setSelectedDate(null);
+  }}
+  onSave={handleSaveEvent}
+/>
           )}
         </div>
       );
@@ -3678,7 +3692,10 @@ return (
         className={`view-container ${activeView === 'calendar' ? 'active' : ''}`}
         data-view="calendar"
       >
-        <CalendarView onOpenSettings={() => goTo("settings")} />
+        <CalendarView
+  onOpenSettings={() => goTo("settings")}
+  userTimezone={userTimezone}
+/>
       </div>
 
       <div

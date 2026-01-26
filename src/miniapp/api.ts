@@ -251,8 +251,26 @@ router.put("/reminders/:id", async (req, res) => {
 
     const update: any = {};
     if (text !== undefined) update.text = text;
-    if (nextRunAt !== undefined) update.nextRunAt = new Date(nextRunAt);
-    if (schedule !== undefined) update.schedule = schedule;
+if (nextRunAt !== undefined) {
+  const dt = new Date(nextRunAt);
+  if (isNaN(dt.getTime())) {
+    return res.status(400).json({ error: "Invalid nextRunAt date" });
+  }
+  update.nextRunAt = dt;
+}
+if (schedule !== undefined) {
+  const kind = schedule?.kind || "once";
+  if (kind === "daily" || kind === "weekly") {
+    if (!schedule.timeOfDay || !String(schedule.timeOfDay).includes(":")) {
+      return res.status(400).json({ error: "Missing schedule.timeOfDay for recurring reminders" });
+    }
+  }
+  if (kind === "weekly") {
+    if (!Array.isArray(schedule.daysOfWeek) || schedule.daysOfWeek.length === 0) {
+      return res.status(400).json({ error: "Missing schedule.daysOfWeek for weekly reminders" });
+    }
+  }
+}
     if (status !== undefined) update.status = status;
 
     const reminder = await Reminder.findOneAndUpdate(
@@ -314,7 +332,10 @@ function computeNextRunFromSchedule(
   const timeOfDay = String(schedule.timeOfDay || "");
   const [hRaw, mRaw] = timeOfDay.split(":");
   const hour = Number(hRaw);
-  const minute = Number(mRaw);
+const mins = Number(minutes);
+if (!Number.isFinite(mins) || mins < 1) {
+  return res.status(400).json({ error: "Invalid snooze minutes" });
+}
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
 
   if (schedule.kind === "daily") {
@@ -364,8 +385,8 @@ router.post("/reminders/:id/done", async (req, res) => {
       return res.status(404).json({ error: "Reminder not found" });
     }
 
-    const tz = rem.timezone || "America/Chicago";
-    const kind = rem.schedule?.kind || "once";
+const settings = await UserSettings.findOne({ userId: req.userId }).lean();
+const tz = settings?.timezone || rem.timezone || "America/Chicago";
 
     // One-time reminders: mark sent and stop
     if (kind === "once") {

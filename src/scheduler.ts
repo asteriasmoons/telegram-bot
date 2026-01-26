@@ -186,12 +186,12 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
       Number(sched.anchorDayOfMonth) ||
       (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
-const clampDay = (dt: DateTime, dayNum: number) => {
-  if (!dt.isValid) return dt; // keep it safe; caller should handle invalid if needed
-  const dim = dt.daysInMonth ?? 31; // ✅ force number
-  const safeDay = Math.min(Math.max(1, dayNum), dim);
-  return dt.set({ day: safeDay });
-};
+    const clampDay = (dt: DateTime, dayNum: number) => {
+      if (!dt.isValid) return dt;
+      const dim = dt.daysInMonth ?? 31;
+      const safeDay = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safeDay });
+    };
 
     let candidate = clampDay(
       nowZ.set({ hour, minute, second: 0, millisecond: 0 }),
@@ -221,12 +221,12 @@ const clampDay = (dt: DateTime, dayNum: number) => {
       Number(sched.anchorDay) ||
       (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
-const clampDay = (dt: DateTime, dayNum: number) => {
-  if (!dt.isValid) return dt;
-  const dim = dt.daysInMonth ?? 31; // ✅ force number
-  const safeDay = Math.min(Math.max(1, dayNum), dim);
-  return dt.set({ day: safeDay });
-};
+    const clampDay = (dt: DateTime, dayNum: number) => {
+      if (!dt.isValid) return dt;
+      const dim = dt.daysInMonth ?? 31;
+      const safeDay = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safeDay });
+    };
 
     let candidate = nowZ.set({
       month: Math.min(Math.max(1, anchorMonth), 12),
@@ -251,23 +251,31 @@ const clampDay = (dt: DateTime, dayNum: number) => {
 /**
  * Back-compat repeat computation (kept, but we prefer Luxon version now).
  * (Still used as fallback if Luxon can't compute for some reason.)
+ *
+ * IMPORTANT: This fallback must NOT do +24h/+7d in minutes (DST drift).
+ * So it uses Luxon anchored to rem.nextRunAt in the reminder's timezone.
  */
-function computeNextForRepeat(rem: ReminderDoc): Date | null {
+function computeNextForRepeat(rem: ReminderDoc | any): Date | null {
   const sched = rem.schedule;
-  if (!sched) return null;
+  if (!sched || !sched.kind || sched.kind === "once") return null;
 
+  // Interval fallback is fine (absolute minutes)
   if (sched.kind === "interval") {
-    const mins = sched.intervalMinutes;
-    if (!mins || mins <= 0) return null;
+    const mins = Number(sched.intervalMinutes);
+    if (!Number.isFinite(mins) || mins <= 0) return null;
     return addMinutes(now(), mins);
   }
 
-  // ✅ nextRunAt is required for these fallbacks
   if (!rem.nextRunAt) return null;
 
-  if (sched.kind === "daily") return addMinutes(rem.nextRunAt, 24 * 60);
-  if (sched.kind === "weekly") return addMinutes(rem.nextRunAt, 7 * 24 * 60);
+  const tz = String(rem.timezone || "America/Chicago");
+  const base = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
+  if (!base.isValid) return null;
 
+  if (sched.kind === "daily") return base.plus({ days: 1 }).toJSDate();
+  if (sched.kind === "weekly") return base.plus({ weeks: 1 }).toJSDate();
+
+  // For monthly/yearly, Luxon version above should handle it; keep null here as a true fallback.
   return null;
 }
 
