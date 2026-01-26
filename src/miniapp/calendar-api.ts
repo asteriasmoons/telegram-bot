@@ -249,11 +249,12 @@ function computeNextFromScheduleLuxon(args: {
     const step = Math.max(1, Number(schedule.interval || 1));
     const anchor = Math.max(1, Number(schedule.anchorDayOfMonth || candidate.day));
 
-    const clamp = (dt: DateTime, dayNum: number) => {
-      const dim = dt.daysInMonth;
-      const safe = Math.min(Math.max(1, dayNum), dim);
-      return dt.set({ day: safe });
-    };
+const clamp = (dt: DateTime, dayNum: number) => {
+  if (!dt.isValid) return dt;
+  const dim = dt.daysInMonth ?? 31; // ✅ force number
+  const safe = Math.min(Math.max(1, dayNum), dim);
+  return dt.set({ day: safe });
+};
 
     let c = clamp(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), anchor);
     if (c <= nowZ) c = clamp(c.plus({ months: 1 }), anchor);
@@ -269,11 +270,12 @@ function computeNextFromScheduleLuxon(args: {
     const anchorMonth = Math.min(Math.max(1, Number(schedule.anchorMonth || candidate.month)), 12);
     const anchorDay = Math.max(1, Number(schedule.anchorDay || candidate.day));
 
-    const clamp = (dt: DateTime, dayNum: number) => {
-      const dim = dt.daysInMonth;
-      const safe = Math.min(Math.max(1, dayNum), dim);
-      return dt.set({ day: safe });
-    };
+const clamp = (dt: DateTime, dayNum: number) => {
+  if (!dt.isValid) return dt;
+  const dim = dt.daysInMonth ?? 31; // ✅ force number
+  const safe = Math.min(Math.max(1, dayNum), dim);
+  return dt.set({ day: safe });
+};
 
     let c = nowZ.set({ month: anchorMonth, hour, minute, second: 0, millisecond: 0 });
     c = clamp(c, anchorDay);
@@ -355,7 +357,7 @@ const safeNextRunAt =
       {
         $set: {
           text,
-          nextRunAt,
+          nextRunAt: safeNextRunAt,
           schedule,
           timezone,
           status: "scheduled"
@@ -376,7 +378,7 @@ const safeNextRunAt =
     chatId: settings.dmChatId,
     text,
     status: "scheduled",
-    nextRunAt,
+    nextRunAt: safeNextRunAt,
     schedule,
     timezone,
     // your reminders use lock:{} so keep consistent
