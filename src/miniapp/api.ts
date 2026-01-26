@@ -329,14 +329,13 @@ function computeNextRunFromSchedule(
     return from.plus({ minutes: mins }).toJSDate();
   }
 
-  const timeOfDay = String(schedule.timeOfDay || "");
-  const [hRaw, mRaw] = timeOfDay.split(":");
-  const hour = Number(hRaw);
-const mins = Number(minutes);
-if (!Number.isFinite(mins) || mins < 1) {
-  return res.status(400).json({ error: "Invalid snooze minutes" });
-}
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+const timeOfDay = String(schedule.timeOfDay || "");
+const [hRaw, mRaw] = timeOfDay.split(":");
+
+const hour = Number(hRaw);
+const minute = Number(mRaw);
+
+if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
 
   if (schedule.kind === "daily") {
     let candidate = from.set({ hour, minute, second: 0, millisecond: 0 });
@@ -384,6 +383,8 @@ router.post("/reminders/:id/done", async (req, res) => {
     if (!rem) {
       return res.status(404).json({ error: "Reminder not found" });
     }
+    
+    const kind = rem.schedule?.kind || "once"; 
 
 const settings = await UserSettings.findOne({ userId: req.userId }).lean();
 const tz = settings?.timezone || rem.timezone || "America/Chicago";
@@ -400,7 +401,7 @@ const tz = settings?.timezone || rem.timezone || "America/Chicago";
     }
 
     // Recurring reminders: advance nextRunAt and keep scheduled
-    const next = computeNextRunFromSchedule(rem.schedule, tz, now);
+const next = computeNextRunFromSchedule(rem.schedule || { kind: "once" }, tz, now);
     if (!next) {
       return res.status(500).json({ error: "Could not compute next run time" });
     }
