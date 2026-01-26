@@ -603,24 +603,24 @@ router.get("/events", async (req, res) => {
     }
 
     // 1) non-recurring events in range (your original behavior)
-    const oneTime = await Event.find({
-      userId: req.userId,
-      recurrence: { $exists: false },
-      startDate: { $gte: rangeStart, $lte: rangeEnd }
-    })
-      .sort({ startDate: 1 })
-      .lean();
+const oneTime = await Event.find({
+  userId: req.userId,
+  $or: [{ recurrence: { $exists: false } }, { recurrence: null }],
+  startDate: { $gte: rangeStart, $lte: rangeEnd }
+})
+  .sort({ startDate: 1 })
+  .lean();
 
     // 2) recurring parent events that could affect the range
     // We include parents whose startDate is <= rangeEnd
     // (and optionally: whose "until" is >= rangeStart, but we keep it simple here)
-    const recurringParents = await Event.find({
-      userId: req.userId,
-      recurrence: { $exists: true },
-      startDate: { $lte: rangeEnd }
-    })
-      .sort({ startDate: 1 })
-      .lean();
+const recurringParents = await Event.find({
+  userId: req.userId,
+  recurrence: { $exists: true, $ne: null },
+  startDate: { $lte: rangeEnd }
+})
+  .sort({ startDate: 1 })
+  .lean();
 
     // Expand occurrences
     const occurrences = recurringParents.flatMap((ev) =>
@@ -813,21 +813,32 @@ router.put("/events/:id", async (req, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    const update: any = {};
-    if (title !== undefined) update.title = title;
-    if (description !== undefined) update.description = description;
-    if (startDate !== undefined) update.startDate = new Date(startDate);
-    if (endDate !== undefined) update.endDate = endDate ? new Date(endDate) : null;
-    if (allDay !== undefined) update.allDay = allDay;
-    if (color !== undefined) update.color = color;
-    if (location !== undefined) update.location = location;
-    if (recurrence !== undefined) update.recurrence = recurrence || null;
+const $set: any = {};
+const $unset: any = {};
 
-    const event = await Event.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
-      { $set: update },
-      { new: true }
-    ).lean();
+if (title !== undefined) $set.title = title;
+if (description !== undefined) $set.description = description;
+if (startDate !== undefined) $set.startDate = new Date(startDate);
+if (endDate !== undefined) $set.endDate = endDate ? new Date(endDate) : null;
+if (allDay !== undefined) $set.allDay = allDay;
+if (color !== undefined) $set.color = color;
+if (location !== undefined) $set.location = location;
+
+// IMPORTANT: if recurrence is cleared, UNSET the field (do NOT set null)
+if (recurrence !== undefined) {
+  if (recurrence) $set.recurrence = recurrence;
+  else $unset.recurrence = "";
+}
+
+const updateDoc: any = {};
+if (Object.keys($set).length) updateDoc.$set = $set;
+if (Object.keys($unset).length) updateDoc.$unset = $unset;
+
+const event = await Event.findOneAndUpdate(
+  { _id: req.params.id, userId: req.userId },
+  updateDoc,
+  { new: true }
+).lean();
 
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
