@@ -519,7 +519,7 @@ router.post("/events", async (req, res) => {
       endDate: endDate ? new Date(endDate) : undefined,
       allDay: allDay || false,
       color,
-      location
+      location,
       recurrence: recurrence || undefined
     });
 
