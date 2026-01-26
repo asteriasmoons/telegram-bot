@@ -186,11 +186,12 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
       Number(sched.anchorDayOfMonth) ||
       (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
-    const clampDay = (dt: DateTime, dayNum: number) => {
-      const dim = dt.daysInMonth;
-      const safeDay = Math.min(Math.max(1, dayNum), dim);
-      return dt.set({ day: safeDay });
-    };
+const clampDay = (dt: DateTime, dayNum: number) => {
+  if (!dt.isValid) return dt; // keep it safe; caller should handle invalid if needed
+  const dim = dt.daysInMonth ?? 31; // ✅ force number
+  const safeDay = Math.min(Math.max(1, dayNum), dim);
+  return dt.set({ day: safeDay });
+};
 
     let candidate = clampDay(
       nowZ.set({ hour, minute, second: 0, millisecond: 0 }),
@@ -220,11 +221,12 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
       Number(sched.anchorDay) ||
       (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
-    const clampDay = (dt: DateTime, dayNum: number) => {
-      const dim = dt.daysInMonth;
-      const safeDay = Math.min(Math.max(1, dayNum), dim);
-      return dt.set({ day: safeDay });
-    };
+const clampDay = (dt: DateTime, dayNum: number) => {
+  if (!dt.isValid) return dt;
+  const dim = dt.daysInMonth ?? 31; // ✅ force number
+  const safeDay = Math.min(Math.max(1, dayNum), dim);
+  return dt.set({ day: safeDay });
+};
 
     let candidate = nowZ.set({
       month: Math.min(Math.max(1, anchorMonth), 12),
