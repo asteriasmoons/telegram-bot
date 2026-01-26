@@ -2679,32 +2679,36 @@ reminderPayload = {
           ? repeatWeekdays.map(n => Number(n)).filter(n => n >= 0 && n <= 6)
           : [];
 
-        if (list.length === 0) {
-          byWeekday = [startDate.getDay()];
-        } else {
-          byWeekday = Array.from(new Set(list));
-        }
+const startWeekday = new Date(date + "T00:00:00").getDay(); // 0..6
+
+if (list.length === 0) {
+  byWeekday = [startWeekday];
+} else {
+  byWeekday = Array.from(new Set(list));
+}
       }
 
-      let end = { kind: 'never' };
+let end = { kind: "never" };
 
-      if (repeatEndKind === 'until') {
-        if (!repeatUntilDate) {
-          tg.showAlert('Choose an "until" date for repeating events.');
-          return;
-        }
-        const untilISO = DateTime
-  .fromISO(repeatUntilDate, { zone })
-  .endOf("day")
-  .toUTC()
-  .toISO();
+if (repeatEndKind === "until") {
+  if (!repeatUntilDate) {
+    tg.showAlert('Choose an "until" date for repeating events.');
+    return;
+  }
 
-end = { kind: "until", until: untilISO };
+  const untilISO = DateTime
+    .fromISO(repeatUntilDate, { zone })
+    .endOf("day")
+    .toUTC()
+    .toISO();
 
-      if (repeatEndKind === 'count') {
-        const c = Math.max(1, Number(repeatCount || 1));
-        end = { kind: 'count', count: c };
-      }
+  end = { kind: "until", until: untilISO };
+}
+
+if (repeatEndKind === "count") {
+  const c = Math.max(1, Number(repeatCount || 1));
+  end = { kind: "count", count: c };
+}
 
       recurrence = {
         freq,
