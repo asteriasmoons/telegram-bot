@@ -260,6 +260,9 @@ function computeNextForRepeat(rem: ReminderDoc): Date | null {
     return addMinutes(now(), mins);
   }
 
+  // ✅ nextRunAt is required for these fallbacks
+  if (!rem.nextRunAt) return null;
+
   if (sched.kind === "daily") return addMinutes(rem.nextRunAt, 24 * 60);
   if (sched.kind === "weekly") return addMinutes(rem.nextRunAt, 7 * 24 * 60);
 
