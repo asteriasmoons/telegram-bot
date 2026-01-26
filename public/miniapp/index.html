@@ -3536,6 +3536,11 @@ function SettingsView({ onBack }) {
   const [timezone, setTimezone] = useState("America/Chicago");
   const [saving, setSaving] = useState(false);
 
+// quiet hours state
+const [qhEnabled, setQhEnabled] = useState(false);
+const [qhStart, setQhStart] = useState("23:00");
+const [qhEnd, setQhEnd] = useState("08:00");
+
   useEffect(() => {
     document.body.classList.remove("modal-open"); // safety
   }, []);
@@ -3544,7 +3549,16 @@ function SettingsView({ onBack }) {
     (async () => {
       try {
         setLoading(true);
-        const data = await apiCall(`/settings`);
+const data = await apiCall(`/settings`);
+
+if (data?.settings?.timezone) setTimezone(String(data.settings.timezone));
+
+const qh = data?.settings?.quietHours;
+if (qh) {
+  setQhEnabled(!!qh.enabled);
+  setQhStart(String(qh.start || "23:00"));
+  setQhEnd(String(qh.end || "08:00"));
+}
         if (data?.settings?.timezone) setTimezone(String(data.settings.timezone));
       } catch (e) {
         tg.showAlert("Failed to load settings: " + (e.message || "Unknown error"));
@@ -3559,7 +3573,14 @@ function SettingsView({ onBack }) {
       setSaving(true);
       await apiCall(`/settings`, {
         method: "PUT",
-        body: JSON.stringify({ timezone }),
+body: JSON.stringify({
+  timezone,
+  quietHours: {
+    enabled: qhEnabled,
+    start: qhStart,
+    end: qhEnd,
+  },
+}),
       });
       tg.showPopup({ message: "Settings saved" });
     } catch (e) {
@@ -3610,6 +3631,54 @@ function SettingsView({ onBack }) {
                 {saving ? "Saving..." : "Save"}
               </button>
             </div>
+            <div className="card" style={{ cursor: "default" }} onClick={(e) => e.stopPropagation()}>
+  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+    Quiet Hours
+  </div>
+
+  <div style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.4, marginBottom: 12 }}>
+    If enabled, reminders that would deliver during this window can be delayed until quiet hours end.
+  </div>
+
+  <label className="checkbox-row" style={{ marginBottom: 12 }}>
+    <input
+      type="checkbox"
+      checked={qhEnabled}
+      onChange={(e) => setQhEnabled(e.target.checked)}
+    />
+    <span>Enable Quiet Hours</span>
+  </label>
+
+  <div className="form-row">
+    <div className="form-group">
+      <label className="form-label">Start</label>
+      <input
+        type="time"
+        className="form-input"
+        value={qhStart}
+        onChange={(e) => setQhStart(e.target.value)}
+        disabled={!qhEnabled}
+      />
+    </div>
+
+    <div className="form-group">
+      <label className="form-label">End</label>
+      <input
+        type="time"
+        className="form-input"
+        value={qhEnd}
+        onChange={(e) => setQhEnd(e.target.value)}
+        disabled={!qhEnabled}
+      />
+    </div>
+  </div>
+
+  <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+    <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>
+      {saving ? "Saving..." : "Save"}
+    </button>
+  </div>
+</div>
           </div>
         </>
       )}
