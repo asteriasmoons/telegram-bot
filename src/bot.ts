@@ -24,6 +24,8 @@ import { registerAdminReplyRouter } from "./middleware/adminReplyRouter";
 
 import { registerPromptCommand } from "./commands/prompt";
 
+import { registerTimezoneCommand } from "./commands/timezone";
+
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -172,6 +174,9 @@ registerAdminReplyRouter(bot);
 
 // PROMPT COMMAND
 registerPromptCommand(bot);
+
+// TIMEZONE COMMAND
+registerTimezoneCommand(bot);
 
 
   bot.catch((err) => {
