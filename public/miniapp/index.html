@@ -1040,6 +1040,128 @@ img {
   width: 18px;
   height: 18px;
 }
+
+/* =========================
+   SETTINGS VIEW POLISH
+   ========================= */
+
+/* Settings should not feel like tappable reminder cards */
+.settings-card {
+  cursor: default !important;
+  transform: none !important;
+}
+.settings-card:hover {
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Section titles inside settings */
+.settings-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 10px;
+  letter-spacing: 0.2px;
+}
+
+.settings-help {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+/* Save row aligns nicely and doesn't float */
+.settings-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+/* Quiet Hours container (avoid "card inside card" look) */
+.qh-box {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+
+/* Quiet Hours header text */
+.qh-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.qh-sub {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+/* Toggle row for quiet hours */
+.qh-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 12px;
+}
+
+.qh-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Make checkbox not look tiny/off-center */
+.qh-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+/* Two time inputs, clean and aligned */
+.qh-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* Label styling for Start/End */
+.qh-times .form-label {
+  margin-bottom: 6px;
+}
+
+/* Disable times visually if quiet hours off */
+.qh-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Quiet hours save button row */
+.qh-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+/* Optional: smaller save button in settings so it doesn’t look chunky */
+.btn.btn-sm {
+  padding: 10px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+}
   </style>
 </head>
 
@@ -3590,101 +3712,116 @@ body: JSON.stringify({
     }
   };
 
-  return (
-    <div>
-      <div className="header">
-        <h1>Settings</h1>
+return (
+  <div>
+    <div className="header">
+      <h1>Settings</h1>
 
-        <div className="journal-header-actions">
-          <button className="btn btn-secondary" type="button" onClick={onBack}>
-            Back
+      <div className="journal-header-actions">
+        <button className="btn btn-secondary" type="button" onClick={onBack}>
+          Back
+        </button>
+      </div>
+    </div>
+
+    {loading ? (
+      <div className="loading">
+        <div className="spinner" />
+        <div>Loading settings...</div>
+      </div>
+    ) : (
+      <div
+        className="card settings-card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* -------------------
+            TIMEZONE SECTION
+           ------------------- */}
+        <div className="settings-title">Timezone</div>
+
+        <div className="settings-help">
+          Use an IANA timezone like <b>Asia/Jakarta</b>. Offsets like <b>+7</b>{" "}
+          can be mapped by the bot command too, but the stored value should be
+          IANA.
+        </div>
+
+        <input
+          className="form-input"
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          placeholder="e.g. Asia/Jakarta"
+        />
+
+        <div className="settings-actions">
+          <button
+            className="btn btn-primary btn-sm"
+            type="button"
+            onClick={save}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save Timezone"}
           </button>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="loading">
-          <div className="spinner" />
-          <div>Loading settings...</div>
-        </div>
-      ) : (
-        <>
-          <div className="card" style={{ cursor: "default" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
-              Timezone
-            </div>
+        {/* -------------------
+            QUIET HOURS SECTION
+           ------------------- */}
+        <div className="qh-box">
+          <div className="qh-title">Quiet Hours</div>
 
-            <div style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.4, marginBottom: 12 }}>
-              Use an IANA timezone like <b>Asia/Jakarta</b>. Offsets like <b>+7</b> can be mapped by the bot command too,
-              but the stored value should be IANA.
-            </div>
-
-            <input
-              className="form-input"
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              placeholder="e.g. Asia/Jakarta"
-            />
-
-            <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-              <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-            <div className="card" style={{ cursor: "default" }} onClick={(e) => e.stopPropagation()}>
-  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
-    Quiet Hours
-  </div>
-
-  <div style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.4, marginBottom: 12 }}>
-    If enabled, reminders that would deliver during this window can be delayed until quiet hours end.
-  </div>
-
-  <label className="checkbox-row" style={{ marginBottom: 12 }}>
-    <input
-      type="checkbox"
-      checked={qhEnabled}
-      onChange={(e) => setQhEnabled(e.target.checked)}
-    />
-    <span>Enable Quiet Hours</span>
-  </label>
-
-  <div className="form-row">
-    <div className="form-group">
-      <label className="form-label">Start</label>
-      <input
-        type="time"
-        className="form-input"
-        value={qhStart}
-        onChange={(e) => setQhStart(e.target.value)}
-        disabled={!qhEnabled}
-      />
-    </div>
-
-    <div className="form-group">
-      <label className="form-label">End</label>
-      <input
-        type="time"
-        className="form-input"
-        value={qhEnd}
-        onChange={(e) => setQhEnd(e.target.value)}
-        disabled={!qhEnabled}
-      />
-    </div>
-  </div>
-
-  <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-    <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>
-      {saving ? "Saving..." : "Save"}
-    </button>
-  </div>
-</div>
+          <div className="qh-sub">
+            If enabled, reminders that would deliver during this window can be
+            delayed until quiet hours end.
           </div>
-        </>
-      )}
-    </div>
-  );
-}
+
+          <div className="qh-toggle">
+            <label>
+              <input
+                type="checkbox"
+                checked={qhEnabled}
+                onChange={(e) => setQhEnabled(e.target.checked)}
+              />
+              <span>Enable Quiet Hours</span>
+            </label>
+          </div>
+
+          <div className={`qh-times ${qhEnabled ? "" : "qh-disabled"}`}>
+            <div className="form-group">
+              <label className="form-label">Start</label>
+              <input
+                type="time"
+                className="form-input"
+                value={qhStart}
+                onChange={(e) => setQhStart(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">End</label>
+              <input
+                type="time"
+                className="form-input"
+                value={qhEnd}
+                onChange={(e) => setQhEnd(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="qh-actions">
+            <button
+              className="btn btn-primary btn-sm"
+              type="button"
+              onClick={save}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save Quiet Hours"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+);
 
     // Main App Component
 function App() {
