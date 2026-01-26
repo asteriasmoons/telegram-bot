@@ -1124,6 +1124,10 @@ tg.onEvent("viewportChanged", syncTelegramViewportHeight);
       return timeStr;
     }
     
+    function hasReminder(event) {
+  return !!(event?.reminderId || event?.reminder?.nextRunAt);
+}
+    
     // Journal helpers
 function normalizeTagsFromText(input) {
   const matches = String(input || '').match(/#[A-Za-z0-9_-]+/g) || [];
@@ -2417,6 +2421,7 @@ useEffect(() => {
 
 
     // Event Modal
+// Event Modal
 function EventModal({ event, selectedDate, onClose, onSave }) {
   const [title, setTitle] = useState(event?.title || '');
   const [description, setDescription] = useState(event?.description || '');
@@ -2432,7 +2437,18 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
   const [offsetMinutes, setOffsetMinutes] = useState(10);
   const [customReminderDate, setCustomReminderDate] = useState('');
   const [customReminderTime, setCustomReminderTime] = useState('');
-  
+
+  // =============================
+  // NEW: Recurrence UI state
+  // =============================
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatFreq, setRepeatFreq] = useState('weekly'); // daily | weekly | monthly | yearly
+  const [repeatInterval, setRepeatInterval] = useState(1); // every X
+  const [repeatWeekdays, setRepeatWeekdays] = useState([]); // [0..6] Sun..Sat (only for weekly)
+  const [repeatEndKind, setRepeatEndKind] = useState('never'); // never | until | count
+  const [repeatUntilDate, setRepeatUntilDate] = useState(''); // YYYY-MM-DD
+  const [repeatCount, setRepeatCount] = useState(10); // occurrences
+
   useEffect(() => {
     document.body.classList.add('modal-open');
     return () => {
@@ -2441,7 +2457,9 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
   }, []);
 
   useEffect(() => {
+    // -----------------------------
     // Base event fields
+    // -----------------------------
     if (event) {
       const d = new Date(event.startDate);
       setDate(d.toISOString().split('T')[0]);
@@ -2476,35 +2494,85 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       setTitle('');
     }
 
-    // Reminder defaults
+    // -----------------------------
+    // Reminder defaults + prefill
+    // -----------------------------
     setReminderEnabled(false);
     setReminderMode('at_event');
     setOffsetMinutes(10);
 
-    const now = new Date();
-    setCustomReminderDate(now.toISOString().split('T')[0]);
-    setCustomReminderTime('09:00');
+    {
+      const now = new Date();
+      setCustomReminderDate(now.toISOString().split('T')[0]);
+      setCustomReminderTime('09:00');
+    }
 
-    if (event && event.reminder && event.reminder.nextRunAt) {
-      const rNext = new Date(event.reminder.nextRunAt);
-      const eStart = new Date(event.startDate);
+    if (event && (event.reminder?.nextRunAt || event.reminderId)) {
+  setReminderEnabled(true);
 
-      setReminderEnabled(true);
+  // If backend only gives reminderId (no nextRunAt),
+  // we can't calculate offset/custom accurately.
+  if (!event.reminder?.nextRunAt) {
+    setReminderMode('at_event');
+  } else {
+    const rNext = new Date(event.reminder.nextRunAt);
+    const eStart = new Date(event.startDate);
 
-      const diffMs = eStart.getTime() - rNext.getTime();
-      const diffMinutes = Math.round(diffMs / 60000);
+    const diffMs = eStart.getTime() - rNext.getTime();
+    const diffMinutes = Math.round(diffMs / 60000);
 
-      if (Math.abs(diffMinutes) <= 1) {
-        setReminderMode('at_event');
+    if (Math.abs(diffMinutes) <= 1) {
+      setReminderMode('at_event');
+    } else if (diffMinutes > 0) {
+      setReminderMode('offset');
+      setOffsetMinutes(Math.max(1, diffMinutes));
+    } else {
+      setReminderMode('custom');
+      setCustomReminderDate(rNext.toISOString().split('T')[0]);
+      setCustomReminderTime(rNext.toTimeString().slice(0, 5));
+    }
+  }
+}
+
+    // -----------------------------
+    // NEW: Recurrence defaults + prefill
+    // -----------------------------
+    setRepeatEnabled(false);
+    setRepeatFreq('weekly');
+    setRepeatInterval(1);
+    setRepeatWeekdays([]);
+    setRepeatEndKind('never');
+    setRepeatUntilDate('');
+    setRepeatCount(10);
+
+    if (event && event.recurrence && event.recurrence.freq) {
+      const r = event.recurrence;
+
+      setRepeatEnabled(true);
+      setRepeatFreq(String(r.freq || 'weekly'));
+      setRepeatInterval(Math.max(1, Number(r.interval || 1)));
+
+      if (Array.isArray(r.byWeekday)) {
+        setRepeatWeekdays(
+          r.byWeekday
+            .map(n => Number(n))
+            .filter(n => Number.isFinite(n) && n >= 0 && n <= 6)
+        );
       }
-      else if (diffMinutes > 0) {
-        setReminderMode('offset');
-        setOffsetMinutes(Math.max(1, diffMinutes));
-      }
-      else {
-        setReminderMode('custom');
-        setCustomReminderDate(rNext.toISOString().split('T')[0]);
-        setCustomReminderTime(rNext.toTimeString().slice(0, 5));
+
+      if (r.end && r.end.kind) {
+        setRepeatEndKind(String(r.end.kind));
+
+        if (r.end.kind === 'until' && r.end.until) {
+          const until = new Date(r.end.until);
+          if (!isNaN(until.getTime())) {
+            setRepeatUntilDate(until.toISOString().split('T')[0]);
+          }
+        }
+
+        if (r.end.kind === 'count' && typeof r.end.count === 'number') {
+          setRepeatCount(Math.max(1, Number(r.end.count)));
+        }
       }
     }
   }, [event, selectedDate]);
@@ -2524,6 +2592,9 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
         ? new Date(`${date}T${endTime}`)
         : null;
 
+    // -----------------------------
+    // Reminder payload
+    // -----------------------------
     let reminderPayload = { enabled: false };
 
     if (reminderEnabled) {
@@ -2550,6 +2621,56 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       }
     }
 
+    // -----------------------------
+    // NEW: Recurrence payload
+    // -----------------------------
+    let recurrence = null;
+
+    if (repeatEnabled) {
+      const freq = String(repeatFreq || 'weekly');
+      const interval = Math.max(1, Number(repeatInterval || 1));
+
+      let byWeekday = undefined;
+      if (freq === 'weekly') {
+        const list = Array.isArray(repeatWeekdays)
+          ? repeatWeekdays.map(n => Number(n)).filter(n => n >= 0 && n <= 6)
+          : [];
+
+        if (list.length === 0) {
+          byWeekday = [startDate.getDay()];
+        } else {
+          byWeekday = Array.from(new Set(list));
+        }
+      }
+
+      let end = { kind: 'never' };
+
+      if (repeatEndKind === 'until') {
+        if (!repeatUntilDate) {
+          tg.showAlert('Choose an "until" date for repeating events.');
+          return;
+        }
+        const until = new Date(`${repeatUntilDate}T23:59:59`);
+        if (isNaN(until.getTime())) {
+          tg.showAlert('Invalid "until" date.');
+          return;
+        }
+        end = { kind: 'until', until: until.toISOString() };
+      }
+
+      if (repeatEndKind === 'count') {
+        const c = Math.max(1, Number(repeatCount || 1));
+        end = { kind: 'count', count: c };
+      }
+
+      recurrence = {
+        freq,
+        interval,
+        ...(byWeekday ? { byWeekday } : {}),
+        end,
+      };
+    }
+
     await onSave({
       title,
       description,
@@ -2558,6 +2679,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       allDay,
       location,
       reminder: reminderPayload,
+      recurrence,
     });
   };
 
@@ -2585,6 +2707,48 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
         onClick={() => setOffsetMinutes(minutes)}
       >
         {minutes}m
+      </button>
+    );
+  };
+
+  // =============================
+  // NEW: Repeat UI helpers
+  // =============================
+  const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const toggleWeekday = (idx) => {
+    setRepeatWeekdays((prev) => {
+      const set = new Set(Array.isArray(prev) ? prev : []);
+      if (set.has(idx)) set.delete(idx);
+      else set.add(idx);
+      return Array.from(set).sort((a, b) => a - b);
+    });
+  };
+
+  const WeekdayButton = ({ idx }) => {
+    const active = Array.isArray(repeatWeekdays) && repeatWeekdays.includes(idx);
+    const className = `btn ${active ? 'btn-primary' : 'btn-secondary'}`;
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={() => toggleWeekday(idx)}
+      >
+        {weekdayLabels[idx]}
+      </button>
+    );
+  };
+
+  const EndKindButton = ({ value, label }) => {
+    const active = repeatEndKind === value;
+    const className = `btn ${active ? 'btn-primary' : 'btn-secondary'}`;
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={() => setRepeatEndKind(value)}
+      >
+        {label}
       </button>
     );
   };
@@ -2674,6 +2838,9 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
             />
           </div>
 
+          {/* =============================
+              Reminder section (existing)
+             ============================= */}
           <div className="form-group">
             <label className="form-label">Reminder</label>
 
@@ -2732,6 +2899,120 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
                     For all-day events, use Custom reminder time.
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* =============================
+              NEW: Repeat section
+             ============================= */}
+          <div className="form-group">
+            <label className="form-label">Repeat</label>
+
+            <label className="checkbox-row" style={{ marginBottom: 12 }}>
+              <input
+                type="checkbox"
+                checked={repeatEnabled}
+                onChange={e => setRepeatEnabled(e.target.checked)}
+              />
+              <span>Repeat event</span>
+            </label>
+
+            {repeatEnabled && (
+              <div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Frequency</label>
+                    <select
+                      className="form-select"
+                      value={repeatFreq}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setRepeatFreq(v);
+
+                        // If they switch away from weekly, clear weekday selection
+                        if (v !== 'weekly') {
+                          setRepeatWeekdays([]);
+                        }
+                      }}
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Every</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      min="1"
+                      value={repeatInterval}
+                      onChange={(e) => setRepeatInterval(Math.max(1, Number(e.target.value || 1)))}
+                      placeholder="1"
+                    />
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 6, lineHeight: 1.35 }}>
+                      {repeatFreq === 'daily' ? 'days' :
+                       repeatFreq === 'weekly' ? 'weeks' :
+                       repeatFreq === 'monthly' ? 'months' : 'years'}
+                    </div>
+                  </div>
+                </div>
+
+                {repeatFreq === 'weekly' && (
+                  <div className="form-group">
+                    <label className="form-label">On</label>
+                    <div className="card-actions" style={{ marginBottom: 6 }}>
+                      {weekdayLabels.map((_, idx) => (
+                        <WeekdayButton key={idx} idx={idx} />
+                      ))}
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.35 }}>
+                      If you select none, it defaults to the event’s start weekday.
+                    </div>
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label">Ends</label>
+
+                  <div className="card-actions" style={{ marginBottom: 12 }}>
+                    <EndKindButton value="never" label="Never" />
+                    <EndKindButton value="until" label="Until date" />
+                    <EndKindButton value="count" label="After N" />
+                  </div>
+
+                  {repeatEndKind === 'until' && (
+                    <div className="form-group">
+                      <label className="form-label">Until</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={repeatUntilDate}
+                        onChange={(e) => setRepeatUntilDate(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {repeatEndKind === 'count' && (
+                    <div className="form-group">
+                      <label className="form-label">Occurrences</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        min="1"
+                        value={repeatCount}
+                        onChange={(e) => setRepeatCount(Math.max(1, Number(e.target.value || 1)))}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.35 }}>
+                    Your backend still needs to store and expand recurrence for it to appear on the calendar.
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2796,11 +3077,22 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
       };
 
       const getEventsForDate = (date) => {
-        return events.filter(event => {
-          const eventDate = new Date(event.startDate);
-          return eventDate.toDateString() === date.toDateString();
-        });
-      };
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0);
+
+  return events.filter((event) => {
+    const start = new Date(event.startDate);
+    const end = event.endDate ? new Date(event.endDate) : null;
+
+    // No end date = treat as instant event on start time
+    if (!end || isNaN(end.getTime())) {
+      return start >= dayStart && start < dayEnd;
+    }
+
+    // Overlap test: event intersects [dayStart, dayEnd)
+    return start < dayEnd && end > dayStart;
+  });
+};
 
       const isToday = (date) => {
         const today = new Date();
@@ -2929,7 +3221,7 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
                                       </div>
                                     )}
                                     <div className="calendar-event-title">
-                                      {event.title}                                 {event.reminderId && <span className="event-reminder-dot" />}
+{hasReminder(event) && <span className="event-reminder-dot" />}
                                     </div>
                                     {!event.allDay && (
                                       <div className="calendar-event-time">

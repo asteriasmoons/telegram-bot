@@ -190,6 +190,202 @@ async function upsertEventReminder(args: {
   return { reminderId: created._id };
 }
 
+function startOfDayKey(d: Date) {
+  // "YYYY-MM-DD" in local time of the Date object
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function clampDayOfMonth(year: number, month0: number, desiredDay: number) {
+  // month0 is 0..11
+  const lastDay = new Date(year, month0 + 1, 0).getDate();
+  return Math.min(desiredDay, lastDay);
+}
+
+function addDays(d: Date, days: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + days);
+  return x;
+}
+
+function addWeeks(d: Date, weeks: number) {
+  return addDays(d, weeks * 7);
+}
+
+function addMonthsClamped(d: Date, months: number) {
+  const year = d.getFullYear();
+  const month0 = d.getMonth();
+  const day = d.getDate();
+
+  const targetMonthIndex = month0 + months;
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const targetMonth0 = ((targetMonthIndex % 12) + 12) % 12;
+
+  const safeDay = clampDayOfMonth(targetYear, targetMonth0, day);
+  const out = new Date(d);
+  out.setFullYear(targetYear);
+  out.setMonth(targetMonth0);
+  out.setDate(safeDay);
+  return out;
+}
+
+function addYearsClamped(d: Date, years: number) {
+  const year = d.getFullYear() + years;
+  const month0 = d.getMonth();
+  const day = d.getDate();
+  const safeDay = clampDayOfMonth(year, month0, day);
+
+  const out = new Date(d);
+  out.setFullYear(year);
+  out.setMonth(month0);
+  out.setDate(safeDay);
+  return out;
+}
+
+function isRecurrenceActiveOnDate(rule: any, occurrenceIndex: number, occurrenceDate: Date) {
+  const end = rule?.end;
+  if (!end || end.kind === "never") return true;
+
+  if (end.kind === "count") {
+    const c = Number(end.count);
+    if (!Number.isFinite(c) || c < 1) return false;
+    return occurrenceIndex < c;
+  }
+
+  if (end.kind === "until") {
+    const until = new Date(end.until);
+    if (isNaN(until.getTime())) return true;
+    // occurrence must be <= until (date-time)
+    return occurrenceDate.getTime() <= until.getTime();
+  }
+
+  return true;
+}
+
+function expandRecurringEventIntoRange(event: any, rangeStart: Date, rangeEnd: Date) {
+  const rule = event.recurrence;
+  if (!rule) return [];
+
+  const freq = String(rule.freq || "").toLowerCase();
+  const interval = Math.max(1, Number(rule.interval || 1));
+
+  const exceptions = new Set<string>(Array.isArray(event.recurrenceExceptions) ? event.recurrenceExceptions : []);
+
+  // Base template for occurrences
+  const baseStart = new Date(event.startDate);
+  const baseEnd = event.endDate ? new Date(event.endDate) : null;
+  const durationMs = baseEnd ? baseEnd.getTime() - baseStart.getTime() : 0;
+
+  const occurrences: any[] = [];
+
+  // We’ll generate by stepping forward from baseStart until we pass rangeEnd.
+  // For performance: if baseStart is far before rangeStart, we fast-forward roughly for daily/weekly/monthly/yearly.
+  let current = new Date(baseStart);
+  let index = 0;
+
+  // Fast-forward (rough) to reduce iterations for daily/weekly
+  if (current < rangeStart) {
+    if (freq === "daily") {
+      const diffDays = Math.floor((rangeStart.getTime() - current.getTime()) / 86400000);
+      const jumps = Math.floor(diffDays / interval) * interval;
+      if (jumps > 0) {
+        current = addDays(current, jumps);
+        index += Math.floor(jumps / interval);
+      }
+    } else if (freq === "weekly") {
+      const diffDays = Math.floor((rangeStart.getTime() - current.getTime()) / 86400000);
+      const diffWeeks = Math.floor(diffDays / 7);
+      const jumps = Math.floor(diffWeeks / interval) * interval;
+      if (jumps > 0) {
+        current = addWeeks(current, jumps);
+        index += Math.floor(jumps / interval);
+      }
+    } else if (freq === "monthly") {
+      // monthly/yearly fast-forward safely by stepping months/years (still not too costly for calendar windows)
+      while (current < rangeStart) {
+        const next = addMonthsClamped(current, interval);
+        if (next.getTime() === current.getTime()) break;
+        current = next;
+        index += 1;
+        if (index > 5000) break;
+      }
+    } else if (freq === "yearly") {
+      while (current < rangeStart) {
+        const next = addYearsClamped(current, interval);
+        if (next.getTime() === current.getTime()) break;
+        current = next;
+        index += 1;
+        if (index > 5000) break;
+      }
+    }
+  }
+
+  const byWeekday =
+    Array.isArray(rule.byWeekday) && rule.byWeekday.length
+      ? new Set(rule.byWeekday.map((n: any) => Number(n)).filter((n: number) => n >= 0 && n <= 6))
+      : null;
+
+  // Generate
+  while (current <= rangeEnd) {
+    // Stop if recurrence ended
+    if (!isRecurrenceActiveOnDate(rule, index, current)) break;
+
+    // Weekly weekday filter: only include certain weekdays
+    if (freq === "weekly" && byWeekday) {
+      const dow = current.getDay(); // 0..6
+      if (!byWeekday.has(dow)) {
+        // move one day forward within the week until we hit a valid weekday,
+        // but still advance overall in a controlled manner:
+        // simplest: walk day-by-day, but guard it.
+        const nextDay = addDays(current, 1);
+        current = nextDay;
+        continue;
+      }
+    }
+
+    const occStart = new Date(current);
+    const occEnd = baseEnd ? new Date(occStart.getTime() + durationMs) : null;
+
+    // Exceptions are stored by day key (keeps it simple for all-day + timed)
+    const key = startOfDayKey(occStart);
+    if (!exceptions.has(key)) {
+      // Only include occurrences that overlap the range
+      // For timed events, check start within range; for multi-day, check overlap
+      const overlaps =
+        occEnd
+          ? occStart <= rangeEnd && occEnd >= rangeStart
+          : occStart >= rangeStart && occStart <= rangeEnd;
+
+      if (overlaps) {
+        occurrences.push({
+          ...event,
+          parentId: event._id,
+          occurrenceId: `${String(event._id)}|${occStart.toISOString()}`,
+          isOccurrence: true,
+          startDate: occStart,
+          endDate: occEnd || undefined
+        });
+      }
+    }
+
+    // Advance to next
+    if (freq === "daily") current = addDays(current, interval);
+    else if (freq === "weekly") current = addWeeks(current, interval);
+    else if (freq === "monthly") current = addMonthsClamped(current, interval);
+    else if (freq === "yearly") current = addYearsClamped(current, interval);
+    else break;
+
+    index += 1;
+
+    // safety guard
+    if (index > 5000) break;
+  }
+
+  return occurrences;
+}
+
 // GET /api/miniapp/calendar/events - Get events for a date range
 router.get("/events", async (req, res) => {
   try {
@@ -199,20 +395,46 @@ router.get("/events", async (req, res) => {
       return res.status(400).json({ error: "startDate and endDate required" });
     }
 
-    const events = await Event.find({
+    const rangeStart = new Date(startDate as string);
+    const rangeEnd = new Date(endDate as string);
+
+    if (isNaN(rangeStart.getTime()) || isNaN(rangeEnd.getTime())) {
+      return res.status(400).json({ error: "Invalid date range" });
+    }
+
+    // 1) non-recurring events in range (your original behavior)
+    const oneTime = await Event.find({
       userId: req.userId,
-      startDate: {
-        $gte: new Date(startDate as string),
-        $lte: new Date(endDate as string)
-      }
+      recurrence: { $exists: false },
+      startDate: { $gte: rangeStart, $lte: rangeEnd }
     })
       .sort({ startDate: 1 })
       .lean();
 
-    // Optional but useful: attach reminder info for UI
-    const reminderIds = events
-      .map(e => e.reminderId)
-      .filter(Boolean);
+    // 2) recurring parent events that could affect the range
+    // We include parents whose startDate is <= rangeEnd
+    // (and optionally: whose "until" is >= rangeStart, but we keep it simple here)
+    const recurringParents = await Event.find({
+      userId: req.userId,
+      recurrence: { $exists: true },
+      startDate: { $lte: rangeEnd }
+    })
+      .sort({ startDate: 1 })
+      .lean();
+
+    // Expand occurrences
+    const occurrences = recurringParents.flatMap((ev) =>
+      expandRecurringEventIntoRange(ev, rangeStart, rangeEnd)
+    );
+
+    // Merge and sort
+    const combined = [...oneTime, ...occurrences].sort((a, b) => {
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    });
+
+    // Reminder enrichment: keep your existing behavior
+    // NOTE: occurrences should generally NOT have reminderId in the future, but we won't break anything here.
+    const reminderIds = combined.map((e: any) => e.reminderId).filter(Boolean);
 
     let remindersById = new Map<string, any>();
     if (reminderIds.length) {
@@ -222,15 +444,12 @@ router.get("/events", async (req, res) => {
         status: { $ne: "deleted" }
       }).lean();
 
-      remindersById = new Map(reminders.map(r => [String(r._id), r]));
+      remindersById = new Map(reminders.map((r) => [String(r._id), r]));
     }
 
-    const enriched = events.map(e => {
+    const enriched = combined.map((e: any) => {
       const rid = e.reminderId ? String(e.reminderId) : null;
-      return {
-        ...e,
-        reminder: rid ? remindersById.get(rid) || null : null
-      };
+      return { ...e, reminder: rid ? remindersById.get(rid) || null : null };
     });
 
     res.json({ events: enriched });
@@ -279,7 +498,8 @@ router.post("/events", async (req, res) => {
       allDay,
       color,
       location,
-      reminder // <-- NEW
+      reminder, // <-- NEW
+      recurrence
     } = req.body as any;
 
     if (!title || !startDate) {
@@ -300,6 +520,7 @@ router.post("/events", async (req, res) => {
       allDay: allDay || false,
       color,
       location
+      recurrence: recurrence || undefined
     });
 
     // Handle optional reminder link
@@ -377,7 +598,8 @@ router.put("/events/:id", async (req, res) => {
       allDay,
       color,
       location,
-      reminder // <-- NEW
+      reminder, // <-- NEW
+      recurrence
     } = req.body as any;
 
     const current = await Event.findOne({
@@ -397,6 +619,7 @@ router.put("/events/:id", async (req, res) => {
     if (allDay !== undefined) update.allDay = allDay;
     if (color !== undefined) update.color = color;
     if (location !== undefined) update.location = location;
+    if (recurrence !== undefined) update.recurrence = recurrence || null;
 
     const event = await Event.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
