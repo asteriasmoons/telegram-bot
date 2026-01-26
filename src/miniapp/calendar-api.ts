@@ -4,6 +4,7 @@
 import { Router } from "express";
 import { Event } from "../models/Event";
 import { Reminder } from "../models/Reminder";
+import { DateTime } from "luxon";
 import { UserSettings } from "../models/UserSettings";
 import { Premium } from "../models/Premium"; // ✅ needed for Premium bypass
 
@@ -108,6 +109,190 @@ function computeReminderNextRunAt(args: {
   return null;
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function toTimeOfDayHHmm(d: Date, tz: string) {
+  const dt = DateTime.fromJSDate(d, { zone: tz });
+  return `${pad2(dt.hour)}:${pad2(dt.minute)}`;
+}
+
+function mapRecurrenceToReminderSchedule(args: {
+  eventStart: Date;
+  tz: string;
+  recurrence: any;
+  reminderNextRunAt: Date; // the first intended reminder timestamp (event time / offset time / etc.)
+}) {
+  const { eventStart, tz, recurrence, reminderNextRunAt } = args;
+
+  if (!recurrence) return { kind: "once" as const };
+
+  const freq = String(recurrence.freq || "").toLowerCase();
+  const interval = Math.max(1, Number(recurrence.interval || 1));
+
+  // Reminder time-of-day should follow the reminder timestamp (offset included),
+  // NOT always the event start time.
+  const timeOfDay = toTimeOfDayHHmm(reminderNextRunAt, tz);
+
+  // If you store byWeekday for weekly recurrence, keep it.
+  // Your system uses Sun=0..Sat=6 already.
+  const daysOfWeek = Array.isArray(recurrence.byWeekday)
+    ? recurrence.byWeekday
+        .map((x: any) => Number(x))
+        .filter((n: number) => Number.isFinite(n) && n >= 0 && n <= 6)
+    : [];
+
+  // Anchors for monthly/yearly:
+  const startZ = DateTime.fromJSDate(eventStart, { zone: tz });
+
+  if (freq === "daily") {
+    return {
+      kind: "daily" as const,
+      interval,
+      timeOfDay
+    };
+  }
+
+  if (freq === "weekly") {
+    return {
+      kind: "weekly" as const,
+      interval,
+      timeOfDay,
+      daysOfWeek: daysOfWeek.length ? daysOfWeek : [startZ.weekday % 7] // Luxon Mon=1..Sun=7; convert to 0..6-ish
+    };
+  }
+
+  if (freq === "monthly") {
+    return {
+      kind: "monthly" as const,
+      interval,
+      timeOfDay,
+      anchorDayOfMonth: startZ.day
+    };
+  }
+
+  if (freq === "yearly") {
+    return {
+      kind: "yearly" as const,
+      interval,
+      timeOfDay,
+      anchorMonth: startZ.month,
+      anchorDay: startZ.day
+    };
+  }
+
+  // Unknown recurrence types -> default to once (safe)
+  return { kind: "once" as const };
+}
+
+/**
+ * Given a schedule and timezone, compute the next run after "now".
+ * This mirrors the scheduler behavior so your stored nextRunAt is never stale.
+ */
+function computeNextFromScheduleLuxon(args: {
+  schedule: any;
+  tz: string;
+  seed: Date; // initial intended reminder time (often eventStart adjusted by offset)
+}) {
+  const { schedule, tz, seed } = args;
+
+  if (!schedule || schedule.kind === "once") return seed;
+
+  const nowZ = DateTime.now().setZone(tz);
+  let candidate = DateTime.fromJSDate(seed, { zone: tz });
+
+  // If candidate is already in the future, keep it.
+  if (candidate > nowZ) return candidate.toJSDate();
+
+  const timeOfDay = String(schedule.timeOfDay || "");
+  const m = timeOfDay.match(/^(\d{2}):(\d{2})$/);
+  const hour = m ? Number(m[1]) : candidate.hour;
+  const minute = m ? Number(m[2]) : candidate.minute;
+
+  if (schedule.kind === "daily") {
+    const step = Math.max(1, Number(schedule.interval || 1));
+    let c = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
+    if (c <= nowZ) c = c.plus({ days: 1 });
+    // apply interval skipping
+    while (c <= nowZ) c = c.plus({ days: step });
+    return c.toJSDate();
+  }
+
+  if (schedule.kind === "weekly") {
+    const step = Math.max(1, Number(schedule.interval || 1));
+    const days: number[] = Array.isArray(schedule.daysOfWeek) ? schedule.daysOfWeek : [];
+
+    const target = new Set(
+      days
+        .map((d) => Number(d))
+        .filter((d) => Number.isFinite(d) && d >= 0 && d <= 6)
+        .map((d) => (d === 0 ? 7 : d)) // Sun 0 -> Luxon 7
+    );
+
+    if (target.size === 0) target.add(nowZ.weekday);
+
+    // Search next 7 days
+    for (let i = 0; i <= 7; i++) {
+      const day = nowZ.plus({ days: i });
+      if (!target.has(day.weekday)) continue;
+
+      const c = day.set({ hour, minute, second: 0, millisecond: 0 });
+      if (c > nowZ) return c.toJSDate();
+    }
+
+    // fallback: jump by interval weeks from now
+    return nowZ.plus({ weeks: step }).set({ hour, minute, second: 0, millisecond: 0 }).toJSDate();
+  }
+
+  if (schedule.kind === "monthly") {
+    const step = Math.max(1, Number(schedule.interval || 1));
+    const anchor = Math.max(1, Number(schedule.anchorDayOfMonth || candidate.day));
+
+    const clamp = (dt: DateTime, dayNum: number) => {
+      const dim = dt.daysInMonth;
+      const safe = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safe });
+    };
+
+    let c = clamp(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), anchor);
+    if (c <= nowZ) c = clamp(c.plus({ months: 1 }), anchor);
+
+    // apply interval skipping
+    while (c <= nowZ) c = clamp(c.plus({ months: step }), anchor);
+
+    return c.toJSDate();
+  }
+
+  if (schedule.kind === "yearly") {
+    const step = Math.max(1, Number(schedule.interval || 1));
+    const anchorMonth = Math.min(Math.max(1, Number(schedule.anchorMonth || candidate.month)), 12);
+    const anchorDay = Math.max(1, Number(schedule.anchorDay || candidate.day));
+
+    const clamp = (dt: DateTime, dayNum: number) => {
+      const dim = dt.daysInMonth;
+      const safe = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safe });
+    };
+
+    let c = nowZ.set({ month: anchorMonth, hour, minute, second: 0, millisecond: 0 });
+    c = clamp(c, anchorDay);
+    if (c <= nowZ) {
+      c = c.plus({ years: 1 });
+      c = clamp(c, anchorDay);
+    }
+
+    while (c <= nowZ) {
+      c = c.plus({ years: step });
+      c = clamp(c, anchorDay);
+    }
+
+    return c.toJSDate();
+  }
+
+  return candidate.toJSDate();
+}
+
 /**
  * Create/update/delete linked reminder for an event.
  * - Uses user's dmChatId (like your reminders endpoint does)
@@ -120,6 +305,8 @@ async function upsertEventReminder(args: {
   existingReminderId?: any;
   eventDataForText: { title: string; description?: string; location?: string };
   nextRunAt: Date | null;
+  eventStart: Date;
+  recurrence?: any;
 }) {
   const { userId, eventId, existingReminderId, eventDataForText, nextRunAt } = args;
 
@@ -148,7 +335,18 @@ async function upsertEventReminder(args: {
 
   // IMPORTANT: We are creating a ONE-TIME reminder for the event reminder feature.
   // You can expand later if you want repeating event reminders.
-  const schedule = { kind: "once" as const };
+const schedule = mapRecurrenceToReminderSchedule({
+  eventStart: args.eventStart,
+  tz: timezone,
+  recurrence: args.recurrence,
+  reminderNextRunAt: nextRunAt
+});
+
+// If recurring, make sure nextRunAt is advanced to a future occurrence
+const safeNextRunAt =
+  schedule.kind === "once"
+    ? nextRunAt
+    : computeNextFromScheduleLuxon({ schedule, tz: timezone, seed: nextRunAt });
 
   // If reminder exists, update it
   if (existingReminderId) {
@@ -555,13 +753,15 @@ router.post("/events", async (req, res) => {
         }
       }
 
-      const { reminderId } = await upsertEventReminder({
-        userId: req.userId!,
-        eventId: String(event._id),
-        existingReminderId: null,
-        eventDataForText: { title, description, location },
-        nextRunAt
-      });
+const { reminderId } = await upsertEventReminder({
+  userId: req.userId!,
+  eventId: String(event._id),
+  existingReminderId: null,
+  eventDataForText: { title, description, location },
+  nextRunAt,
+  eventStart: start,
+  recurrence: recurrence || undefined
+});
 
       // Update event with reminderId if created
       if (reminderId) {
@@ -665,17 +865,19 @@ router.put("/events/:id", async (req, res) => {
         }
       }
 
-      const { reminderId } = await upsertEventReminder({
-        userId: req.userId!,
-        eventId: String(event._id),
-        existingReminderId: event.reminderId,
-        eventDataForText: {
-          title: event.title,
-          description: event.description,
-          location: event.location
-        },
-        nextRunAt
-      });
+const { reminderId } = await upsertEventReminder({
+  userId: req.userId!,
+  eventId: String(event._id),
+  existingReminderId: event.reminderId,
+  eventDataForText: {
+    title: event.title,
+    description: event.description,
+    location: event.location
+  },
+  nextRunAt,
+  eventStart: start,
+  recurrence: event.recurrence || undefined
+});
 
       // persist reminderId change (set or clear)
       const updated = await Event.findOneAndUpdate(

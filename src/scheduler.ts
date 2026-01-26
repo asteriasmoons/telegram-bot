@@ -106,15 +106,20 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   const tz = String(rem.timezone || "America/Chicago");
   const nowZ = DateTime.now().setZone(tz);
 
+  // -------------------------
+  // interval: now + X minutes
+  // -------------------------
   if (sched.kind === "interval") {
     const mins = Number(sched.intervalMinutes);
     if (!Number.isFinite(mins) || mins <= 0) return null;
     return nowZ.plus({ minutes: mins }).toJSDate();
   }
 
-  // pick the time-of-day:
-  // prefer schedule.timeOfDay; fallback: time in rem.nextRunAt; fallback: 09:00
+  // -----------------------------------------
+  // Pick time-of-day (HH:mm), timezone-correct
+  // -----------------------------------------
   const timeFromSchedule = parseTimeOfDay(sched.timeOfDay);
+
   const timeFromNext = rem.nextRunAt
     ? DateTime.fromJSDate(rem.nextRunAt, { zone: tz })
     : null;
@@ -127,18 +132,23 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
     timeFromSchedule?.minute ??
     (timeFromNext?.isValid ? timeFromNext.minute : 0);
 
+  // -------------------------
+  // daily
+  // -------------------------
   if (sched.kind === "daily") {
     let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
-    // if already passed today, go tomorrow
     if (candidate <= nowZ) candidate = candidate.plus({ days: 1 });
     return candidate.toJSDate();
   }
 
+  // -------------------------
+  // weekly
+  // daysOfWeek: Sun=0..Sat=6
+  // Luxon weekday: Mon=1..Sun=7
+  // -------------------------
   if (sched.kind === "weekly") {
     const days: number[] = Array.isArray(sched.daysOfWeek) ? sched.daysOfWeek : [];
 
-    // daysOfWeek in your code is Sun=0..Sat=6
-    // Luxon weekday is Mon=1..Sun=7
     const targetLuxonWeekdays = new Set(
       days
         .map((d) => Number(d))
@@ -146,25 +156,91 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
         .map((d) => (d === 0 ? 7 : d)) // Sun 0 -> 7
     );
 
-    // If no days provided, default to the weekday of the current reminder time.
+    // If none provided, default to today's weekday
     if (targetLuxonWeekdays.size === 0) {
-      const fallback = nowZ.weekday; // 1..7
-      targetLuxonWeekdays.add(fallback);
+      targetLuxonWeekdays.add(nowZ.weekday);
     }
 
-    // Search next 7 days for a valid target day at HH:mm
+    // Search next 7 days for next valid day at HH:mm
     for (let i = 0; i <= 7; i++) {
       const day = nowZ.plus({ days: i });
       if (!targetLuxonWeekdays.has(day.weekday)) continue;
 
       const candidate = day.set({ hour, minute, second: 0, millisecond: 0 });
-
-      // For i=0, ensure it's still in the future
       if (candidate > nowZ) return candidate.toJSDate();
     }
 
-    // fallback: one week later same time
+    // fallback
     return nowZ.plus({ days: 7 }).set({ hour, minute, second: 0, millisecond: 0 }).toJSDate();
+  }
+
+  // -------------------------
+  // monthly
+  // supports: interval + anchorDayOfMonth
+  // (clamps to last day of month if needed)
+  // -------------------------
+  if (sched.kind === "monthly") {
+    const step = Math.max(1, Number(sched.interval || 1));
+
+    const anchorDay =
+      Number(sched.anchorDayOfMonth) ||
+      (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
+
+    const clampDay = (dt: DateTime, dayNum: number) => {
+      const dim = dt.daysInMonth;
+      const safeDay = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safeDay });
+    };
+
+    let candidate = clampDay(
+      nowZ.set({ hour, minute, second: 0, millisecond: 0 }),
+      anchorDay
+    );
+
+    while (candidate <= nowZ) {
+      candidate = clampDay(candidate.plus({ months: step }), anchorDay);
+    }
+
+    return candidate.toJSDate();
+  }
+
+  // -------------------------
+  // yearly
+  // supports: interval + anchorMonth + anchorDay
+  // (clamps for Feb 29, etc.)
+  // -------------------------
+  if (sched.kind === "yearly") {
+    const step = Math.max(1, Number(sched.interval || 1));
+
+    const anchorMonth =
+      Number(sched.anchorMonth) ||
+      (timeFromNext?.isValid ? timeFromNext.month : nowZ.month);
+
+    const anchorDay =
+      Number(sched.anchorDay) ||
+      (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
+
+    const clampDay = (dt: DateTime, dayNum: number) => {
+      const dim = dt.daysInMonth;
+      const safeDay = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safeDay });
+    };
+
+    let candidate = nowZ.set({
+      month: Math.min(Math.max(1, anchorMonth), 12),
+      hour,
+      minute,
+      second: 0,
+      millisecond: 0,
+    });
+
+    candidate = clampDay(candidate, anchorDay);
+
+    while (candidate <= nowZ) {
+      candidate = clampDay(candidate.plus({ years: step }), anchorDay);
+    }
+
+    return candidate.toJSDate();
   }
 
   return null;
