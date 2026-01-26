@@ -3221,8 +3221,9 @@ function EventModal({ event, selectedDate, onClose, onSave }) {
                                       </div>
                                     )}
                                     <div className="calendar-event-title">
-{hasReminder(event) && <span className="event-reminder-dot" />}
-                                    </div>
+  {(event.title || event.text || event.name || "(untitled)")}
+  {hasReminder(event) && <span className="event-reminder-dot" />}
+</div>
                                     {!event.allDay && (
                                       <div className="calendar-event-time">
                                         {formatEventTime(event)}
