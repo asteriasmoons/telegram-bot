@@ -181,11 +181,11 @@ router.get("/reminders/:id", async (req, res) => {
 // POST /api/miniapp/reminders - Create new reminder
 router.post("/reminders", async (req, res) => {
   try {
-    const { text, nextRunAt, schedule, timezone } = req.body;
+const { text, nextRunAt, schedule, timezone } = req.body;
 
-    if (!text || !nextRunAt || !timezone) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+if (!text || !nextRunAt) {
+  return res.status(400).json({ error: "Missing required fields" });
+}
 
     /**
      * =========================================================
@@ -222,6 +222,9 @@ router.post("/reminders", async (req, res) => {
     if (!settings?.dmChatId) {
       return res.status(400).json({ error: "DM chat not configured" });
     }
+    
+    // Use timezone from request if provided, otherwise fall back to saved user settings
+const tz = String(timezone || settings.timezone || "America/Chicago").trim();
 
     const reminder = await Reminder.create({
       userId: req.userId,
@@ -230,7 +233,7 @@ router.post("/reminders", async (req, res) => {
       status: "scheduled",
       nextRunAt: new Date(nextRunAt),
       schedule: schedule || { kind: "once" },
-      timezone,
+      timezone: tz,
       lock: {}
     });
 
@@ -414,17 +417,6 @@ router.delete("/reminders/:id", async (req, res) => {
   }
 });
 
-// GET /api/miniapp/settings - Get user settings
-router.get("/settings", async (req, res) => {
-  try {
-    const settings = await UserSettings.findOne({ userId: req.userId }).lean();
-
-    res.json({ settings });
-  } catch (error) {
-    console.error("Error fetching settings:", error);
-    res.status(500).json({ error: "Failed to fetch settings" });
-  }
-});
 
 export default router;
 
