@@ -40,19 +40,30 @@ export function registerAdminReplyRouter(bot: Telegraf) {
       if (session?.activeTicketId) ticketId = session.activeTicketId.toUpperCase();
     }
 
-    // If no ticket target, do nothing (or you can warn if you prefer)
-    if (!ticketId) return;
+// If no ticket target, let other routers handle this message (reading add flow, etc.)
+if (!ticketId) return next();
 
-    const ticket = await Ticket.findOne({ ticketId }).lean();
-    if (!ticket) {
-      await ctx.reply("I couldn’t find that ticket.");
-      return;
-    }
+// If the ticket doesn't exist, clear activeTicketId (if it was coming from session) and pass through
+const ticket = await Ticket.findOne({ ticketId }).lean();
+if (!ticket) {
+  // If this came from "active ticket" mode, clear it so it stops hijacking your messages
+  await AdminSession.updateOne(
+    { adminUserId: ADMIN_USER_ID },
+    { $unset: { activeTicketId: "" } },
+    { upsert: true }
+  );
+  return next();
+}
 
-    if (ticket.status !== "open") {
-      await ctx.reply("That ticket is closed.");
-      return;
-    }
+// If closed, clear activeTicketId and pass through (DO NOT reply "ticket is closed")
+if (ticket.status !== "open") {
+  await AdminSession.updateOne(
+    { adminUserId: ADMIN_USER_ID },
+    { $unset: { activeTicketId: "" } },
+    { upsert: true }
+  );
+  return next();
+}
 
     // Send message to user
     await ctx.telegram.sendMessage(
