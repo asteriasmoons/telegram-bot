@@ -683,6 +683,13 @@ input[type="date"].form-input::-webkit-datetime-edit {
   to { transform: rotate(360deg); }
 }
 
+.reminders-greeting {
+  margin-top: 6px;
+  font-size: 14px;
+  opacity: 0.75;
+  letter-spacing: 0.2px;
+}
+
 /* Quick actions */
 .quick-actions {
   display: flex;
@@ -3651,7 +3658,7 @@ const data = await apiCall(
     }
 
     // Reminders View
-function RemindersView({ activeView, userTimezone }) {
+function RemindersView({ activeView, userTimezone, userDisplayName }) {
       const [reminders, setReminders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showHistory, setShowHistory] = useState(false);
@@ -3755,12 +3762,20 @@ useEffect(() => {
       return (
         <div>
           <div className="header">
-            <h1>Reminders</h1>
-            <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
-              <span>History</span>
-              <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
-            </div>
-          </div>
+  <div>
+    <h1>Reminders</h1>
+
+    {(() => {
+      const name = (userDisplayName || "").trim();
+      return name ? <div className="reminders-greeting">Hello {name}</div> : null;
+    })()}
+  </div>
+
+  <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
+    <span>History</span>
+    <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
+  </div>
+</div>
 
           <div className="quick-actions">
             <div
@@ -4075,8 +4090,10 @@ function App() {
       try {
         const data = await apiCall("/settings");
         if (data?.settings?.timezone) {
-          setUserTimezone(String(data.settings.timezone));
-          if (data?.settings?.displayName !== undefined) {
+  setUserTimezone(String(data.settings.timezone));
+}
+
+if (data?.settings?.displayName !== undefined) {
   setUserDisplayName(String(data.settings.displayName || ""));
 }
         }
@@ -4129,7 +4146,11 @@ return (
         className={`view-container ${activeView === 'reminders' ? 'active' : ''}`}
         data-view="reminders"
       >
-        <RemindersView activeView={activeView} userTimezone={userTimezone} />
+        <RemindersView
+  activeView={activeView}
+  userTimezone={userTimezone}
+  userDisplayName={userDisplayName}
+/>
       </div>
 
       <div
