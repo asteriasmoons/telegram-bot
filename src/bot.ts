@@ -26,6 +26,8 @@ import { registerPromptCommand } from "./commands/prompt";
 
 import { registerTimezoneCommand } from "./commands/timezone";
 
+import { registerReading } from "./commands/reading";
+
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -177,6 +179,9 @@ registerPromptCommand(bot);
 
 // TIMEZONE COMMAND
 registerTimezoneCommand(bot);
+
+// READING COMMANDS
+registerReading(bot);
 
 
   bot.catch((err) => {
