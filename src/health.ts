@@ -76,6 +76,7 @@ console.log("[WEBHOOK PATH]", webhookPath);
 // Telegram webhook endpoint (primary + alias)
 const handler = async (req: any, res: any) => {
   try {
+  console.log("[WEBHOOK HIT]", req.path, req.method);
     await bot.handleUpdate(req.body, res);
     if (!res.headersSent) res.sendStatus(200);
   } catch (err) {
@@ -88,7 +89,6 @@ app.post(webhookPath, handler);
 
 // Safety alias so /telegram always works
 app.post("/telegram", handler);
-console.log("[WEBHOOK HIT]", req.path, req.method);
 
   // ---- Mini App API mounting ----
   // Your existing miniapp API router already has its own auth middleware inside api.ts,
