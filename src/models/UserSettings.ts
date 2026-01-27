@@ -10,6 +10,7 @@ export type UserSettingsDoc = {
   userId: number; // Telegram user id
   dmChatId?: number; // Telegram private chat id with bot (needed for DM delivery)
   timezone: string; // IANA timezone, e.g. "America/Chicago"
+  displayName?: string; // NEW: user-chosen display name (shown in UI)
   quietHours: QuietHours;
   createdAt: Date;
   updatedAt: Date;
@@ -28,7 +29,18 @@ const UserSettingsSchema = new Schema<UserSettingsDoc>(
   {
     userId: { type: Number, required: true, unique: true, index: true },
     dmChatId: { type: Number, required: false, index: true },
+
     timezone: { type: String, required: true, default: "America/Chicago" },
+
+    // NEW: Display Name
+    displayName: {
+      type: String,
+      required: false,
+      default: "",
+      trim: true,
+      maxlength: 48,
+    },
+
     quietHours: { type: QuietHoursSchema, required: true, default: () => ({}) }
   },
   { timestamps: true }

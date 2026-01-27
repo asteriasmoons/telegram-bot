@@ -3819,6 +3819,7 @@ useEffect(() => {
 function SettingsView({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [timezone, setTimezone] = useState("America/Chicago");
+  const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
 
 // quiet hours state
@@ -3837,6 +3838,9 @@ const [qhEnd, setQhEnd] = useState("08:00");
 const data = await apiCall(`/settings`);
 
 if (data?.settings?.timezone) setTimezone(String(data.settings.timezone));
+if (data?.settings?.displayName !== undefined) {
+  setDisplayName(String(data.settings.displayName || ""));
+}
 
 const qh = data?.settings?.quietHours;
 if (qh) {
@@ -3844,7 +3848,6 @@ if (qh) {
   setQhStart(String(qh.start || "23:00"));
   setQhEnd(String(qh.end || "08:00"));
 }
-        if (data?.settings?.timezone) setTimezone(String(data.settings.timezone));
       } catch (e) {
         tg.showAlert("Failed to load settings: " + (e.message || "Unknown error"));
       } finally {
@@ -3860,6 +3863,7 @@ if (qh) {
         method: "PUT",
 body: JSON.stringify({
   timezone,
+  displayName,
   quietHours: {
     enabled: qhEnabled,
     start: qhStart,
@@ -3925,6 +3929,36 @@ return (
             {saving ? "Saving..." : "Save Timezone"}
           </button>
         </div>
+        
+        {/* -------------------
+    DISPLAY NAME SECTION
+   ------------------- */}
+<div style={{ marginTop: 18 }}>
+  <div className="settings-title">Display Name</div>
+
+  <div className="settings-help">
+    Optional name shown in the mini app. Leave blank to use your Telegram name.
+  </div>
+
+  <input
+    className="form-input"
+    value={displayName}
+    onChange={(e) => setDisplayName(e.target.value)}
+    placeholder="e.g. Asteria"
+    maxLength={48}
+  />
+
+  <div className="settings-actions">
+    <button
+      className="btn btn-primary btn-sm"
+      type="button"
+      onClick={save}
+      disabled={saving}
+    >
+      {saving ? "Saving..." : "Save Display Name"}
+    </button>
+  </div>
+</div>
 
         {/* -------------------
             QUIET HOURS SECTION
@@ -3999,6 +4033,11 @@ function App() {
   // USER SETTINGS STATE (NEW)
   // --------------------
   const [userTimezone, setUserTimezone] = useState("America/Chicago");
+  
+  // ---------------------
+  // DISPLAY NAME STATE
+  // ---------------------
+  const [userDisplayName, setUserDisplayName] = useState("");
 
   // --------------------
   // LOAD USER SETTINGS (NEW)
@@ -4009,6 +4048,9 @@ function App() {
         const data = await apiCall("/settings");
         if (data?.settings?.timezone) {
           setUserTimezone(String(data.settings.timezone));
+          if (data?.settings?.displayName !== undefined) {
+  setUserDisplayName(String(data.settings.displayName || ""));
+}
         }
       } catch (e) {
         // intentionally silent – app still works with default
