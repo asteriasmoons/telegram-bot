@@ -572,36 +572,6 @@ if (action === "progress" && parts[2] === "cancel") {
         return ctx.editMessageText(detailsText(updated), Markup.inlineKeyboard([[Markup.button.callback("Back", `books:view:${id}:${listStatus}:${page}`)]]));
       }
 
-      if (action === "pickprogress") {
-        const id = parts[2];
-        const listStatus = (parts[3] as any) || "reading";
-        const page = Number(parts[4] || 0) || 0;
-        await ctx.answerCbQuery();
-
-        const userId = getUserId(ctx);
-        const book = await Book.findOne({ _id: id, userId }).lean();
-        if (!book) return ctx.editMessageText("Book not found.");
-        if (book.status !== "reading") {
-          return ctx.editMessageText(
-            "Progress can only be set when status is Reading.",
-            Markup.inlineKeyboard([[Markup.button.callback("Back", `books:view:${id}:${listStatus}:${page}`)]])
-          );
-        }
-
-        return ctx.editMessageText(
-          [
-            "Reply with:",
-            "<currentPage> [totalPages]",
-            "",
-            "Example: 120 640",
-            "Example: 85",
-            "",
-            `Book id: ${id}`,
-          ].join("\n"),
-          Markup.inlineKeyboard([[Markup.button.callback("Back", `books:view:${id}:${listStatus}:${page}`)]])
-        );
-      }
-
       if (action === "deleteconfirm") {
         const id = parts[2];
         const listStatus = (parts[3] as any) || "reading";
