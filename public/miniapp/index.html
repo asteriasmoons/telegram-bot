@@ -34,6 +34,7 @@
   
   /* Telegram viewport height (will be set by JS) */
   --tg-viewport-height: 100vh;
+  --gradient-blue: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
 }
 
 body {
@@ -378,6 +379,32 @@ body {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* -------- Reading Streak Button (ONLY) -------- */
+.streak-actions .btn.btn-success {
+  background: var(--gradient-blue);
+  color: #fff;
+  border: 1px solid rgba(91, 141, 239, 0.45);
+  box-shadow: 0 6px 16px rgba(91, 141, 239, 0.22);
+}
+
+.streak-actions .btn.btn-success:hover {
+  filter: brightness(1.08);
+}
+
+.streak-actions .btn.btn-success:active {
+  transform: scale(0.96);
+  filter: brightness(0.95);
+}
+
+/* Disabled (when checked in or loading) */
+.streak-actions .btn.btn-success:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+  box-shadow: none;
 }
 
 /* FAB */
