@@ -612,6 +612,30 @@ body.modal-open .app-content {
   padding: 12px;
 }
 
+/* ---- iOS time/date input normalization ---- */
+input[type="time"].form-input,
+input[type="date"].form-input {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 44px;          /* forces consistent vertical alignment */
+  line-height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Center the displayed value inside iOS time/date controls */
+input[type="time"].form-input::-webkit-date-and-time-value,
+input[type="date"].form-input::-webkit-date-and-time-value {
+  height: 44px;
+  line-height: 44px;
+}
+
+/* Optional: reduces weird internal offsets on some iOS versions */
+input[type="time"].form-input::-webkit-datetime-edit,
+input[type="date"].form-input::-webkit-datetime-edit {
+  padding: 0;
+}
+
 /* Checkbox row (moved from inline styles) */
 .checkbox-row {
   display: flex;
