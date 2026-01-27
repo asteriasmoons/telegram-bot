@@ -72,8 +72,9 @@ export async function startServer({ bot, webhookPath }: StartServerOpts) {
   // Root (prevents "Cannot GET /" in logs)
 app.get("/", (_req, res) => res.status(200).send("ok"));
 
-  // Telegram webhook endpoint
-app.post(webhookPath, async (req, res) => {
+console.log("[WEBHOOK PATH]", webhookPath);
+// Telegram webhook endpoint (primary + alias)
+const handler = async (req: any, res: any) => {
   try {
     await bot.handleUpdate(req.body, res);
     if (!res.headersSent) res.sendStatus(200);
@@ -81,7 +82,12 @@ app.post(webhookPath, async (req, res) => {
     console.error("handleUpdate error:", err);
     if (!res.headersSent) res.sendStatus(200);
   }
-});
+};
+
+app.post(webhookPath, handler);
+
+// Safety alias so /telegram always works
+app.post("/telegram", handler);
 
   // ---- Mini App API mounting ----
   // Your existing miniapp API router already has its own auth middleware inside api.ts,
