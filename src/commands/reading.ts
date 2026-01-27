@@ -187,6 +187,8 @@ async function renderAddFlow(ctx: any, userId: number) {
   draft.messageId = sent?.message_id ?? null;
   // DO NOT clear awaiting here -- user may be in the middle of entering a field
   addDrafts.set(userId, draft);
+  return; // optional, but makes intent clear
+}
 
 async function startAddFlow(ctx: any) {
   const userId = getUserId(ctx);
