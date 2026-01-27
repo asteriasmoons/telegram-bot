@@ -88,6 +88,7 @@ app.post(webhookPath, handler);
 
 // Safety alias so /telegram always works
 app.post("/telegram", handler);
+console.log("[WEBHOOK HIT]", req.path, req.method);
 
   // ---- Mini App API mounting ----
   // Your existing miniapp API router already has its own auth middleware inside api.ts,
