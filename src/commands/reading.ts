@@ -1,6 +1,6 @@
 // src/bot/commands/reading.ts
 import { Telegraf, Markup } from "telegraf";
-import { Book } from "../../models/Book";
+import { Book } from "../models/Book";
 
 type BookStatus = "tbr" | "reading" | "finished";
 
