@@ -108,6 +108,102 @@ function pickBookKeyboard(books: any[], action: string, page: number, status: Bo
   return Markup.inlineKeyboard(rows);
 }
 
+type AddField = "title" | "author" | "totalPages" | "currentPage" | "shortSummary";
+
+type BookDraft = {
+  title: string;
+  author: string;
+  status: BookStatus;
+  totalPages: number | null;
+  currentPage: number | null;
+  shortSummary: string;
+  awaiting?: AddField | null;
+  messageId?: number | null; // the message we keep editing
+};
+
+const addDrafts = new Map<number, BookDraft>();
+
+function newDraft(): BookDraft {
+  return {
+    title: "",
+    author: "",
+    status: "tbr",
+    totalPages: null,
+    currentPage: null,
+    shortSummary: "",
+    awaiting: null,
+    messageId: null,
+  };
+}
+
+function draftSummaryLines(d: BookDraft) {
+  const lines: string[] = [];
+  lines.push("Add a book");
+  lines.push("");
+  lines.push(`Title: ${d.title ? d.title : "(not set)"}`);
+  lines.push(`Author: ${d.author ? d.author : "(not set)"}`);
+  lines.push(`Status: ${statusLabel(d.status)}`);
+  lines.push(`Total pages: ${d.totalPages === null ? "(not set)" : String(d.totalPages)}`);
+  lines.push(`Current page: ${d.currentPage === null ? "(not set)" : String(d.currentPage)}`);
+  lines.push(`Short summary: ${d.shortSummary ? d.shortSummary : "(not set)"}`);
+
+  if (d.awaiting) {
+    lines.push("");
+    lines.push(`Waiting for: ${d.awaiting}`);
+    lines.push("Type your value in chat (not a command).");
+  }
+
+  return lines.join("\n");
+}
+
+function addBuilderKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("Title", "books:add:field:title"), Markup.button.callback("Author", "books:add:field:author")],
+    [Markup.button.callback("Status", "books:add:status:menu")],
+    [Markup.button.callback("Total pages", "books:add:field:totalPages"), Markup.button.callback("Current page", "books:add:field:currentPage")],
+    [Markup.button.callback("Short summary", "books:add:field:shortSummary")],
+    [Markup.button.callback("Save", "books:add:save"), Markup.button.callback("Cancel", "books:add:cancel")],
+  ]);
+}
+
+async function renderAddFlow(ctx: any, userId: number) {
+  const draft = addDrafts.get(userId) || newDraft();
+  addDrafts.set(userId, draft);
+
+  const text = draftSummaryLines(draft);
+  const kb = addBuilderKeyboard();
+
+  // If we have a messageId, try to edit that same message (keeps UI clean)
+  if (draft.messageId && ctx.telegram && ctx.chat?.id) {
+    try {
+      await ctx.telegram.editMessageText(ctx.chat.id, draft.messageId, undefined, text, kb);
+      return;
+    } catch {
+      // fall through to sending a new message
+    }
+  }
+
+  const sent = await ctx.reply(text, kb);
+  draft.messageId = sent?.message_id ?? null;
+  // DO NOT clear awaiting here -- user may be in the middle of entering a field
+  addDrafts.set(userId, draft);
+
+async function startAddFlow(ctx: any) {
+  const userId = getUserId(ctx);
+  if (!userId) return ctx.reply("Unauthorized.");
+
+  addDrafts.set(userId, newDraft());
+  return renderAddFlow(ctx, userId);
+}
+
+function promptForField(field: AddField) {
+  if (field === "title") return "Send the title:";
+  if (field === "author") return "Send the author (or type - to clear):";
+  if (field === "totalPages") return "Send total pages (number) or - to clear:";
+  if (field === "currentPage") return "Send current page (number) or - to clear:";
+  return "Send short summary (up to 800 chars) or - to clear:";
+}
+
 /**
  * Register reading commands + callback handlers
  * Assumes ctx.state.userId is set, or ctx.from.id is your userId.
@@ -127,48 +223,11 @@ export function registerReading(bot: Telegraf<any>) {
   });
 
   // Add quickly:
-  // /bookadd Title | Author | status | totalPages | currentPage | shortSummary
+  // /bookadd now opens the guided "Add Book" builder (buttons -> then type)
   bot.command("bookadd", async (ctx) => {
     const userId = getUserId(ctx);
     if (!userId) return ctx.reply("Unauthorized.");
-
-    const raw = (ctx.message?.text || "").replace(/^\/bookadd(@\w+)?/i, "").trim();
-    if (!raw) {
-      return ctx.reply(
-        [
-          "Usage:",
-          "/bookadd Title | Author | status | totalPages | currentPage | shortSummary",
-          "",
-          "Examples:",
-          "/bookadd The Hobbit | Tolkien | tbr",
-          "/bookadd Iron Flame | Yarros | reading | 640 | 120 | Two short sentences here.",
-        ].join("\n")
-      );
-    }
-
-    const parts = raw.split("|").map((s) => s.trim());
-    const title = String(parts[0] || "").trim();
-    const author = String(parts[1] || "").trim();
-    const status = normStatus(parts[2] || "tbr") || "tbr";
-    const totalPages = toIntOrNull(parts[3]);
-    const currentPage = toIntOrNull(parts[4]);
-    const shortSummary = clampSummary(parts.slice(5).join("|"));
-
-    if (!title) return ctx.reply("Title is required.");
-
-    const prog = normalizeProgress(status, totalPages, currentPage);
-
-    const created = await Book.create({
-      userId,
-      title,
-      author,
-      status,
-      totalPages: prog.totalPages,
-      currentPage: prog.currentPage,
-      shortSummary,
-    });
-
-    return ctx.reply(detailsText(created), Markup.inlineKeyboard([[Markup.button.callback("View list", "books:tab:reading:0")]]));
+    return startAddFlow(ctx);
   });
 
   // Update progress:
@@ -260,6 +319,74 @@ export function registerReading(bot: Telegraf<any>) {
     if (!deleted) return ctx.reply("Book not found.");
 
     return ctx.reply("Deleted.");
+  });
+  
+    // Capture typed replies for the Add Book draft (only when awaiting a field)
+  bot.on("text", async (ctx, next) => {
+    const userId = getUserId(ctx);
+    if (!userId) return next();
+
+    const draft = addDrafts.get(userId);
+    if (!draft || !draft.awaiting) return next();
+
+    const text = String(ctx.message?.text || "").trim();
+
+    // Don't treat commands as field input
+    if (text.startsWith("/")) return next();
+
+    const field = draft.awaiting;
+
+    // Allow "-" to clear a field
+    const clear = text === "-";
+
+    if (field === "title") {
+      draft.title = clear ? "" : text;
+    }
+
+    if (field === "author") {
+      draft.author = clear ? "" : text;
+    }
+
+    if (field === "shortSummary") {
+      draft.shortSummary = clear ? "" : clampSummary(text);
+    }
+
+    if (field === "totalPages") {
+      if (clear) {
+        draft.totalPages = null;
+      } else {
+        const n = toIntOrNull(text);
+        if (n === null) {
+          await ctx.reply("Total pages must be a non-negative number (or - to clear).");
+          return;
+        }
+        draft.totalPages = n;
+      }
+    }
+
+    if (field === "currentPage") {
+      if (clear) {
+        draft.currentPage = null;
+      } else {
+        const n = toIntOrNull(text);
+        if (n === null) {
+          await ctx.reply("Current page must be a non-negative number (or - to clear).");
+          return;
+        }
+        draft.currentPage = n;
+      }
+    }
+
+    // Apply progress rules (only keep progress if status is reading)
+    const prog = normalizeProgress(draft.status, draft.totalPages, draft.currentPage);
+    draft.totalPages = prog.totalPages;
+    draft.currentPage = prog.currentPage;
+
+    draft.awaiting = null;
+    addDrafts.set(userId, draft);
+
+    await renderAddFlow(ctx, userId);
+    return;
   });
 
   // ---------- Callback handlers (UI-like flow) ----------
@@ -425,17 +552,115 @@ export function registerReading(bot: Telegraf<any>) {
         return showList(ctx, listStatus, page);
       }
 
+      // --- ADD FLOW ---
       if (action === "add" && parts[2] === "start") {
         await ctx.answerCbQuery();
+        return startAddFlow(ctx);
+      }
+
+      if (action === "add" && parts[2] === "field") {
+        // books:add:field:<fieldName>
+        const field = parts[3] as AddField;
+        await ctx.answerCbQuery();
+
+        const userId = getUserId(ctx);
+        if (!userId) return ctx.reply("Unauthorized.");
+
+        const draft = addDrafts.get(userId) || newDraft();
+        draft.awaiting = field;
+        addDrafts.set(userId, draft);
+
+        // Keep the builder message updated
+        await renderAddFlow(ctx, userId);
+
+        // Prompt separately so it’s super clear what to type
+        return ctx.reply(promptForField(field));
+      }
+
+      if (action === "add" && parts[2] === "status" && parts[3] === "menu") {
+        await ctx.answerCbQuery();
+
+        const userId = getUserId(ctx);
+        if (!userId) return ctx.reply("Unauthorized.");
+
         return ctx.editMessageText(
-          [
-            "Add a book:",
-            "Use /bookadd Title | Author | status | totalPages | currentPage | shortSummary",
-            "",
-            "Example:",
-            "/bookadd The Hobbit | Tolkien | tbr",
-          ].join("\n"),
-          Markup.inlineKeyboard([[Markup.button.callback("Back", "books:tab:reading:0")]])
+          "Choose status:",
+          Markup.inlineKeyboard([
+            [Markup.button.callback("TBR", "books:add:status:set:tbr")],
+            [Markup.button.callback("Reading", "books:add:status:set:reading")],
+            [Markup.button.callback("Finished", "books:add:status:set:finished")],
+            [Markup.button.callback("Back", "books:add:start")],
+          ])
+        );
+      }
+
+      if (action === "add" && parts[2] === "status" && parts[3] === "set") {
+        // books:add:status:set:<status>
+        const newStatus = normStatus(parts[4]);
+        await ctx.answerCbQuery();
+
+        const userId = getUserId(ctx);
+        if (!userId) return ctx.reply("Unauthorized.");
+        if (!newStatus) return ctx.reply("Invalid status.");
+
+        const draft = addDrafts.get(userId) || newDraft();
+        draft.status = newStatus;
+
+        // If not reading, clear progress automatically (matches your API rules)
+        const prog = normalizeProgress(draft.status, draft.totalPages, draft.currentPage);
+        draft.totalPages = prog.totalPages;
+        draft.currentPage = prog.currentPage;
+
+        draft.awaiting = null;
+        addDrafts.set(userId, draft);
+
+        // Go back to builder UI
+        return renderAddFlow(ctx, userId);
+      }
+
+      if (action === "add" && parts[2] === "save") {
+        await ctx.answerCbQuery();
+
+        const userId = getUserId(ctx);
+        if (!userId) return ctx.reply("Unauthorized.");
+
+        const draft = addDrafts.get(userId);
+        if (!draft) return startAddFlow(ctx);
+
+        const title = String(draft.title || "").trim();
+        if (!title) return ctx.reply("Title is required. Tap Title and enter it.");
+
+        const prog = normalizeProgress(draft.status, draft.totalPages, draft.currentPage);
+
+        const created = await Book.create({
+          userId,
+          title,
+          author: String(draft.author || "").trim(),
+          status: draft.status,
+          totalPages: prog.totalPages,
+          currentPage: prog.currentPage,
+          shortSummary: clampSummary(draft.shortSummary),
+        });
+
+        addDrafts.delete(userId);
+
+        // Show final card-like details
+        return ctx.reply(
+          detailsText(created),
+          Markup.inlineKeyboard([[Markup.button.callback("View list", "books:tab:reading:0")]])
+        );
+      }
+
+      if (action === "add" && parts[2] === "cancel") {
+        await ctx.answerCbQuery();
+
+        const userId = getUserId(ctx);
+        if (!userId) return ctx.reply("Unauthorized.");
+
+        addDrafts.delete(userId);
+        return ctx.editMessageText(
+          "Add cancelled.",
+          Markup.inlineKeyboard([[Markup.button.callback("Back to list", "books:tab:reading:0")]])
         );
       }
 
