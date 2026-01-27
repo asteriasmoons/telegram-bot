@@ -1055,6 +1055,97 @@ input[type="date"].form-input::-webkit-datetime-edit {
   padding: 12px;
 }
 
+/* -------- Journal Tags View -------- */
+
+.tags-search {
+  margin: 0 16px 16px;
+}
+
+.tags-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.tag-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tag-item:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tag-item-name {
+  font-weight: 800;
+}
+
+.tag-item-count {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.journal-filter-bar {
+  margin: 0 16px 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.journal-filter-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.journal-filter-left img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
+}
+
+.journal-filter-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.journal-filter-clear {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.journal-filter-clear:hover {
+  border-color: var(--accent);
+}
+
 /* ---------------- Icon System (SVG icons replacing emojis) ---------------- */
 
 /* Global sanity */
@@ -2046,7 +2137,7 @@ const handleCheckIn = async (e) => {
 }
 
 // Journal Card Component
-function JournalCard({ entry, onView, onEdit, onDelete }) {
+function JournalCard({ entry, onView, onEdit, onDelete, onTagSelect }) {
   const [expanded, setExpanded] = useState(false);
 
   const title = entry.title?.trim() ? entry.title.trim() : '(untitled)';
@@ -2076,12 +2167,22 @@ function JournalCard({ entry, onView, onEdit, onDelete }) {
       <div className="journal-preview">{preview}</div>
 
       {tags.length > 0 && (
-        <div className="tag-row">
-          {tags.map(t => (
-            <span key={t} className="tag-pill">#{t}</span>
-          ))}
-        </div>
-      )}
+  <div className="tag-row">
+    {tags.map((t) => (
+      <button
+        key={t}
+        type="button"
+        className="tag-pill"
+        onClick={(e) => {
+          e.stopPropagation();               // don’t open the entry viewer
+          if (onTagSelect) onTagSelect(t);   // filter by tag
+        }}
+      >
+        #{t}
+      </button>
+    ))}
+  </div>
+)}
 
       {expanded && (
         <div className="card-actions" onClick={e => e.stopPropagation()} style={{ marginTop: 14 }}>
@@ -2099,7 +2200,7 @@ function JournalCard({ entry, onView, onEdit, onDelete }) {
 }
 
 // Journal Modal
-function JournalModal({ entry, onClose, onSave, onDelete }) {
+function JournalEntryModal({ entry, onClose, onEdit, onDelete, onTagSelect }) {
   const [title, setTitle] = useState(entry?.title || '');
   const [tagsText, setTagsText] = useState(tagsToDisplay(entry?.tags || []));
   const [body, setBody] = useState(entry?.body || '');
@@ -2190,9 +2291,89 @@ function JournalModal({ entry, onClose, onSave, onDelete }) {
   );
 }
 
+// TAGS VIEW 
+function JournalTagsView({ onBack, onPickTag }) {
+  const [loading, setLoading] = useState(true);
+  const [tags, setTags] = useState([]);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await apiCall("/journal/tags");
+        setTags(Array.isArray(data.tags) ? data.tags : []);
+      } catch (e) {
+        tg.showAlert("Failed to load tags: " + (e.message || "Unknown error"));
+        setTags([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const filtered = tags.filter((t) => {
+    const name = String(t?.name || "");
+    if (!query.trim()) return true;
+    return name.includes(query.trim().toLowerCase());
+  });
+
+  return (
+    <div>
+      <div className="header">
+        <h1>Tags</h1>
+
+        <div className="journal-header-actions">
+          <button className="btn btn-secondary" type="button" onClick={onBack}>
+            Back
+          </button>
+        </div>
+      </div>
+
+      <div className="tags-search">
+        <input
+          className="form-input"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search tags…"
+        />
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading tags...</div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <img src="/icons/tag.svg" alt="" />
+          </div>
+          <div className="empty-state-text">
+            No tags found.
+          </div>
+        </div>
+      ) : (
+        <div className="tags-list">
+          {filtered.map((t) => (
+            <div
+              key={t.name}
+              className="tag-item"
+              onClick={() => onPickTag(String(t.name || ""))}
+            >
+              <div className="tag-item-name">#{t.name}</div>
+              <div className="tag-item-count">{t.count}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // Journals View
-function JournalsView({ activeView }) {
+function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -2212,10 +2393,9 @@ const PAGE_SIZE = 10;
 
 useEffect(() => {
   if (activeView === "journal") {
-    // reset + load first page every time you enter the Journal tab
     loadFirstPage();
   }
-}, [activeView]);
+}, [activeView, tagFilter]);
 
 const loadFirstPage = async () => {
   try {
@@ -2226,7 +2406,8 @@ const loadFirstPage = async () => {
     setCursor(null);
     setHasMore(true);
 
-    const data = await apiCall(`/journal?limit=${PAGE_SIZE}`);
+const tagParam = tagFilter ? `&tag=${encodeURIComponent(tagFilter)}` : "";
+const data = await apiCall(`/journal?limit=${PAGE_SIZE}${tagParam}`);
     const list = data.entries || [];
 
     setEntries(list);
@@ -2255,9 +2436,10 @@ const loadMore = async () => {
   try {
     setLoadingMore(true);
 
-    const data = await apiCall(
-      `/journal?limit=${PAGE_SIZE}&before=${encodeURIComponent(cursor)}`
-    );
+const tagParam = tagFilter ? `&tag=${encodeURIComponent(tagFilter)}` : "";
+const data = await apiCall(
+  `/journal?limit=${PAGE_SIZE}&before=${encodeURIComponent(cursor)}${tagParam}`
+);
     const list = data.entries || [];
 
     // append (do NOT overwrite)
@@ -2344,20 +2526,44 @@ const handleGeneratePrompt = async () => {
   return (
     <div>
       <div className="header">
-        <h1>Journal</h1>
-<div className="journal-header-actions">
-  <button
-  className="btn btn-prompt"
-  type="button"
-  onClick={() => {
-    setPromptModalOpen(true);
-    handleGeneratePrompt();
-  }}
->
-  Prompt
-</button>
+  <h1>Journal</h1>
+
+  <div className="journal-header-actions">
+    <button
+      className="icon-btn"
+      type="button"
+      onClick={() => onOpenTags && onOpenTags()}
+      aria-label="Tags"
+      title="Tags"
+    >
+      <img src="/icons/tag.svg" alt="" />
+    </button>
+
+    <button
+      className="btn btn-prompt"
+      type="button"
+      onClick={() => {
+        setPromptModalOpen(true);
+        handleGeneratePrompt();
+      }}
+    >
+      Prompt
+    </button>
+  </div>
 </div>
-      </div>
+      
+      {tagFilter ? (
+  <div className="journal-filter-bar">
+    <div className="journal-filter-left">
+      <img src="/icons/tag.svg" alt="" />
+      <div className="journal-filter-text">Filtered by #{tagFilter}</div>
+    </div>
+
+    <button className="journal-filter-clear" type="button" onClick={onClearTag}>
+      Clear
+    </button>
+  </div>
+) : null}
 
       {loading ? (
         <div className="loading">
@@ -2377,14 +2583,15 @@ const handleGeneratePrompt = async () => {
       ) : (
         <>
           {entries.map((entry) => (
-            <JournalCard
-  key={entry._id}
-  entry={entry}
-  onView={(e) => setViewerEntry(e)}
-  onEdit={handleEdit}
-  onDelete={handleDelete}
-/>
-          ))}
+  <JournalCard
+    key={entry._id}
+    entry={entry}
+    onView={(e) => setViewerEntry(e)}
+    onEdit={handleEdit}
+    onDelete={handleDelete}
+    onTagSelect={onTagSelect}
+  />
+))}
 
           {hasMore && (
             <div className="load-more-container">
@@ -2410,6 +2617,7 @@ const handleGeneratePrompt = async () => {
       setShowModal(true);
     }}
     onDelete={handleDelete}
+    onTagSelect={onTagSelect}
   />
 )}
 
@@ -2483,12 +2691,23 @@ function JournalEntryModal({ entry, onClose, onEdit, onDelete }) {
           </div>
 
           {Array.isArray(entry.tags) && entry.tags.length > 0 && (
-            <div className="tag-row">
-              {entry.tags.map((t) => (
-                <span key={t} className="tag-pill">#{t}</span>
-              ))}
-            </div>
-          )}
+  <div className="tag-row">
+    {entry.tags.map((t) => (
+      <button
+        key={t}
+        type="button"
+        className="tag-pill"
+        onClick={(e) => {
+          e.stopPropagation();              // keep modal click behavior clean
+          if (onTagSelect) onTagSelect(t);  // apply filter
+          onClose();                        // optional: close the preview after selecting a tag
+        }}
+      >
+        #{t}
+      </button>
+    ))}
+  </div>
+)}
         </div>
 
         <div className="modal-actions journal-preview-actions">
@@ -4071,6 +4290,7 @@ function App() {
   // --------------------
   const [activeView, setActiveView] = useState("reminders");
   const [previousView, setPreviousView] = useState("reminders");
+  const [journalTagFilter, setJournalTagFilter] = useState("");
 
   // --------------------
   // USER SETTINGS STATE (NEW)
@@ -4113,6 +4333,18 @@ if (data?.settings?.displayName !== undefined) {
   function goBack() {
     setActiveView(previousView || "reminders");
   }
+  
+  function openJournalTag(tag) {
+  const clean = String(tag || "").trim().toLowerCase().replace(/^#/, "");
+  if (!clean) return;
+  setJournalTagFilter(clean);
+  setPreviousView(activeView);
+  setActiveView("journal");
+}
+
+function clearJournalTag() {
+  setJournalTagFilter("");
+}
 
       const remindersViewRef = useRef(null);
       const calendarViewRef = useRef(null);
@@ -4166,8 +4398,27 @@ return (
         className={`view-container ${activeView === 'journal' ? 'active' : ''}`}
         data-view="journal"
       >
-        <JournalsView activeView={activeView} />
+        <JournalsView
+  activeView={activeView}
+  tagFilter={journalTagFilter}
+  onOpenTags={() => goTo("journal_tags")}
+  onClearTag={() => setJournalTagFilter("")}
+  onTagSelect={openJournalTag}
+/>
       </div>
+      
+      <div
+  className={`view-container ${activeView === 'journal_tags' ? 'active' : ''}`}
+  data-view="journal_tags"
+>
+  <JournalTagsView
+    onBack={goBack}
+    onPickTag={(tag) => {
+      setJournalTagFilter(tag);
+      goTo("journal");
+    }}
+  />
+</div>
       
       <div
   className={`view-container ${activeView === 'reading' ? 'active' : ''}`}

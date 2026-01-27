@@ -104,6 +104,39 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/miniapp/journal/tags
+// Returns a list of { name, count } for the user's tags
+router.get("/tags", async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const tags = await JournalEntry.aggregate([
+      { $match: { userId } },
+      { $unwind: "$tags" },
+      {
+        $group: {
+          _id: "$tags",
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1, _id: 1 } },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id",
+          count: 1,
+        },
+      },
+    ]);
+
+    res.json({ tags });
+  } catch (error) {
+    console.error("Error fetching journal tags:", error);
+    res.status(500).json({ error: "Failed to fetch journal tags" });
+  }
+});
+
 // GET /api/miniapp/journal/:id
 router.get("/:id", async (req, res) => {
   try {
