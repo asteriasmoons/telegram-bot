@@ -441,6 +441,12 @@ bot.on("text", async (ctx, next) => {
       const parts = data.split(":"); // books:<action>:...
       const action = parts[1];
       
+      // If user clicks anything OTHER than progress controls, cancel progress input mode
+const uid = getUserId(ctx);
+if (uid && action !== "progress") {
+  progressDrafts.delete(uid);
+}
+      
       // -------------------- PROGRESS PICKER CALLBACKS --------------------
 if (action === "progress" && parts[2] === "page") {
   const page = Number(parts[3] || 0) || 0;
