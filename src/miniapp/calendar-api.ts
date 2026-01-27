@@ -595,12 +595,30 @@ router.get("/events", async (req, res) => {
       return res.status(400).json({ error: "startDate and endDate required" });
     }
 
-    const rangeStart = new Date(startDate as string);
-    const rangeEnd = new Date(endDate as string);
+// Get user's timezone (same as reminders logic)
+const settings = await UserSettings.findOne({ userId: req.userId }).lean();
+const tz = settings?.timezone || "America/Chicago";
+
+const startISO = String(startDate);
+const endISO = String(endDate);
+
+// Interpret the incoming ISO in the user's timezone
+// and expand to full-day bounds so events don't disappear
+const startZ = DateTime.fromISO(startISO, { zone: tz }).startOf("day");
+const endZ = DateTime.fromISO(endISO, { zone: tz }).endOf("day");
+
+const rangeStart = startZ.toUTC().toJSDate();
+const rangeEnd = endZ.toUTC().toJSDate();
 
     if (isNaN(rangeStart.getTime()) || isNaN(rangeEnd.getTime())) {
       return res.status(400).json({ error: "Invalid date range" });
     }
+    
+    console.log("RANGE RAW:", { startDate, endDate });
+console.log("RANGE PARSED:", {
+  rangeStart: rangeStart.toISOString(),
+  rangeEnd: rangeEnd.toISOString()
+});
 
     // 1) non-recurring events in range (your original behavior)
 const oneTime = await Event.find({
