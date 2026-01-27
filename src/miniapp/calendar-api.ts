@@ -606,7 +606,16 @@ router.get("/events", async (req, res) => {
 const oneTime = await Event.find({
   userId: req.userId,
   $or: [{ recurrence: { $exists: false } }, { recurrence: null }],
-  startDate: { $gte: rangeStart, $lte: rangeEnd }
+  $and: [
+    { startDate: { $lte: rangeEnd } },
+    {
+      $or: [
+        { endDate: { $exists: false } },
+        { endDate: null },
+        { endDate: { $gte: rangeStart } }
+      ]
+    }
+  ]
 })
   .sort({ startDate: 1 })
   .lean();
@@ -690,6 +699,7 @@ router.get("/events/:id", async (req, res) => {
 // POST /api/miniapp/calendar/events - Create new event
 router.post("/events", async (req, res) => {
   try {
+  console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
     const {
       title,
       description,
@@ -706,22 +716,39 @@ router.post("/events", async (req, res) => {
       return res.status(400).json({ error: "title and startDate required" });
     }
 
-    const start = new Date(startDate);
-    if (isNaN(start.getTime())) {
-      return res.status(400).json({ error: "Invalid startDate" });
-    }
+// Validate startDate
+const start = new Date(startDate);
+if (isNaN(start.getTime())) {
+  return res.status(400).json({ error: "Invalid startDate" });
+}
 
-    const event = await Event.create({
-      userId: req.userId,
-      title,
-      description,
-      startDate: start,
-      endDate: endDate ? new Date(endDate) : undefined,
-      allDay: allDay || false,
-      color,
-      location,
-      recurrence: recurrence || undefined
-    });
+// Validate endDate (optional)
+let end: Date | undefined = undefined;
+
+if (endDate !== undefined) {
+  if (!endDate) {
+    // if they send "" or null, treat it as "no end date"
+    end = undefined; // or use null if your schema prefers nulls
+  } else {
+    const ed = new Date(endDate);
+    if (isNaN(ed.getTime())) {
+      return res.status(400).json({ error: "Invalid endDate" });
+    }
+    end = ed;
+  }
+}
+
+const event = await Event.create({
+  userId: req.userId,
+  title,
+  description,
+  startDate: start,
+  endDate: end,
+  allDay: allDay || false,
+  color,
+  location,
+  recurrence: recurrence || undefined
+});
 
     // Handle optional reminder link
     if (reminder) {
@@ -792,6 +819,7 @@ const { reminderId } = await upsertEventReminder({
 // PUT /api/miniapp/calendar/events/:id - Update event
 router.put("/events/:id", async (req, res) => {
   try {
+  console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
     const {
       title,
       description,
@@ -818,13 +846,32 @@ const $unset: any = {};
 
 if (title !== undefined) $set.title = title;
 if (description !== undefined) $set.description = description;
-if (startDate !== undefined) $set.startDate = new Date(startDate);
-if (endDate !== undefined) $set.endDate = endDate ? new Date(endDate) : null;
+
+if (startDate !== undefined) {
+  const sd = new Date(startDate);
+  if (isNaN(sd.getTime())) {
+    return res.status(400).json({ error: "Invalid startDate" });
+  }
+  $set.startDate = sd;
+}
+
+if (endDate !== undefined) {
+  if (!endDate) {
+    $set.endDate = null;
+  } else {
+    const ed = new Date(endDate);
+    if (isNaN(ed.getTime())) {
+      return res.status(400).json({ error: "Invalid endDate" });
+    }
+    $set.endDate = ed;
+  }
+}
+
 if (allDay !== undefined) $set.allDay = allDay;
 if (color !== undefined) $set.color = color;
 if (location !== undefined) $set.location = location;
 
-// IMPORTANT: if recurrence is cleared, UNSET the field (do NOT set null)
+// recurrence handling stays the same
 if (recurrence !== undefined) {
   if (recurrence) $set.recurrence = recurrence;
   else $unset.recurrence = "";
