@@ -692,6 +692,12 @@ function getUserId(ctx: any): number | null {
   return null;
 }
 
+function canEditFromCtx(ctx: any) {
+  // Only safe to edit when this handler was triggered by a callback query
+  // (Telegram gives you the original message to edit)
+  return Boolean(ctx.callbackQuery && ctx.callbackQuery.message && typeof ctx.editMessageText === "function");
+}
+
 async function showList(ctx: any, status: BookStatus | "all", page: number) {
   const userId = getUserId(ctx);
   if (!userId) return ctx.reply("Unauthorized.");
@@ -715,8 +721,7 @@ async function showList(ctx: any, status: BookStatus | "all", page: number) {
         ? "No books yet."
         : `No books in ${statusLabel(status as BookStatus)}.`;
 
-    // edit if possible, otherwise reply
-    if (ctx.editMessageText) {
+    if (canEditFromCtx(ctx)) {
       return ctx.editMessageText(txt, listKeyboard({ status, page, hasPrev, hasNext }));
     }
     return ctx.reply(txt, listKeyboard({ status, page, hasPrev, hasNext }));
@@ -726,7 +731,6 @@ async function showList(ctx: any, status: BookStatus | "all", page: number) {
   lines.push(`Books: ${status === "all" ? "All" : statusLabel(status as BookStatus)}`);
   lines.push(`Page ${page + 1}`);
 
-  // Show compact list like the mini app cards
   for (const b of books) {
     lines.push("");
     lines.push(bookLabel(b));
@@ -742,6 +746,6 @@ async function showList(ctx: any, status: BookStatus | "all", page: number) {
     [Markup.button.callback("Open picker", `books:pick:${status}:${page}`)],
   ]);
 
-  if (ctx.editMessageText) return ctx.editMessageText(lines.join("\n"), kb);
+  if (canEditFromCtx(ctx)) return ctx.editMessageText(lines.join("\n"), kb);
   return ctx.reply(lines.join("\n"), kb);
 }
