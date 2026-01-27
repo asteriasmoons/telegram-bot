@@ -3629,7 +3629,11 @@ const data = await apiCall(
               })}
             </div>
           )}
-
+<button
+  className="is-hidden"
+  data-create-event="1"
+  onClick={() => handleCreateEvent(new Date())}
+/>
           {showEventModal && (
             <EventModal
   event={editingEvent}
@@ -4103,13 +4107,10 @@ if (activeView === 'reminders') {
   if (btn) btn.click();
 }
 
-  else if (activeView === 'calendar') {
-    const today = new Date();
-    const todayBtn = document.querySelector(
-      `[data-date="${today.toDateString()}"]`
-    );
-    if (todayBtn) todayBtn.click();
-  }
+else if (activeView === 'calendar') {
+  const btn = document.querySelector('[data-create-event="1"]');
+  if (btn) btn.click();
+}
 
   else if (activeView === 'journal') {
     const btn = document.querySelector('[data-create-journal="1"]');
