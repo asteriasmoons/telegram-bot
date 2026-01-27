@@ -341,6 +341,45 @@ body {
   transform: scale(0.95);
 }
 
+/* -------- Reading Streak Card -------- */
+.streak-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.streak-stat {
+  flex: 1;
+  min-width: 140px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+
+.streak-stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+.streak-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.streak-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* FAB */
 .fab {
   position: fixed;
@@ -1646,6 +1685,63 @@ function SummaryModal({ onClose, title, author, loading, summary, source, error,
   );
 }
 
+// READING STREAKS CARD
+function ReadingStreakCard({ streak, loading, onCheckIn }) {
+  const current = streak?.currentStreak ?? 0;
+  const best = streak?.bestStreak ?? 0;
+  const checked = !!streak?.checkedInToday;
+
+  return (
+    <div className="card" onClick={(e) => e.stopPropagation()} style={{ cursor: "default" }}>
+      <div className="card-header">
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>
+            Reading Streak
+          </div>
+          <div className="card-time">
+            <img src="/icons/cal.svg" alt="" />
+            <span>{checked ? "Checked in today" : "Not checked in today"}</span>
+          </div>
+        </div>
+
+        <span
+          className="card-badge"
+          style={{
+            background: checked ? "rgba(76,175,80,0.15)" : "rgba(255,152,0,0.15)",
+            color: checked ? "#4caf50" : "#ff9800",
+          }}
+        >
+          {checked ? "ACTIVE" : "PENDING"}
+        </span>
+      </div>
+
+      <div className="streak-row">
+        <div className="streak-stat">
+          <div className="streak-stat-label">Current</div>
+          <div className="streak-stat-value">{current}</div>
+        </div>
+
+        <div className="streak-stat">
+          <div className="streak-stat-label">Best</div>
+          <div className="streak-stat-value">{best}</div>
+        </div>
+      </div>
+
+      <div className="streak-actions">
+        <button
+          className="btn btn-success"
+          type="button"
+          onClick={onCheckIn}
+          disabled={loading || checked}
+        >
+          <img src="/icons/check.svg" alt="" />
+          {checked ? "Checked In" : loading ? "Saving…" : "Check In"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Reading View
 function ReadingView({ activeView }) {
   const [books, setBooks] = useState([]);
@@ -1663,12 +1759,46 @@ function ReadingView({ activeView }) {
   const [summaryError, setSummaryError] = useState("");
   const [summaryTitle, setSummaryTitle] = useState("");
   const [summaryAuthor, setSummaryAuthor] = useState("");
+  
+  const [streak, setStreak] = useState(null);
+const [streakLoading, setStreakLoading] = useState(false);
 
   useEffect(() => {
-    if (activeView === "reading") {
-      loadBooks();
-    }
-  }, [activeView, filter]);
+  if (activeView === "reading") {
+    loadBooks();
+    loadStreak();
+  }
+}, [activeView, filter]);
+
+const loadStreak = async () => {
+  try {
+    setStreakLoading(true);
+    const data = await apiCall(`/books/streak`);
+    setStreak(data?.streak || null);
+  } catch (error) {
+    // silent-ish; streak card can just not show if needed
+    setStreak(null);
+  } finally {
+    setStreakLoading(false);
+  }
+};
+
+const handleCheckIn = async (e) => {
+  if (e) e.stopPropagation();
+  try {
+    setStreakLoading(true);
+    const data = await apiCall(`/books/streak/checkin`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    setStreak(data?.streak || null);
+    tg.showPopup({ message: "Checked in" });
+  } catch (error) {
+    tg.showAlert("Failed to check in: " + error.message);
+  } finally {
+    setStreakLoading(false);
+  }
+};
 
   const loadBooks = async () => {
     try {
@@ -1770,6 +1900,12 @@ function ReadingView({ activeView }) {
           </button>
         </div>
       </div>
+      
+      <ReadingStreakCard
+  streak={streak}
+  loading={streakLoading}
+  onCheckIn={handleCheckIn}
+/>
 
       <div className="quick-actions">
         <div

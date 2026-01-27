@@ -1,6 +1,8 @@
 // src/miniapp/books-api.ts
 import { Router } from "express";
 import { Book } from "../models/Book";
+import { ReadingStreak } from "../models/ReadingStreak";
+import { UserSettings } from "../models/UserSettings";
 
 const router = Router();
 
@@ -65,6 +67,32 @@ function normalizeProgress(
   };
 }
 
+async function getTimezoneForUser(userId: number): Promise<string> {
+  const s = await UserSettings.findOne({ userId }).lean();
+  return String(s?.timezone || "America/Chicago");
+}
+
+// returns "YYYY-MM-DD" in the user's timezone
+function dateKeyInTz(tz: string, d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+// given "YYYY-MM-DD", return yesterday "YYYY-MM-DD"
+function yesterdayKeyFromTodayKey(todayKey: string): string {
+  const [y, m, d] = todayKey.split("-").map(Number);
+  const utc = Date.UTC(y, m - 1, d);
+  const prev = new Date(utc - 86400000);
+  const yy = prev.getUTCFullYear();
+  const mm = String(prev.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(prev.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 /**
  * GET /api/miniapp/books?status=all|tbr|reading|finished
  */
@@ -91,6 +119,99 @@ router.get("/", async (req: any, res) => {
     return res.json({ books: books.map(withId) });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to load books" });
+  }
+});
+
+// GET streaks
+router.get("/streak", async (req: any, res) => {
+  try {
+    const userId = req.userId as number;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const tz = await getTimezoneForUser(userId);
+    const todayKey = dateKeyInTz(tz);
+
+    let doc = await ReadingStreak.findOne({ userId }).lean();
+
+    if (!doc) {
+      const created = await ReadingStreak.create({
+        userId,
+        currentStreak: 0,
+        bestStreak: 0,
+        lastCheckInDate: null,
+      });
+      doc = created.toObject();
+    }
+
+    return res.json({
+      streak: {
+        currentStreak: doc.currentStreak || 0,
+        bestStreak: doc.bestStreak || 0,
+        lastCheckInDate: doc.lastCheckInDate || null,
+        checkedInToday: doc.lastCheckInDate === todayKey,
+        todayKey,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to load streak" });
+  }
+});
+
+// POST streaks
+router.post("/streak/checkin", async (req: any, res) => {
+  try {
+    const userId = req.userId as number;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const tz = await getTimezoneForUser(userId);
+    const todayKey = dateKeyInTz(tz);
+    const yesterdayKey = yesterdayKeyFromTodayKey(todayKey);
+
+    const existing = await ReadingStreak.findOne({ userId }).lean();
+
+    // idempotent check-in (tap twice does nothing)
+    if (existing?.lastCheckInDate === todayKey) {
+      return res.json({
+        streak: {
+          currentStreak: existing.currentStreak || 0,
+          bestStreak: existing.bestStreak || 0,
+          lastCheckInDate: existing.lastCheckInDate || null,
+          checkedInToday: true,
+          todayKey,
+        },
+      });
+    }
+
+    const nextStreak =
+      existing?.lastCheckInDate === yesterdayKey
+        ? (existing?.currentStreak || 0) + 1
+        : 1;
+
+    const nextBest = Math.max(existing?.bestStreak || 0, nextStreak);
+
+    const updated = await ReadingStreak.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          lastCheckInDate: todayKey,
+          currentStreak: nextStreak,
+          bestStreak: nextBest,
+        },
+      },
+      { upsert: true, new: true }
+    ).lean();
+
+    return res.json({
+      streak: {
+        currentStreak: updated?.currentStreak ?? nextStreak,
+        bestStreak: updated?.bestStreak ?? nextBest,
+        lastCheckInDate: updated?.lastCheckInDate ?? todayKey,
+        checkedInToday: true,
+        todayKey,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to check in" });
   }
 });
 
