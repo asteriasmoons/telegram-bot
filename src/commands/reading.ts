@@ -28,11 +28,20 @@ function clampSummary(v: any) {
   return s.slice(0, 800);
 }
 
-function normalizeProgress(status: BookStatus, totalPages: number | null, currentPage: number | null) {
-  if (status !== "reading") return { totalPages: null, currentPage: null };
-
+function normalizeProgress(
+  status: BookStatus,
+  totalPages: number | null,
+  currentPage: number | null
+) {
+  // totalPages can exist for any status
   if (totalPages !== null && totalPages <= 0) totalPages = null;
 
+  // currentPage only makes sense for "reading"
+  if (status !== "reading") {
+    return { totalPages, currentPage: null };
+  }
+
+  // status === "reading"
   if (totalPages !== null && currentPage !== null) {
     currentPage = Math.min(Math.max(currentPage, 0), totalPages);
   }
