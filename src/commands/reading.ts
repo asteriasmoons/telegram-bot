@@ -215,6 +215,45 @@ function promptForField(field: AddField) {
   return "Send short summary (up to 800 chars) or - to clear:";
 }
 
+// -------------------- PROGRESS PICKER STATE --------------------
+type ProgressDraft = {
+  bookId: string;
+};
+
+const progressDrafts = new Map<number, ProgressDraft>();
+
+function progressPromptText(book: any) {
+  const lines: string[] = [];
+  lines.push(bookLabel(book));
+  lines.push(`Status: ${statusLabel(book.status)}`);
+  if (book.status === "reading") lines.push(progressLabel(book));
+  lines.push("");
+  lines.push("Send:");
+  lines.push("<currentPage> [totalPages]");
+  lines.push("");
+  lines.push("Examples:");
+  lines.push("120 640");
+  lines.push("85");
+  lines.push("");
+  lines.push("Type - to cancel.");
+  return lines.join("\n");
+}
+
+function progressPickKeyboard(books: any[], page: number, hasPrev: boolean, hasNext: boolean) {
+  const rows = books.map((b) => [
+    Markup.button.callback(bookLabel(b), `books:progress:pick:${String(b._id)}:${page}`),
+  ]);
+
+  const nav: any[] = [];
+  if (hasPrev) nav.push(Markup.button.callback("Prev", `books:progress:page:${page - 1}`));
+  if (hasNext) nav.push(Markup.button.callback("Next", `books:progress:page:${page + 1}`));
+  if (nav.length) rows.push(nav);
+
+  rows.push([Markup.button.callback("Back", "books:tab:reading:0")]);
+
+  return Markup.inlineKeyboard(rows);
+}
+
 /**
  * Register reading commands + callback handlers
  * Assumes ctx.state.userId is set, or ctx.from.id is your userId.
@@ -241,49 +280,11 @@ export function registerReading(bot: Telegraf<any>) {
     return startAddFlow(ctx);
   });
 
-  // Update progress:
-  // /progress <bookId> <currentPage> [totalPages]
-  bot.command("progress", async (ctx) => {
-    const userId = getUserId(ctx);
-    if (!userId) return ctx.reply("Unauthorized.");
-
-    const raw = (ctx.message?.text || "").replace(/^\/progress(@\w+)?/i, "").trim();
-    const parts = raw.split(/\s+/).filter(Boolean);
-
-    if (parts.length < 2) {
-      return ctx.reply(
-        [
-          "Usage:",
-          "/progress <bookId> <currentPage> [totalPages]",
-          "",
-          "Tip: use /books then tap Edit to copy the book id.",
-        ].join("\n")
-      );
-    }
-
-    const id = parts[0];
-    const currentPage = toIntOrNull(parts[1]);
-    const totalPages = parts.length >= 3 ? toIntOrNull(parts[2]) : null;
-
-    if (currentPage === null) return ctx.reply("Current page must be a non-negative number.");
-
-    const book = await Book.findOne({ _id: id, userId }).lean();
-    if (!book) return ctx.reply("Book not found.");
-
-    const status = (book.status as BookStatus) || "tbr";
-    if (status !== "reading") return ctx.reply("Progress can only be set when status is Reading.");
-
-    const tp = totalPages !== null ? totalPages : (book.totalPages ?? null);
-    const prog = normalizeProgress("reading", tp, currentPage);
-
-    const updated = await Book.findOneAndUpdate(
-      { _id: id, userId },
-      { $set: { totalPages: prog.totalPages, currentPage: prog.currentPage } },
-      { new: true }
-    ).lean();
-
-    return ctx.reply(detailsText(updated));
-  });
+// Update progress (NO IDs)
+// /progress -> pick a book -> type progress
+bot.command("progress", async (ctx) => {
+  return showProgressPicker(ctx, 0);
+});
 
   // Change status:
   // /status <bookId> tbr|reading|finished
@@ -333,62 +334,42 @@ export function registerReading(bot: Telegraf<any>) {
   });
   
     // Capture typed replies for the Add Book draft (only when awaiting a field)
-  bot.on("text", async (ctx, next) => {
-    const userId = getUserId(ctx);
-    if (!userId) return next();
+bot.on("text", async (ctx, next) => {
+  const userId = getUserId(ctx);
+  if (!userId) return next();
 
-    const draft = addDrafts.get(userId);
-    if (!draft || !draft.awaiting) return next();
+  const text = String((ctx.message as any)?.text || "").trim();
+  if (!text) return next();
+  if (text.startsWith("/")) return next();
 
-    const text = String(ctx.message?.text || "").trim();
-
-    // Don't treat commands as field input
-    if (text.startsWith("/")) return next();
-
+  // 1) PRIORITY: Add-book draft input
+  const draft = addDrafts.get(userId);
+  if (draft?.awaiting) {
     const field = draft.awaiting;
-
-    // Allow "-" to clear a field
     const clear = text === "-";
 
-    if (field === "title") {
-      draft.title = clear ? "" : text;
-    }
-
-    if (field === "author") {
-      draft.author = clear ? "" : text;
-    }
-
-    if (field === "shortSummary") {
-      draft.shortSummary = clear ? "" : clampSummary(text);
-    }
+    if (field === "title") draft.title = clear ? "" : text;
+    if (field === "author") draft.author = clear ? "" : text;
+    if (field === "shortSummary") draft.shortSummary = clear ? "" : clampSummary(text);
 
     if (field === "totalPages") {
-      if (clear) {
-        draft.totalPages = null;
-      } else {
+      if (clear) draft.totalPages = null;
+      else {
         const n = toIntOrNull(text);
-        if (n === null) {
-          await ctx.reply("Total pages must be a non-negative number (or - to clear).");
-          return;
-        }
+        if (n === null) return ctx.reply("Total pages must be a non-negative number (or - to clear).");
         draft.totalPages = n;
       }
     }
 
     if (field === "currentPage") {
-      if (clear) {
-        draft.currentPage = null;
-      } else {
+      if (clear) draft.currentPage = null;
+      else {
         const n = toIntOrNull(text);
-        if (n === null) {
-          await ctx.reply("Current page must be a non-negative number (or - to clear).");
-          return;
-        }
+        if (n === null) return ctx.reply("Current page must be a non-negative number (or - to clear).");
         draft.currentPage = n;
       }
     }
 
-    // Apply progress rules (only keep progress if status is reading)
     const prog = normalizeProgress(draft.status, draft.totalPages, draft.currentPage);
     draft.totalPages = prog.totalPages;
     draft.currentPage = prog.currentPage;
@@ -398,7 +379,56 @@ export function registerReading(bot: Telegraf<any>) {
 
     await renderAddFlow(ctx, userId);
     return;
-  });
+  }
+
+  // 2) SECOND PRIORITY: Progress update input
+  const pd = progressDrafts.get(userId);
+  if (pd) {
+    if (text === "-") {
+      progressDrafts.delete(userId);
+      await ctx.reply("Progress update cancelled.");
+      return;
+    }
+
+    const parts = text.split(/\s+/).filter(Boolean);
+    if (parts.length < 1 || parts.length > 2) {
+      await ctx.reply("Format must be: <currentPage> [totalPages]  (example: 120 640)");
+      return;
+    }
+
+    const currentPage = toIntOrNull(parts[0]);
+    const totalPages = parts.length === 2 ? toIntOrNull(parts[1]) : null;
+
+    if (currentPage === null) return ctx.reply("Current page must be a non-negative number.");
+    if (parts.length === 2 && totalPages === null) return ctx.reply("Total pages must be a non-negative number.");
+
+    const book = await Book.findOne({ _id: pd.bookId, userId }).lean();
+    if (!book) {
+      progressDrafts.delete(userId);
+      return ctx.reply("Book not found anymore.");
+    }
+
+    if (book.status !== "reading") {
+      progressDrafts.delete(userId);
+      return ctx.reply("That book is no longer marked as Reading.");
+    }
+
+    const tp = totalPages !== null ? totalPages : (book.totalPages ?? null);
+    const prog = normalizeProgress("reading", tp, currentPage);
+
+    const updated = await Book.findOneAndUpdate(
+      { _id: pd.bookId, userId },
+      { $set: { totalPages: prog.totalPages, currentPage: prog.currentPage } },
+      { new: true }
+    ).lean();
+
+    progressDrafts.delete(userId);
+    await ctx.reply(detailsText(updated));
+    return;
+  }
+
+  return next();
+});
 
   // ---------- Callback handlers (UI-like flow) ----------
   bot.on("callback_query", async (ctx, next) => {
@@ -410,6 +440,42 @@ export function registerReading(bot: Telegraf<any>) {
     try {
       const parts = data.split(":"); // books:<action>:...
       const action = parts[1];
+      
+      // -------------------- PROGRESS PICKER CALLBACKS --------------------
+if (action === "progress" && parts[2] === "page") {
+  const page = Number(parts[3] || 0) || 0;
+  await ctx.answerCbQuery();
+  return showProgressPicker(ctx, page);
+}
+
+if (action === "progress" && parts[2] === "pick") {
+  const bookId = parts[3];
+  await ctx.answerCbQuery();
+
+  const userId = getUserId(ctx);
+  if (!userId) return ctx.reply("Unauthorized.");
+
+  const book = await Book.findOne({ _id: bookId, userId }).lean();
+  if (!book) return ctx.reply("Book not found.");
+
+  if (book.status !== "reading") {
+    return ctx.reply("Progress can only be updated when status is Reading.");
+  }
+
+  progressDrafts.set(userId, { bookId: String(book._id) });
+
+  const txt = progressPromptText(book);
+  const kb = Markup.inlineKeyboard([[Markup.button.callback("Cancel", "books:progress:cancel")]]);
+  if (canEditFromCtx(ctx)) return ctx.editMessageText(txt, kb);
+  return ctx.reply(txt, kb);
+}
+
+if (action === "progress" && parts[2] === "cancel") {
+  await ctx.answerCbQuery();
+  const userId = getUserId(ctx);
+  if (userId) progressDrafts.delete(userId);
+  return showProgressPicker(ctx, 0);
+}
 
       if (action === "tab") {
         const status = (parts[2] as any) || "reading";
@@ -439,7 +505,7 @@ export function registerReading(bot: Telegraf<any>) {
           detailsText(book),
           Markup.inlineKeyboard([
             [Markup.button.callback("Edit status", `books:pickstatus:${id}:${status}:${page}`)],
-            [Markup.button.callback("Edit progress", `books:pickprogress:${id}:${status}:${page}`)],
+            [Markup.button.callback("Update progress", `books:progress:pick:${id}:0`)],
             [Markup.button.callback("Delete", `books:deleteconfirm:${id}:${status}:${page}`)],
             [Markup.button.callback("Back", `books:tab:${status}:${page}`)],
           ])
@@ -705,6 +771,36 @@ function canEditFromCtx(ctx: any) {
   // Only safe to edit when this handler was triggered by a callback query
   // (Telegram gives you the original message to edit)
   return Boolean(ctx.callbackQuery && ctx.callbackQuery.message && typeof ctx.editMessageText === "function");
+}
+
+async function showProgressPicker(ctx: any, page: number) {
+  const userId = getUserId(ctx);
+  if (!userId) return ctx.reply("Unauthorized.");
+
+  const filter: any = { userId, status: "reading" };
+
+  const total = await Book.countDocuments(filter);
+  const books = await Book.find(filter)
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .skip(page * PAGE_SIZE)
+    .limit(PAGE_SIZE)
+    .lean();
+
+  const hasPrev = page > 0;
+  const hasNext = (page + 1) * PAGE_SIZE < total;
+
+  if (!books.length) {
+    const txt = "No books in Reading right now.";
+    const kb = Markup.inlineKeyboard([[Markup.button.callback("Back", "books:tab:reading:0")]]);
+    if (canEditFromCtx(ctx)) return ctx.editMessageText(txt, kb);
+    return ctx.reply(txt, kb);
+  }
+
+  const txt = "Pick a book to update progress:";
+  const kb = progressPickKeyboard(books, page, hasPrev, hasNext);
+
+  if (canEditFromCtx(ctx)) return ctx.editMessageText(txt, kb);
+  return ctx.reply(txt, kb);
 }
 
 async function showList(ctx: any, status: BookStatus | "all", page: number) {
