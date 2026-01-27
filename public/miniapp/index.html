@@ -2199,8 +2199,8 @@ function JournalCard({ entry, onView, onEdit, onDelete, onTagSelect }) {
   );
 }
 
-// Journal Modal
-function JournalEntryModal({ entry, onClose, onEdit, onDelete, onTagSelect }) {
+// Journal Modal (Create/Edit)
+function JournalModal({ entry, onClose, onSave, onDelete }) {
   const [title, setTitle] = useState(entry?.title || '');
   const [tagsText, setTagsText] = useState(tagsToDisplay(entry?.tags || []));
   const [body, setBody] = useState(entry?.body || '');
@@ -2608,7 +2608,7 @@ const handleGeneratePrompt = async () => {
       )}
 
 {viewerEntry && (
-  <JournalEntryModal
+  <JournalPreviewModal
     entry={viewerEntry}
     onClose={() => setViewerEntry(null)}
     onEdit={(entry) => {
@@ -2655,7 +2655,7 @@ const handleGeneratePrompt = async () => {
 }
 
 // Journal Preview Modal
-function JournalEntryModal({ entry, onClose, onEdit, onDelete }) {
+function JournalPreviewModal({ entry, onClose, onEdit, onDelete, onTagSelect }) {
   if (!entry) return null;
   
   useEffect(() => {
