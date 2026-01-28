@@ -136,10 +136,11 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   // daily
   // -------------------------
   if (sched.kind === "daily") {
-    let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
-    if (candidate <= nowZ) candidate = candidate.plus({ days: 1 });
-    return candidate.toJSDate();
-  }
+  const step = Math.max(1, Number(sched.interval || 1));
+  let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
+  while (candidate <= nowZ) candidate = candidate.plus({ days: step });
+  return candidate.toJSDate();
+}
 
   // -------------------------
   // weekly

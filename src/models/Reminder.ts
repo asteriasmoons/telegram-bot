@@ -2,17 +2,27 @@ import mongoose, { Schema, Model, Types } from "mongoose";
 
 export type ReminderStatus = "scheduled" | "sent" | "paused" | "deleted";
 
-export type ReminderScheduleKind = "once" | "daily" | "weekly" | "interval";
+export type ReminderScheduleKind = "once" | "daily" | "weekly" | "monthly" | "yearly" | "interval";
 
 export type ReminderSchedule = {
-kind: ReminderScheduleKind;
+  kind: ReminderScheduleKind;
 
-// For daily/weekly schedules
-timeOfDay?: string; // "HH:MM" 24-hour, user-local time
-daysOfWeek?: number[]; // 0-6 (Sun-Sat) if weekly
+  // For daily/weekly/monthly/yearly schedules
+  timeOfDay?: string;       // "HH:mm" 24-hour, user-local time
+  interval?: number;        // every X days/weeks/months/years (>= 1)
 
-// For interval schedules
-intervalMinutes?: number;
+  // Weekly only
+  daysOfWeek?: number[];    // 0-6 (Sun-Sat)
+
+  // Monthly only
+  anchorDayOfMonth?: number; // 1-31 (clamped by scheduler)
+
+  // Yearly only
+  anchorMonth?: number;     // 1-12
+  anchorDay?: number;       // 1-31 (clamped by scheduler)
+
+  // Interval only
+  intervalMinutes?: number;
 };
 
 export type ReminderLock = {
@@ -67,13 +77,31 @@ lock?: ReminderLock;
 };
 
 const ReminderScheduleSchema = new Schema<ReminderSchedule>(
-{
-kind: { type: String, required: true, enum: ["once", "daily", "weekly", "interval"] },
-timeOfDay: { type: String, required: false },
-daysOfWeek: { type: [Number], required: false },
-intervalMinutes: { type: Number, required: false }
-},
-{ _id: false }
+  {
+    kind: {
+      type: String,
+      required: true,
+      enum: ["once", "daily", "weekly", "monthly", "yearly", "interval"]
+    },
+
+    // for daily/weekly/monthly/yearly
+    timeOfDay: { type: String, required: false }, // "HH:mm"
+    interval: { type: Number, required: false, min: 1, default: 1 },
+
+    // weekly only
+    daysOfWeek: { type: [Number], required: false, default: [] },
+
+    // monthly only
+    anchorDayOfMonth: { type: Number, required: false },
+
+    // yearly only
+    anchorMonth: { type: Number, required: false },
+    anchorDay: { type: Number, required: false },
+
+    // interval only
+    intervalMinutes: { type: Number, required: false }
+  },
+  { _id: false }
 );
 
 const ReminderLockSchema = new Schema<ReminderLock>(
