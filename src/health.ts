@@ -10,6 +10,8 @@ import journalApiRouter from "./miniapp/journal-api";
 import booksApiRouter from "./miniapp/books-api";
 import settingsApiRouter from "./miniapp/settings-api";
 
+import eventShareApiRouter from "./miniapp/eventShare-api";
+
 type StartServerOpts = {
   bot: Telegraf<any>;
   webhookPath: string;
@@ -102,6 +104,7 @@ app.use("/api/miniapp/calendar", miniAppAuth, calendarApiRouter);
 app.use("/api/miniapp/journal", miniAppAuth, journalApiRouter);
 app.use("/api/miniapp/books", miniAppAuth, booksApiRouter);
 app.use("/api/miniapp/settings", miniAppAuth, settingsApiRouter);
+app.use("/api/miniapp/eventShare", miniAppAuth, eventShareApiRouter);
 
   // ---- Mini App static files (if you serve them here) ----
   // If you already serve your mini app HTML somewhere else, keep your existing logic.

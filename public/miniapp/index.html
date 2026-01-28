@@ -948,6 +948,111 @@ input[type="date"].form-input::-webkit-datetime-edit {
   opacity: 0.9;
 }
 
+/* =========================
+   EVENT SHARE VIEW
+   ========================= */
+
+.event-share-wrap {
+  padding: 16px;
+}
+
+.event-share-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.event-share-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.event-share-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.event-share-desc {
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.event-share-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.event-share-input {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.event-share-status {
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.event-share-status.success {
+  color: var(--success);
+}
+
+.event-share-status.error {
+  color: var(--danger);
+}
+
+.event-share-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+/* =========================
+   SHARE CODE MODAL
+   ========================= */
+
+.share-code-box {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+
+.share-code-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+.share-code-token {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.35);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  word-break: break-all;
+  user-select: text;
+}
+
+.share-code-help {
+  margin-top: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 /* Utility */
 .is-hidden {
   display: none !important;
@@ -3000,6 +3105,11 @@ function EventModal({ event, selectedDate, userTimezone, onClose, onSave }) {
   const [endTime, setEndTime] = useState('');
   const [allDay, setAllDay] = useState(event?.allDay || false);
   const [location, setLocation] = useState(event?.location || '');
+  
+  // EVENT SHARE STATE
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+const [shareToken, setShareToken] = useState("");
+const [shareLoading, setShareLoading] = useState(false);
 
   // Reminder UI state (default OFF)
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -3152,6 +3262,34 @@ function EventModal({ event, selectedDate, userTimezone, onClose, onSave }) {
       tg.showAlert('Please enter a title');
       return;
     }
+    
+    const createShareCode = async () => {
+  if (!event?._id) return;
+
+  try {
+    setShareLoading(true);
+    setShareToken("");
+
+    // ✅ Adjust this path if your backend uses a different route
+    const data = await apiCall("/eventShare/create", {
+      method: "POST",
+      body: JSON.stringify({ eventId: event._id }),
+    });
+
+    const token = String(data?.token || data?.code || "");
+    if (!token) {
+      tg.showAlert("No token returned from server.");
+      return;
+    }
+
+    setShareToken(token);
+    setShareModalOpen(true);
+  } catch (e) {
+    tg.showAlert("Failed to create share code: " + (e?.message || "Unknown error"));
+  } finally {
+    setShareLoading(false);
+  }
+};
 
 const zone = userTimezone || "America/Chicago";
 
@@ -3338,6 +3476,13 @@ endDate: endISO || undefined,
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
+      
+      {shareModalOpen && (
+  <ShareCodeModal
+    token={shareToken}
+    onClose={() => setShareModalOpen(false)}
+  />
+)}
         <div className="modal-header">
           <h2>{event ? 'Edit Event' : 'New Event'}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -3601,13 +3746,25 @@ endDate: endISO || undefined,
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {event ? 'Update' : 'Create'}
-          </button>
-        </div>
+  <button className="btn btn-secondary" onClick={onClose} type="button">
+    Cancel
+  </button>
+
+  {event?._id && (
+    <button
+      className="btn btn-secondary"
+      onClick={createShareCode}
+      type="button"
+      disabled={shareLoading}
+    >
+      {shareLoading ? "Sharing…" : "Share"}
+    </button>
+  )}
+
+  <button className="btn btn-primary" onClick={handleSave} type="button">
+    {event ? "Update" : "Create"}
+  </button>
+</div>
       </div>
     </div>
   );
@@ -3615,7 +3772,7 @@ endDate: endISO || undefined,
 
 
     // Calendar View - Day List Style
-function CalendarView({ onOpenSettings, userTimezone }) {
+function CalendarView({ onOpenSettings, userTimezone, onOpenEventShare }) {
       const [currentMonth, setCurrentMonth] = useState(new Date());
       const [events, setEvents] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -3750,16 +3907,24 @@ const data = await apiCall(
   </div>
 
   <div className="calendar-header-right">
-    <button
-      className="icon-btn"
-      type="button"
-      onClick={() => onOpenSettings && onOpenSettings()}
-      aria-label="Settings"
-      title="Settings"
-    >
-      <img src="/icons/cog.svg" alt="" />
-    </button>
-  </div>
+  <button
+    className="icon-btn"
+    type="button"
+    onClick={() => onOpenEventShare && onOpenEventShare()}
+    aria-label="Join shared event"
+    title="Join shared event"
+  >
+    <img src="/icons/link.svg" alt="" />
+  </button>
+
+  <button
+    className="icon-btn"
+    type="button"
+    onClick={() => onOpenSettings && onOpenSettings()}
+  >
+    <img src="/icons/cog.svg" alt="" />
+  </button>
+</div>
 </div>
 
           {loading ? (
@@ -4283,6 +4448,226 @@ return (
 );
 }
 
+function EventShareView({ onBack }) {
+  const [token, setToken] = useState("");
+  const [event, setEvent] = useState(null);
+
+  // status state should carry a "kind"
+  const [status, setStatus] = useState("");
+  const [statusKind, setStatusKind] = useState("info"); // "info" | "success" | "error"
+
+  const [loading, setLoading] = useState(false);
+
+  const reset = () => {
+    setToken("");
+    setEvent(null);
+    setStatus("");
+    setStatusKind("info");
+    setLoading(false);
+  };
+
+  const join = async () => {
+    const code = token.trim();
+    if (!code) return;
+
+    try {
+      setLoading(true);
+      setStatus("");
+      setStatusKind("info");
+
+      const data = await apiCall("/eventShare/join", {
+        method: "POST",
+        body: JSON.stringify({ token: code }),
+      });
+
+      // Be defensive about the shape coming back
+      const joinedEvent = data?.event || null;
+
+      if (!joinedEvent) {
+        setEvent(null);
+        setStatusKind("error");
+        setStatus("Joined, but the server did not return an event payload.");
+        return;
+      }
+
+      setEvent(joinedEvent);
+      setStatusKind("success");
+      setStatus("Joined event successfully.");
+    } catch (e) {
+      setEvent(null);
+      setStatusKind("error");
+      setStatus(e?.message || "Invalid or expired code.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Safe formatting wrapper so the view never blows up
+  const safeEventTime = (ev) => {
+    try {
+      if (!ev?.startDate) return "";
+      return formatEventTime(ev);
+    } catch {
+      return "";
+    }
+  };
+
+  return (
+    <div className="event-share-wrap">
+      <div className="header">
+        <h1>Shared Event</h1>
+
+        <div className="journal-header-actions">
+          <button className="btn btn-secondary" onClick={onBack} type="button">
+            Back
+          </button>
+        </div>
+      </div>
+
+      {!event && (
+        <div className="event-share-card">
+          <label className="form-label">Enter Share Code</label>
+          <input
+            className="form-input event-share-input"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="Paste event code…"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+
+          <div className="event-share-actions">
+            <button
+              className="btn btn-primary"
+              onClick={join}
+              disabled={loading || !token.trim()}
+              type="button"
+            >
+              {loading ? "Joining…" : "Join Event"}
+            </button>
+
+            <button
+              className="btn btn-secondary"
+              onClick={reset}
+              disabled={loading && !status}
+              type="button"
+            >
+              Clear
+            </button>
+          </div>
+
+          {loading && (
+            <div className="loading" style={{ padding: "18px 0 0" }}>
+              <div className="spinner" />
+              <div>Checking code…</div>
+            </div>
+          )}
+
+          {!loading && status && (
+            <div className={`event-share-status ${statusKind}`}>
+              {status}
+            </div>
+          )}
+        </div>
+      )}
+
+      {event && (
+        <div className="event-share-card">
+          <div className="event-share-title">{event.title || "(untitled event)"}</div>
+
+          {safeEventTime(event) && (
+            <div className="event-share-meta">{safeEventTime(event)}</div>
+          )}
+
+          {event.description && (
+            <div className="event-share-desc">{event.description}</div>
+          )}
+
+          {event.location && (
+            <div className="event-share-meta">
+              <img
+                src="/icons/location.svg"
+                alt=""
+                style={{ width: 14, height: 14, verticalAlign: "-0.12em", marginRight: 8, opacity: 0.85 }}
+              />
+              {event.location}
+            </div>
+          )}
+
+          <div className="event-share-status success">You’ve joined this event.</div>
+
+          <div className="event-share-actions">
+            <button className="btn btn-secondary" onClick={reset} type="button">
+              Join another
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShareCodeModal({ onClose, token }) {
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const copy = async () => {
+    try {
+      if (!token) return;
+
+      // Prefer clipboard
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(token);
+      } else {
+        // Fallback for older WebViews
+        const ta = document.createElement("textarea");
+        ta.value = token;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+
+      tg.showPopup({ message: "Share code copied" });
+    } catch (e) {
+      tg.showAlert("Could not copy. Please press and hold to copy.");
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Share Code</h2>
+          <button className="modal-close" onClick={onClose} type="button">×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="share-code-box">
+            <div className="share-code-label">Code</div>
+            <div className="share-code-token">{token || ""}</div>
+            <div className="share-code-help">
+              Send this code to someone. They can open the Calendar and tap the link icon to join.
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose} type="button">
+            Close
+          </button>
+          <button className="btn btn-primary" onClick={copy} type="button" disabled={!token}>
+            Copy
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
     // Main App Component
 function App() {
   // --------------------
@@ -4390,9 +4775,17 @@ return (
       >
         <CalendarView
   onOpenSettings={() => goTo("settings")}
+  onOpenEventShare={() => goTo("event_share")}
   userTimezone={userTimezone}
 />
       </div>
+      
+      <div
+  className={`view-container ${activeView === 'event_share' ? 'active' : ''}`}
+  data-view="event_share"
+>
+  <EventShareView onBack={goBack} />
+</div>
 
       <div
         className={`view-container ${activeView === 'journal' ? 'active' : ''}`}
