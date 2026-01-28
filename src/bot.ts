@@ -27,7 +27,7 @@ import { registerPromptCommand } from "./commands/prompt";
 import { registerTimezoneCommand } from "./commands/timezone";
 
 import { registerReading } from "./commands/reading";
-import { registerReadingStreakHandlers } from "./bot/readingStreaks";
+import { registerReadingStreakHandlers } from "./commands/readingStreaks";
 
 
 import { UserSettings } from "./models/UserSettings";
