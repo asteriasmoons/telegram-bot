@@ -128,7 +128,7 @@ router.post("/join", async (req, res) => {
 
 /**
  * =========================================================
- * GET MY JOINED EVENTS
+ * GET MY JOINED EVENTS (with RSVP)
  * GET /api/miniapp/eventShare/joined/list
  * =========================================================
  */
@@ -137,25 +137,46 @@ router.get("/joined/list", async (req, res) => {
     const userId = req.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
+    // Pull attendee rows newest-first
     const joins = await EventAttendee.find({ userId })
       .sort({ joinedAt: -1 })
       .lean();
 
-    const eventIds = joins.map((j) => j.eventId);
+    if (joins.length === 0) {
+      return res.json({ items: [] });
+    }
 
+    // Fetch events in one go
+    const eventIds = joins.map((j) => j.eventId);
     const events = await Event.find({ _id: { $in: eventIds } }).lean();
 
-    return res.json({
-      events: events.map((e) => ({
-        id: String(e._id),
-        title: e.title,
-        startDate: e.startDate,
-        endDate: e.endDate,
-        allDay: e.allDay,
-        color: e.color,
-        location: e.location,
-      })),
-    });
+    // Map by id for fast lookup
+    const byId = new Map(events.map((e) => [String(e._id), e]));
+
+    // Preserve attendee ordering and include rsvp/joinedAt
+    const items = joins
+      .map((j) => {
+        const ev = byId.get(String(j.eventId));
+        if (!ev) return null; // event deleted
+        return {
+          event: {
+            id: String(ev._id),
+            title: ev.title,
+            description: ev.description,
+            startDate: ev.startDate,
+            endDate: ev.endDate,
+            allDay: ev.allDay,
+            color: ev.color,
+            location: ev.location,
+            recurrence: ev.recurrence,
+          },
+          rsvp: j.rsvp,
+          joinedAt: j.joinedAt,
+        };
+      })
+      .filter(Boolean);
+
+    return res.json({ items });
   } catch (err) {
     console.error("Fetch joined events failed:", err);
     return res.status(500).json({ error: "Failed to load joined events" });
@@ -174,9 +195,12 @@ router.post("/:eventId/rsvp", async (req, res) => {
     const userId = req.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { eventId } = req.params;
-    const rsvp = String(req.body?.rsvp || "").toLowerCase();
+    const eventId = String(req.params.eventId || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: "Invalid eventId" });
+    }
 
+    const rsvp = String(req.body?.rsvp || "").toLowerCase();
     if (!["going", "maybe", "declined"].includes(rsvp)) {
       return res.status(400).json({ error: "Invalid RSVP value" });
     }

@@ -4453,19 +4453,66 @@ function EventShareView({ onBack }) {
   const [token, setToken] = useState("");
   const [event, setEvent] = useState(null);
 
+  // Join/Joined toggle
+  const [mode, setMode] = useState("join"); // "join" | "joined"
+
+  // RSVP state (only meaningful when an event is selected)
+  const [rsvp, setRsvp] = useState(""); // "going" | "maybe" | "declined"
+  const [rsvpLoading, setRsvpLoading] = useState(false);
+
+  // Joined events list
+  const [joinedItems, setJoinedItems] = useState([]); // [{ event, rsvp, joinedAt }]
+  const [joinedLoading, setJoinedLoading] = useState(false);
+
   // status state should carry a "kind"
   const [status, setStatus] = useState("");
   const [statusKind, setStatusKind] = useState("info"); // "info" | "success" | "error"
 
   const [loading, setLoading] = useState(false);
 
+  // Safe formatting wrapper so the view never blows up
+  const safeEventTime = (ev) => {
+    try {
+      if (!ev?.startDate) return "";
+      return formatEventTime(ev);
+    } catch {
+      return "";
+    }
+  };
+
   const reset = () => {
     setToken("");
     setEvent(null);
+    setRsvp("");
     setStatus("");
     setStatusKind("info");
     setLoading(false);
+    setRsvpLoading(false);
+    // Keep mode as-is; user might be browsing Joined.
   };
+
+  // Load joined events when switching to Joined mode
+  const loadJoined = async () => {
+    try {
+      setJoinedLoading(true);
+      const data = await apiCall("/eventShare/joined/list");
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setJoinedItems(items);
+    } catch (e) {
+      setJoinedItems([]);
+      setStatusKind("error");
+      setStatus(e?.message || "Failed to load joined events.");
+    } finally {
+      setJoinedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === "joined") {
+      loadJoined();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const join = async () => {
     const code = token.trim();
@@ -4492,6 +4539,10 @@ function EventShareView({ onBack }) {
       }
 
       setEvent(joinedEvent);
+
+      // If your join route returns rsvp, capture it; otherwise default.
+      setRsvp(String(data?.rsvp || "going"));
+
       setStatusKind("success");
       setStatus("Joined event successfully.");
     } catch (e) {
@@ -4503,14 +4554,39 @@ function EventShareView({ onBack }) {
     }
   };
 
-  // Safe formatting wrapper so the view never blows up
-  const safeEventTime = (ev) => {
+  const updateRsvp = async (next) => {
+    if (!event?.id) return;
+
     try {
-      if (!ev?.startDate) return "";
-      return formatEventTime(ev);
-    } catch {
-      return "";
+      setRsvpLoading(true);
+      setStatus("");
+      setStatusKind("info");
+
+      await apiCall(`/eventShare/${event.id}/rsvp`, {
+        method: "POST",
+        body: JSON.stringify({ rsvp: next }),
+      });
+
+      setRsvp(next);
+      setStatusKind("success");
+      setStatus("RSVP updated.");
+    } catch (e) {
+      setStatusKind("error");
+      setStatus(e?.message || "Failed to update RSVP.");
+    } finally {
+      setRsvpLoading(false);
     }
+  };
+
+  // Helper: when you click an item in Joined list, open it in the detail view
+  const openFromJoined = (item) => {
+    const ev = item?.event || null;
+    if (!ev) return;
+    setEvent(ev);
+    setRsvp(String(item?.rsvp || "going"));
+    setMode("join"); // reuse the detail card on the Join tab
+    setStatus("");
+    setStatusKind("info");
   };
 
   return (
@@ -4525,7 +4601,36 @@ function EventShareView({ onBack }) {
         </div>
       </div>
 
-      {!event && (
+      {/* Mode Toggle (always visible) */}
+      <div className="event-share-actions" style={{ marginBottom: 12 }}>
+        <button
+          className={`btn ${mode === "join" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => {
+            setMode("join");
+            setStatus("");
+            setStatusKind("info");
+          }}
+          type="button"
+        >
+          Join
+        </button>
+
+        <button
+          className={`btn ${mode === "joined" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => {
+            setMode("joined");
+            setEvent(null); // hide detail card while browsing list
+            setStatus("");
+            setStatusKind("info");
+          }}
+          type="button"
+        >
+          Joined
+        </button>
+      </div>
+
+      {/* JOIN MODE */}
+      {mode === "join" && !event && (
         <div className="event-share-card">
           <label className="form-label">Enter Share Code</label>
           <input
@@ -4573,7 +4678,8 @@ function EventShareView({ onBack }) {
         </div>
       )}
 
-      {event && (
+      {/* EVENT DETAIL (Join mode) */}
+      {mode === "join" && event && (
         <div className="event-share-card">
           <div className="event-share-title">{event.title || "(untitled event)"}</div>
 
@@ -4590,7 +4696,13 @@ function EventShareView({ onBack }) {
               <img
                 src="/icons/location.svg"
                 alt=""
-                style={{ width: 14, height: 14, verticalAlign: "-0.12em", marginRight: 8, opacity: 0.85 }}
+                style={{
+                  width: 14,
+                  height: 14,
+                  verticalAlign: "-0.12em",
+                  marginRight: 8,
+                  opacity: 0.85,
+                }}
               />
               {event.location}
             </div>
@@ -4598,17 +4710,107 @@ function EventShareView({ onBack }) {
 
           <div className="event-share-status success">You’ve joined this event.</div>
 
-          <div className="event-share-actions">
+          {/* RSVP BUTTONS */}
+          <div className="event-share-actions" style={{ marginTop: 12 }}>
+            <button
+              className={`btn ${rsvp === "going" ? "btn-success" : "btn-secondary"}`}
+              type="button"
+              disabled={rsvpLoading}
+              onClick={() => updateRsvp("going")}
+            >
+              Going
+            </button>
+
+            <button
+              className={`btn ${rsvp === "maybe" ? "btn-primary" : "btn-secondary"}`}
+              type="button"
+              disabled={rsvpLoading}
+              onClick={() => updateRsvp("maybe")}
+            >
+              Maybe
+            </button>
+
+            <button
+              className={`btn ${rsvp === "declined" ? "btn-danger" : "btn-secondary"}`}
+              type="button"
+              disabled={rsvpLoading}
+              onClick={() => updateRsvp("declined")}
+            >
+              Not going
+            </button>
+          </div>
+
+          {/* RSVP status feedback */}
+          {!rsvpLoading && status && (
+            <div className={`event-share-status ${statusKind}`} style={{ marginTop: 12 }}>
+              {status}
+            </div>
+          )}
+
+          <div className="event-share-actions" style={{ marginTop: 12 }}>
             <button className="btn btn-secondary" onClick={reset} type="button">
               Join another
             </button>
           </div>
         </div>
       )}
+
+      {/* JOINED MODE (LIST) */}
+      {mode === "joined" && (
+        <div className="event-share-card">
+          <div className="event-share-title">Joined events</div>
+
+          {joinedLoading && (
+            <div className="loading" style={{ padding: "18px 0 0" }}>
+              <div className="spinner" />
+              <div>Loading joined events…</div>
+            </div>
+          )}
+
+          {!joinedLoading && joinedItems.length === 0 && (
+            <div className="event-share-desc" style={{ marginTop: 10 }}>
+              No joined events yet.
+            </div>
+          )}
+
+          {!joinedLoading && joinedItems.length > 0 && (
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              {joinedItems.map((it) => (
+                <button
+                  key={it.event?.id || Math.random()}
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ textAlign: "left", padding: 12, width: "100%" }}
+                  onClick={() => openFromJoined(it)}
+                >
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                    {it.event?.title || "(untitled event)"}
+                  </div>
+                  <div style={{ opacity: 0.9, fontSize: 13 }}>
+                    {safeEventTime(it.event)}
+                  </div>
+                  <div style={{ opacity: 0.85, fontSize: 13, marginTop: 6 }}>
+                    RSVP: {it.rsvp || "going"}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!joinedLoading && (
+            <div className="event-share-actions" style={{ marginTop: 12 }}>
+              <button className="btn btn-secondary" onClick={loadJoined} type="button">
+                Refresh
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
+// SHARE CODE MODAL
 function ShareCodeModal({ onClose, token }) {
   useEffect(() => {
     document.body.classList.add("modal-open");
