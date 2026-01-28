@@ -3095,7 +3095,7 @@ const nextRunAt = DateTime
 }
 
 
-    // Event Modal
+
 // Event Modal
 function EventModal({ event, selectedDate, userTimezone, onClose, onSave }) {
   const [title, setTitle] = useState(event?.title || '');
@@ -3128,6 +3128,34 @@ const [shareLoading, setShareLoading] = useState(false);
   const [repeatEndKind, setRepeatEndKind] = useState('never'); // never | until | count
   const [repeatUntilDate, setRepeatUntilDate] = useState(''); // YYYY-MM-DD
   const [repeatCount, setRepeatCount] = useState(10); // occurrences
+  
+      const createShareCode = async () => {
+  if (!event?._id) return;
+
+  try {
+    setShareLoading(true);
+    setShareToken("");
+
+    // ✅ Adjust this path if your backend uses a different route
+    const data = await apiCall("/eventShare/create", {
+      method: "POST",
+      body: JSON.stringify({ eventId: event._id }),
+    });
+
+    const token = String(data?.token || data?.code || "");
+    if (!token) {
+      tg.showAlert("No token returned from server.");
+      return;
+    }
+
+    setShareToken(token);
+    setShareModalOpen(true);
+  } catch (e) {
+    tg.showAlert("Failed to create share code: " + (e?.message || "Unknown error"));
+  } finally {
+    setShareLoading(false);
+  }
+};
 
   useEffect(() => {
     document.body.classList.add('modal-open');
@@ -3262,34 +3290,7 @@ const [shareLoading, setShareLoading] = useState(false);
       tg.showAlert('Please enter a title');
       return;
     }
-    
-    const createShareCode = async () => {
-  if (!event?._id) return;
 
-  try {
-    setShareLoading(true);
-    setShareToken("");
-
-    // ✅ Adjust this path if your backend uses a different route
-    const data = await apiCall("/eventShare/create", {
-      method: "POST",
-      body: JSON.stringify({ eventId: event._id }),
-    });
-
-    const token = String(data?.token || data?.code || "");
-    if (!token) {
-      tg.showAlert("No token returned from server.");
-      return;
-    }
-
-    setShareToken(token);
-    setShareModalOpen(true);
-  } catch (e) {
-    tg.showAlert("Failed to create share code: " + (e?.message || "Unknown error"));
-  } finally {
-    setShareLoading(false);
-  }
-};
 
 const zone = userTimezone || "America/Chicago";
 
