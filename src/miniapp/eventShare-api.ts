@@ -1,5 +1,6 @@
 // src/miniapp/eventShare-api.ts
 import { Router } from "express";
+import mongoose from "mongoose";
 import crypto from "crypto";
 import { Event } from "../models/Event";
 import { EventShare } from "../models/EventShare";
@@ -13,6 +14,49 @@ const router = Router();
 function makeToken() {
   return crypto.randomBytes(16).toString("hex"); // short + human-shareable
 }
+
+/**
+ * =========================================================
+ * CREATE SHARE CODE
+ * POST /api/miniapp/eventShare/create
+ * body: { eventId }
+ * =========================================================
+ */
+router.post("/create", async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const eventId = String(req.body?.eventId || "").trim();
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: "Invalid eventId" });
+    }
+
+    const event = await Event.findOne({ _id: eventId, userId }).lean();
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or not owned by you" });
+    }
+
+    const token = makeToken();
+
+    const share = await EventShare.create({
+      eventId: event._id,
+      ownerUserId: userId,
+      token,
+    });
+
+    return res.json({
+      token: share.token,
+      eventId: String(event._id),
+    });
+  } catch (err) {
+    console.error("Create event share failed:", err);
+    return res.status(500).json({ error: "Failed to create share link" });
+  }
+});
 
 /**
  * =========================================================
@@ -151,42 +195,6 @@ router.post("/:eventId/rsvp", async (req, res) => {
   } catch (err) {
     console.error("RSVP update failed:", err);
     return res.status(500).json({ error: "Failed to update RSVP" });
-  }
-});
-
-/**
- * =========================================================
- * CREATE SHARE CODE
- * POST /api/miniapp/eventShare/:eventId
- * =========================================================
- */
-router.post("/:eventId", async (req, res) => {
-  try {
-    const userId = req.userId;
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-    const { eventId } = req.params;
-
-    const event = await Event.findOne({ _id: eventId, userId }).lean();
-    if (!event) {
-      return res.status(404).json({ error: "Event not found or not owned by you" });
-    }
-
-    const token = makeToken();
-
-    const share = await EventShare.create({
-      eventId: event._id,
-      ownerUserId: userId,
-      token,
-    });
-
-    return res.json({
-      token: share.token,
-      eventId: String(event._id),
-    });
-  } catch (err) {
-    console.error("Create event share failed:", err);
-    return res.status(500).json({ error: "Failed to create share link" });
   }
 });
 
