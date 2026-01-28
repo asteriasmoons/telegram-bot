@@ -87,9 +87,9 @@ router.post("/join", async (req, res) => {
     }
 
     // Owner cannot join their own event
-    if (event.userId === userId) {
-      return res.status(400).json({ error: "You already own this event" });
-    }
+    // if (event.userId === userId) {
+      // return res.status(400).json({ error: "You already own this event" });
+    // }
 
     // Upsert attendee
     const attendee = await EventAttendee.findOneAndUpdate(
