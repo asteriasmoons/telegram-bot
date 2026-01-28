@@ -47,17 +47,14 @@ async function acquireLock(reminderId: any, instanceId: string, lockSeconds: num
     {
       _id: reminderId,
       status: "scheduled",
-      $or: [
-        { "lock.lockExpiresAt": { $exists: false } },
-        { "lock.lockExpiresAt": { $lte: lockedAt } }
-      ]
+      $or: [{ "lock.lockExpiresAt": { $exists: false } }, { "lock.lockExpiresAt": { $lte: lockedAt } }],
     },
     {
       $set: {
         "lock.lockedAt": lockedAt,
         "lock.lockExpiresAt": lockExpiresAt,
-        "lock.lockedBy": instanceId
-      }
+        "lock.lockedBy": instanceId,
+      },
     }
   );
 
@@ -74,8 +71,8 @@ async function releaseLock(reminderId: any, instanceId: string) {
       $unset: {
         "lock.lockedAt": 1,
         "lock.lockExpiresAt": 1,
-        "lock.lockedBy": 1
-      }
+        "lock.lockedBy": 1,
+      },
     }
   );
 }
@@ -87,9 +84,11 @@ function parseTimeOfDay(timeOfDay?: string): { hour: number; minute: number } | 
   if (!timeOfDay) return null;
   const t = String(timeOfDay).trim();
   if (!/^\d{2}:\d{2}$/.test(t)) return null;
+
   const [hh, mm] = t.split(":").map((x) => Number(x));
   if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
   if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+
   return { hour: hh, minute: mm };
 }
 
@@ -120,27 +119,20 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   // -----------------------------------------
   const timeFromSchedule = parseTimeOfDay(sched.timeOfDay);
 
-  const timeFromNext = rem.nextRunAt
-    ? DateTime.fromJSDate(rem.nextRunAt, { zone: tz })
-    : null;
+  const timeFromNext = rem.nextRunAt ? DateTime.fromJSDate(rem.nextRunAt, { zone: tz }) : null;
 
-  const hour =
-    timeFromSchedule?.hour ??
-    (timeFromNext?.isValid ? timeFromNext.hour : 9);
-
-  const minute =
-    timeFromSchedule?.minute ??
-    (timeFromNext?.isValid ? timeFromNext.minute : 0);
+  const hour = timeFromSchedule?.hour ?? (timeFromNext?.isValid ? timeFromNext.hour : 9);
+  const minute = timeFromSchedule?.minute ?? (timeFromNext?.isValid ? timeFromNext.minute : 0);
 
   // -------------------------
   // daily
   // -------------------------
   if (sched.kind === "daily") {
-  const step = Math.max(1, Number(sched.interval || 1));
-  let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
-  while (candidate <= nowZ) candidate = candidate.plus({ days: step });
-  return candidate.toJSDate();
-}
+    const step = Math.max(1, Number(sched.interval || 1));
+    let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
+    while (candidate <= nowZ) candidate = candidate.plus({ days: step });
+    return candidate.toJSDate();
+  }
 
   // -------------------------
   // weekly
@@ -183,9 +175,7 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   if (sched.kind === "monthly") {
     const step = Math.max(1, Number(sched.interval || 1));
 
-    const anchorDay =
-      Number(sched.anchorDayOfMonth) ||
-      (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
+    const anchorDay = Number(sched.anchorDayOfMonth) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
     const clampDay = (dt: DateTime, dayNum: number) => {
       if (!dt.isValid) return dt;
@@ -194,10 +184,7 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
       return dt.set({ day: safeDay });
     };
 
-    let candidate = clampDay(
-      nowZ.set({ hour, minute, second: 0, millisecond: 0 }),
-      anchorDay
-    );
+    let candidate = clampDay(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), anchorDay);
 
     while (candidate <= nowZ) {
       candidate = clampDay(candidate.plus({ months: step }), anchorDay);
@@ -214,13 +201,8 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   if (sched.kind === "yearly") {
     const step = Math.max(1, Number(sched.interval || 1));
 
-    const anchorMonth =
-      Number(sched.anchorMonth) ||
-      (timeFromNext?.isValid ? timeFromNext.month : nowZ.month);
-
-    const anchorDay =
-      Number(sched.anchorDay) ||
-      (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
+    const anchorMonth = Number(sched.anchorMonth) || (timeFromNext?.isValid ? timeFromNext.month : nowZ.month);
+    const anchorDay = Number(sched.anchorDay) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
     const clampDay = (dt: DateTime, dayNum: number) => {
       if (!dt.isValid) return dt;
@@ -288,8 +270,8 @@ function reminderActionKeyboard(reminderId: string) {
     [
       Markup.button.callback("Done", `rs:done:${reminderId}`),
       Markup.button.callback("Snooze 15m", `rs:sz:${reminderId}:15`),
-      Markup.button.callback("Snooze 1h", `rs:sz:${reminderId}:60`)
-    ]
+      Markup.button.callback("Custom", `rs:szc:${reminderId}`),
+    ],
   ]);
 }
 
@@ -301,8 +283,7 @@ function reminderActionKeyboard(reminderId: string) {
 async function sendReminder(bot: Telegraf<any>, rem: any) {
   const text = String(rem.text ?? "");
 
-  const entities =
-    Array.isArray(rem.entities) && rem.entities.length > 0 ? rem.entities : undefined;
+  const entities = Array.isArray(rem.entities) && rem.entities.length > 0 ? rem.entities : undefined;
 
   const sendOpts: any = {};
 
@@ -321,6 +302,31 @@ async function sendReminder(bot: Telegraf<any>, rem: any) {
   }
 }
 
+// In-memory pending custom snooze: userId -> { reminderId, expiresAt }
+const pendingCustomSnooze = new Map<number, { reminderId: string; expiresAt: number }>();
+
+function parseDurationToMinutes(input: string): number | null {
+  const raw = String(input || "").trim().toLowerCase();
+
+  // Allow: "15", "15m", "2h", "1d", "1.5h"
+  // Also allow spaced: "15 m", "2 h"
+  const m = raw.match(/^(\d+(?:\.\d+)?)\s*([mhd])?$/);
+  if (!m) return null;
+
+  const value = Number(m[1]);
+  if (!Number.isFinite(value) || value <= 0) return null;
+
+  const unit = (m[2] || "m") as "m" | "h" | "d";
+
+  const minutes = unit === "m" ? value : unit === "h" ? value * 60 : value * 1440;
+
+  // clamp + round to whole minutes
+  const rounded = Math.round(minutes);
+  if (rounded <= 0) return null;
+
+  return rounded;
+}
+
 // Ensure we don't register handlers multiple times.
 let actionsRegistered = false;
 
@@ -333,7 +339,6 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
     const userId = ctx.from?.id;
 
     await ctx.answerCbQuery().catch(() => {});
-
     if (!userId || !data) return;
 
     const parts = data.split(":");
@@ -365,8 +370,8 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
               $set: {
                 status: "scheduled",
                 lastRunAt: new Date(),
-                nextRunAt
-              }
+                nextRunAt,
+              },
             }
           );
 
@@ -376,20 +381,35 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
         }
 
         // If for some reason we can't compute next, just mark sent.
-        await Reminder.updateOne(
-          { _id: id, userId },
-          { $set: { status: "sent", lastRunAt: new Date() } }
-        );
+        await Reminder.updateOne({ _id: id, userId }, { $set: { status: "sent", lastRunAt: new Date() } });
         await ctx.reply("Marked done.");
         return;
       }
 
       // Once: just mark sent
-      await Reminder.updateOne(
-        { _id: id, userId },
-        { $set: { status: "sent", lastRunAt: new Date() } }
-      );
+      await Reminder.updateOne({ _id: id, userId }, { $set: { status: "sent", lastRunAt: new Date() } });
       await ctx.reply("Marked done.");
+      return;
+    }
+
+    // rs:szc:<id>  (custom snooze prompt)
+    if (parts[1] === "szc") {
+      const id = parts[2];
+      if (!id) return;
+
+      const rem = await Reminder.findOne({ _id: id, userId }).lean();
+      if (!rem) {
+        await ctx.reply("That reminder no longer exists.");
+        return;
+      }
+
+      // store pending state for 2 minutes
+      pendingCustomSnooze.set(userId, { reminderId: id, expiresAt: Date.now() + 2 * 60 * 1000 });
+
+      await ctx.reply(
+        "Type a snooze duration like:\n- 10m\n- 2h\n- 1d\n(You can also just type a number for minutes.)",
+        Markup.forceReply()
+      );
       return;
     }
 
@@ -408,16 +428,63 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
 
       const newTime = new Date(Date.now() + minutes * 60 * 1000);
 
-      await Reminder.updateOne(
-        { _id: id, userId },
-        { $set: { nextRunAt: newTime, status: "scheduled" } }
-      );
+      await Reminder.updateOne({ _id: id, userId }, { $set: { nextRunAt: newTime, status: "scheduled" } });
 
       const tz = String(rem.timezone || "America/Chicago");
       const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
       await ctx.reply(`Snoozed. Next reminder: ${nextStr}`);
       return;
     }
+  });
+
+  // ONE text handler (registered once)
+  bot.on("text", async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const pending = pendingCustomSnooze.get(userId);
+    if (!pending) return;
+    
+      const reply = (ctx.message as any)?.reply_to_message;
+  if (!reply || !reply.from?.is_bot) {
+    return;
+  }
+
+  // Optional but recommended: ensure it's replying to *our* prompt
+  const repliedText = String(reply.text || "");
+  if (!repliedText.includes("Type a snooze duration")) {
+    return;
+  }
+
+    // Expired pending prompt
+    if (Date.now() > pending.expiresAt) {
+      pendingCustomSnooze.delete(userId);
+      await ctx.reply("Custom snooze timed out. Tap Custom again if you still want to snooze.");
+      return;
+    }
+
+    const minutes = parseDurationToMinutes((ctx.message as any)?.text);
+    if (!minutes) {
+      await ctx.reply("I couldn’t read that. Try something like 10m, 2h, or 1d.");
+      return;
+    }
+
+    // clear pending before DB work (prevents double processing)
+    pendingCustomSnooze.delete(userId);
+
+    const rem = await Reminder.findOne({ _id: pending.reminderId, userId }).lean();
+    if (!rem) {
+      await ctx.reply("That reminder no longer exists.");
+      return;
+    }
+
+    const newTime = new Date(Date.now() + minutes * 60 * 1000);
+
+    await Reminder.updateOne({ _id: pending.reminderId, userId }, { $set: { nextRunAt: newTime, status: "scheduled" } });
+
+    const tz = String(rem.timezone || "America/Chicago");
+    const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
+    await ctx.reply(`Snoozed. Next reminder: ${nextStr}`);
   });
 }
 
@@ -448,7 +515,7 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
 
       const due = await Reminder.find({
         status: "scheduled",
-        nextRunAt: { $lte: now() }
+        nextRunAt: { $lte: now() },
       })
         .sort({ nextRunAt: 1 })
         .limit(25);
@@ -472,15 +539,15 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
                 $set: {
                   nextRunAt: nextForRepeat,
                   lastRunAt: now(),
-                  status: "scheduled"
-                }
+                  status: "scheduled",
+                },
               }
             );
           } else {
             await Reminder.updateOne(
               { _id: rem._id },
               {
-                $set: { lastRunAt: now(), status: "sent" }
+                $set: { lastRunAt: now(), status: "sent" },
               }
             );
           }
@@ -488,10 +555,7 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
           console.error("Scheduler send error:", err);
 
           // If send fails, push it out 5 minutes so it doesn't hammer.
-          await Reminder.updateOne(
-            { _id: rem._id },
-            { $set: { nextRunAt: addMinutes(now(), 5) } }
-          );
+          await Reminder.updateOne({ _id: rem._id }, { $set: { nextRunAt: addMinutes(now(), 5) } });
         } finally {
           await releaseLock(rem._id, instanceId);
         }
