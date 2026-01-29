@@ -2958,67 +2958,133 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
       );
     }
 
-    // Reminder Modal
+// Reminder Modal
 function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
-  const [text, setText] = useState(reminder?.text || '');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [scheduleKind, setScheduleKind] = useState(reminder?.schedule?.kind || 'once');
-  const [intervalMinutes, setIntervalMinutes] = useState(reminder?.schedule?.intervalMinutes || 30);
-  
-useEffect(() => {
-  console.log('Modal opened - adding modal-open class');
-  document.body.classList.add('modal-open');
-  return () => {
-    console.log('Modal closed - removing modal-open class');
-    document.body.classList.remove('modal-open');
-  };
-}, []);
+  const [text, setText] = React.useState(reminder?.text || "");
+  const [date, setDate] = React.useState("");
+  const [time, setTime] = React.useState("");
+  const [scheduleKind, setScheduleKind] = React.useState(reminder?.schedule?.kind || "once");
+  const [intervalMinutes, setIntervalMinutes] = React.useState(reminder?.schedule?.intervalMinutes || 30);
 
+  // NEW: weekly day picker state (Sun=0..Sat=6)
+  const [weeklyDays, setWeeklyDays] = React.useState([]);
 
-  useEffect(() => {
+  React.useEffect(() => {
+    console.log("Modal opened - adding modal-open class");
+    document.body.classList.add("modal-open");
+    return () => {
+      console.log("Modal closed - removing modal-open class");
+      document.body.classList.remove("modal-open");
+    };
+  }, []);
+
+  React.useEffect(() => {
+    // When editing an existing reminder
     if (reminder) {
       const d = new Date(reminder.nextRunAt);
-      setDate(d.toISOString().split('T')[0]);
+      setDate(d.toISOString().split("T")[0]);
       setTime(d.toTimeString().slice(0, 5));
+
+      // Prefill schedule kind + interval
+      const k = reminder?.schedule?.kind || "once";
+      setScheduleKind(k);
+
+      if (k === "interval") {
+        const mins = Number(reminder?.schedule?.intervalMinutes ?? 30);
+        setIntervalMinutes(Number.isFinite(mins) && mins > 0 ? mins : 30);
+      }
+
+      // Prefill weekly days from schedule, otherwise default to nextRunAt weekday
+      const days = reminder?.schedule?.daysOfWeek;
+      if (Array.isArray(days) && days.length) {
+        setWeeklyDays(
+          days
+            .map((n) => Number(n))
+            .filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
+        );
+      } else {
+        setWeeklyDays([d.getDay()]);
+      }
     } else {
+      // Creating a new reminder
       const now = new Date();
-      setDate(now.toISOString().split('T')[0]);
-      setTime('09:00');
+      setDate(now.toISOString().split("T")[0]);
+      setTime("09:00");
+      setWeeklyDays([now.getDay()]);
+      setScheduleKind("once");
+      setIntervalMinutes(30);
     }
   }, [reminder]);
 
+  const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const toggleWeekday = (idx) => {
+    setWeeklyDays((prev) => {
+      const set = new Set(Array.isArray(prev) ? prev : []);
+      if (set.has(idx)) set.delete(idx);
+      else set.add(idx);
+      return Array.from(set).sort((a, b) => a - b);
+    });
+  };
+
   const handleSave = async () => {
     if (!text.trim()) {
-      tg.showAlert('Please enter a message');
+      tg.showAlert("Please enter a message");
       return;
     }
 
-const nextRunAt = DateTime
-  .fromISO(`${date}T${time}`, { zone: userTimezone })
-  .toUTC()
-  .toISO();
+    const zone = userTimezone || "America/Chicago";
 
-    const schedule = scheduleKind === 'once'
-      ? { kind: 'once' }
-      : scheduleKind === 'interval'
-      ? { kind: 'interval', intervalMinutes }
-      : { kind: scheduleKind, timeOfDay: time };
+    // nextRunAt is a timestamp (UTC ISO) built from the date + time the user picked.
+    // (If the user chooses weekly/daily, schedule drives future repeats.)
+    const nextRunAt = DateTime.fromISO(`${date}T${time}`, { zone }).toUTC().toISO();
+
+    // Build schedule payload that matches backend validation rules
+    let schedule;
+
+    if (scheduleKind === "once") {
+      schedule = { kind: "once" };
+    } else if (scheduleKind === "interval") {
+      const mins = Number(intervalMinutes);
+      if (!Number.isFinite(mins) || mins <= 0) {
+        tg.showAlert("Please enter a valid interval in minutes.");
+        return;
+      }
+      schedule = { kind: "interval", intervalMinutes: mins };
+    } else if (scheduleKind === "weekly") {
+      // Backend requires schedule.daysOfWeek for weekly reminders.
+      // If user selected none, default to the weekday of the chosen date.
+      const chosenWeekday = new Date(`${date}T00:00:00`).getDay(); // 0..6
+      const days = Array.isArray(weeklyDays)
+        ? weeklyDays.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
+        : [];
+
+      schedule = {
+        kind: "weekly",
+        timeOfDay: time,
+        daysOfWeek: days.length ? Array.from(new Set(days)) : [chosenWeekday],
+      };
+    } else {
+      // daily
+      schedule = { kind: "daily", timeOfDay: time };
+    }
 
     await onSave({
       text,
       nextRunAt,
       schedule,
-      timezone: userTimezone,
+      timezone: zone,
     });
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{reminder ? 'Edit Reminder' : 'New Reminder'}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <h2>{reminder ? "Edit Reminder" : "New Reminder"}</h2>
+          <button className="modal-close" onClick={onClose}>
+            ×
+          </button>
         </div>
 
         <div className="modal-body">
@@ -3027,7 +3093,7 @@ const nextRunAt = DateTime
             <textarea
               className="form-textarea"
               value={text}
-              onChange={e => setText(e.target.value)}
+              onChange={(e) => setText(e.target.value)}
               placeholder="What do you want to be reminded about?"
             />
           </div>
@@ -3039,7 +3105,7 @@ const nextRunAt = DateTime
                 type="date"
                 className="form-input"
                 value={date}
-                onChange={e => setDate(e.target.value)}
+                onChange={(e) => setDate(e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -3048,7 +3114,7 @@ const nextRunAt = DateTime
                 type="time"
                 className="form-input"
                 value={time}
-                onChange={e => setTime(e.target.value)}
+                onChange={(e) => setTime(e.target.value)}
               />
             </div>
           </div>
@@ -3058,7 +3124,7 @@ const nextRunAt = DateTime
             <select
               className="form-select"
               value={scheduleKind}
-              onChange={e => setScheduleKind(e.target.value)}
+              onChange={(e) => setScheduleKind(e.target.value)}
             >
               <option value="once">Once</option>
               <option value="daily">Daily</option>
@@ -3067,14 +3133,42 @@ const nextRunAt = DateTime
             </select>
           </div>
 
-          {scheduleKind === 'interval' && (
+          {scheduleKind === "weekly" && (
+            <div className="form-group">
+              <label className="form-label">Days of week</label>
+
+              <div className="card-actions" style={{ marginBottom: 6 }}>
+                {weekdayLabels.map((label, idx) => {
+                  const active = Array.isArray(weeklyDays) && weeklyDays.includes(idx);
+                  const className = `btn ${active ? "btn-primary" : "btn-secondary"}`;
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={className}
+                      onClick={() => toggleWeekday(idx)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
+                If you select none, it defaults to the weekday of the chosen date.
+              </div>
+            </div>
+          )}
+
+          {scheduleKind === "interval" && (
             <div className="form-group">
               <label className="form-label">Interval (minutes)</label>
               <input
                 type="number"
                 className="form-input"
                 value={intervalMinutes}
-                onChange={e => setIntervalMinutes(Number(e.target.value))}
+                onChange={(e) => setIntervalMinutes(Number(e.target.value))}
                 min="1"
               />
             </div>
@@ -3082,11 +3176,11 @@ const nextRunAt = DateTime
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>
+          <button className="btn btn-secondary" onClick={onClose} type="button">
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {reminder ? 'Update' : 'Create'}
+          <button className="btn btn-primary" onClick={handleSave} type="button">
+            {reminder ? "Update" : "Create"}
           </button>
         </div>
       </div>

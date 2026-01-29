@@ -269,6 +269,7 @@ if (schedule !== undefined) {
     if (!Array.isArray(schedule.daysOfWeek) || schedule.daysOfWeek.length === 0) {
       return res.status(400).json({ error: "Missing schedule.daysOfWeek for weekly reminders" });
     }
+    update.schedule = schedule;
   }
 }
     if (status !== undefined) update.status = status;
