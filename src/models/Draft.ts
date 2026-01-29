@@ -102,6 +102,7 @@ export type DraftDoc = {
   step: DraftStep;
 
   timezone: string;
+  panelMessageId?: number;
 
   // create drafts
   reminder?: ReminderDraftData;
@@ -224,6 +225,8 @@ const DraftSchema = new Schema<DraftDoc>(
     step: { type: String, required: true },
 
     timezone: { type: String, required: true },
+        // ✅ control panel message id
+    panelMessageId: { type: Number, required: false },
 
     // create drafts
     reminder: { type: ReminderDraftSchema },

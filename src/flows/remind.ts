@@ -29,8 +29,9 @@ async function upsertDraft(params: {
   timezone: string;
   patch?: Record<string, any>;
   awaiting?: Awaiting;
+  panelMessageId?: number; // ✅ add
 }) {
-  const { userId, chatId, timezone, patch, awaiting } = params;
+  const { userId, chatId, timezone, patch, awaiting, panelMessageId } = params;
 
   const current = await getDraft(userId);
   const curReminder = current?.reminder || {};
@@ -44,6 +45,8 @@ async function upsertDraft(params: {
         kind: "reminder",
         step: "confirm",
         timezone,
+        // ✅ store panel message id if provided, otherwise keep existing
+        panelMessageId: panelMessageId ?? current?.panelMessageId ?? null,
         reminder: {
           ...curReminder,
           ...(patch || {}),
@@ -154,6 +157,55 @@ function kbPickFreq() {
   ]);
 }
 
+async function renderPanel(ctx: any, userId: number) {
+  const d = await getDraft(userId);
+  if (!d) return;
+
+  const chatId = d.chatId;
+  const msgId = d.panelMessageId;
+
+  const text = controlPanelText(d);
+  const extra = { ...kbMain() };
+
+  // Try to edit the existing panel message
+  if (chatId && msgId) {
+    try {
+      await ctx.telegram.editMessageText(chatId, msgId, undefined, text, extra);
+      return;
+    } catch (e) {
+      // If edit fails (message deleted/too old), fall back to sending a new one
+    }
+  }
+
+  // Fallback: send a new panel and store its message_id
+  const sent = await ctx.reply(text, extra);
+  await upsertDraft({
+    userId,
+    chatId: sent.chat.id,
+    timezone: d.timezone || "America/Chicago",
+    panelMessageId: sent.message_id
+  });
+}
+
+async function editPanelWithKeyboard(ctx: any, userId: number, text: string, keyboard: any) {
+  const d = await getDraft(userId);
+
+  // If we don't have a panel yet, send one and store it
+  if (!d?.chatId || !d?.panelMessageId) {
+    const sent = await ctx.reply(text, keyboard);
+    await upsertDraft({
+      userId,
+      chatId: sent.chat.id,
+      timezone: d?.timezone || "America/Chicago",
+      panelMessageId: sent.message_id
+    });
+    return;
+  }
+
+  // Edit existing panel message
+  await ctx.telegram.editMessageText(d.chatId, d.panelMessageId, undefined, text, keyboard);
+}
+
 export function registerRemindersFlow(bot: Telegraf<any>) {
   bot.command("remind", async (ctx) => {
     const userId = ctx.from?.id;
@@ -175,9 +227,16 @@ export function registerRemindersFlow(bot: Telegraf<any>) {
       patch: { repeatKind: "none" }
     });
 
-    const d = await getDraft(userId);
-    await ctx.reply(controlPanelText(d), kbMain());
-  });
+const d = await getDraft(userId);
+const sent = await ctx.reply(controlPanelText(d), kbMain());
+
+await upsertDraft({
+  userId,
+  chatId: settings.dmChatId,
+  timezone: tz,
+  panelMessageId: sent.message_id
+});
+
 
   bot.action(/^rm:/, async (ctx) => {
     const userId = ctx.from?.id;
@@ -224,13 +283,13 @@ await ctx.reply(text, { entities, parse_mode: undefined } as any);
         await ctx.reply("(No message set yet)");
       }
 
-      await ctx.reply(controlPanelText(fresh), kbMain());
+await renderPanel(ctx, userId);
       return;
     }
 
     if (data === "rm:back") {
       const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
+await renderPanel(ctx, userId);
       return;
     }
 
@@ -240,10 +299,10 @@ await ctx.reply(text, { entities, parse_mode: undefined } as any);
       return;
     }
 
-    if (data === "rm:date") {
-      await ctx.reply("Pick a date:", kbPickDate());
-      return;
-    }
+if (data === "rm:date") {
+  await editPanelWithKeyboard(ctx, userId, "Pick a date:", kbPickDate());
+  return;
+}
 
     if (data.startsWith("rm:date:")) {
       const mode = data.split(":")[2];
@@ -264,14 +323,14 @@ await ctx.reply(text, { entities, parse_mode: undefined } as any);
       await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { dateISO } });
 
       const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
+await renderPanel(ctx, userId);
       return;
     }
 
-    if (data === "rm:time") {
-      await ctx.reply("Pick a time:", kbPickTime());
-      return;
-    }
+if (data === "rm:time") {
+  await editPanelWithKeyboard(ctx, userId, "Pick a time:", kbPickTime());
+  return;
+}
 
     if (data.startsWith("rm:time:")) {
       // rm:time:09:00 -> ["rm","time","09","00"]
@@ -293,14 +352,14 @@ await ctx.reply(text, { entities, parse_mode: undefined } as any);
       await upsertDraft({ userId, chatId: settings.dmChatId, timezone: tz, patch: { timeHHMM } });
 
       const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
+await renderPanel(ctx, userId);
       return;
     }
 
     if (data === "rm:freq") {
-      await ctx.reply("Pick a frequency:", kbPickFreq());
-      return;
-    }
+  await editPanelWithKeyboard(ctx, userId, "Pick a frequency:", kbPickFreq());
+  return;
+}
 
     if (data.startsWith("rm:freq:")) {
       const kind = data.split(":")[2];
@@ -327,7 +386,7 @@ await ctx.reply(text, { entities, parse_mode: undefined } as any);
       });
 
       const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
+await renderPanel(ctx, userId);
       return;
     }
 
@@ -445,10 +504,9 @@ await ctx.reply(input, { entities, parse_mode: undefined } as any);
         await ctx.reply(input);
       }
 
-      const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
-      return;
-    }
+await renderPanel(ctx, userId);
+return;
+}
 
     if (awaiting === "date") {
       const dateISO = parseISODate(input);
@@ -465,9 +523,8 @@ await ctx.reply(input, { entities, parse_mode: undefined } as any);
         awaiting: undefined
       });
 
-      const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
-      return;
+      await renderPanel(ctx, userId);
+return;
     }
 
     if (awaiting === "time") {
@@ -485,9 +542,8 @@ await ctx.reply(input, { entities, parse_mode: undefined } as any);
         awaiting: undefined
       });
 
-      const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
-      return;
+await renderPanel(ctx, userId);
+return;
     }
 
     if (awaiting === "interval") {
@@ -505,9 +561,8 @@ await ctx.reply(input, { entities, parse_mode: undefined } as any);
         awaiting: undefined
       });
 
-      const fresh = await getDraft(userId);
-      await ctx.reply(controlPanelText(fresh), kbMain());
-      return;
+      await renderPanel(ctx, userId);
+return;
     }
 
     // Unexpected awaiting value: don't swallow messages
