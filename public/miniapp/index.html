@@ -3516,7 +3516,13 @@ const [shareLoading, setShareLoading] = useState(false);
 
       setRepeatEnabled(true);
       setRepeatFreq(String(r.freq || 'weekly'));
-      setRepeatInterval(Math.max(1, Number(r.interval || 1)));
+      setRepeatInterval("1");
+...
+const intervalStr =
+  r.interval === undefined || r.interval === null
+    ? "1"
+    : String(Math.max(1, Number(r.interval)));
+setRepeatInterval(intervalStr);
 
       if (Array.isArray(r.byWeekday)) {
         setRepeatWeekdays(
@@ -3603,7 +3609,8 @@ reminderPayload = {
 
     if (repeatEnabled) {
       const freq = String(repeatFreq || 'weekly');
-      const interval = Math.max(1, Number(repeatInterval || 1));
+const rawInterval = Number(String(repeatInterval).trim());
+const interval = Number.isFinite(rawInterval) && rawInterval >= 1 ? Math.trunc(rawInterval) : 1;
 
       let byWeekday = undefined;
       if (freq === 'weekly') {
@@ -3932,13 +3939,14 @@ endDate: endISO || undefined,
                   <div className="form-group">
                     <label className="form-label">Every</label>
                     <input
-                      type="number"
-                      className="form-input"
-                      min="1"
-                      value={repeatInterval}
-                      onChange={(e) => setRepeatInterval(Math.max(1, Number(e.target.value || 1)))}
-                      placeholder="1"
-                    />
+  type="number"
+  className="form-input"
+  min="1"
+  step="1"
+  value={repeatInterval}
+  onChange={(e) => setRepeatInterval(e.target.value)}
+  placeholder="1"
+/>
                     <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 6, lineHeight: 1.35 }}>
                       {repeatFreq === 'daily' ? 'days' :
                        repeatFreq === 'weekly' ? 'weeks' :
