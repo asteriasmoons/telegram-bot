@@ -175,7 +175,7 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   if (sched.kind === "monthly") {
     const step = Math.max(1, Number(sched.interval || 1));
 
-    const anchorDay = Number(sched.anchorDayOfMonth) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
+const anchorDay = Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
     const clampDay = (dt: DateTime, dayNum: number) => {
       if (!dt.isValid) return dt;

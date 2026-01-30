@@ -15,7 +15,7 @@ export type ReminderSchedule = {
   daysOfWeek?: number[];    // 0-6 (Sun-Sat)
 
   // Monthly only
-  anchorDayOfMonth?: number; // 1-31 (clamped by scheduler)
+  dayOfMonth?: number; // 1-31 (clamped by scheduler)
 
   // Yearly only
   anchorMonth?: number;     // 1-12
@@ -92,7 +92,7 @@ const ReminderScheduleSchema = new Schema<ReminderSchedule>(
     daysOfWeek: { type: [Number], required: false, default: [] },
 
     // monthly only
-    anchorDayOfMonth: { type: Number, required: false },
+    dayOfMonth: { type: Number, required: false },
 
     // yearly only
     anchorMonth: { type: Number, required: false },

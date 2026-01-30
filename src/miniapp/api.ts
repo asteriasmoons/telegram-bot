@@ -128,7 +128,7 @@ router.get("/reminders", async (req, res) => {
         {
           status: "sent",
           schedule: { $exists: true, $ne: null },
-          "schedule.kind": { $in: ["daily", "weekly", "interval"] },
+          "schedule.kind": { $in: ["daily", "weekly", "monthly", "interval"] },
           nextRunAt: { $lte: new Date(Date.now() + 24 * 60 * 60 * 1000) } // Due within next 24 hours
         }
       ];
@@ -260,17 +260,44 @@ if (nextRunAt !== undefined) {
 }
 if (schedule !== undefined) {
   const kind = schedule?.kind || "once";
-  if (kind === "daily" || kind === "weekly") {
+
+  // Validate timeOfDay for recurring kinds that use it
+  if (kind === "daily" || kind === "weekly" || kind === "monthly") {
     if (!schedule.timeOfDay || !String(schedule.timeOfDay).includes(":")) {
-      return res.status(400).json({ error: "Missing schedule.timeOfDay for recurring reminders" });
+      return res
+        .status(400)
+        .json({ error: "Missing schedule.timeOfDay for recurring reminders" });
     }
   }
+
   if (kind === "weekly") {
     if (!Array.isArray(schedule.daysOfWeek) || schedule.daysOfWeek.length === 0) {
-      return res.status(400).json({ error: "Missing schedule.daysOfWeek for weekly reminders" });
+      return res
+        .status(400)
+        .json({ error: "Missing schedule.daysOfWeek for weekly reminders" });
     }
-    update.schedule = schedule;
   }
+
+  if (kind === "monthly") {
+    const dom = Number(schedule.dayOfMonth);
+    if (!Number.isFinite(dom) || dom < 1 || dom > 31) {
+      return res
+        .status(400)
+        .json({ error: "Missing/invalid schedule.dayOfMonth for monthly reminders" });
+    }
+  }
+
+  if (kind === "interval") {
+    const mins = Number(schedule.intervalMinutes);
+    if (!Number.isFinite(mins) || mins <= 0) {
+      return res
+        .status(400)
+        .json({ error: "Missing/invalid schedule.intervalMinutes for interval reminders" });
+    }
+  }
+
+  // ✅ IMPORTANT: actually persist schedule for ALL kinds
+  update.schedule = schedule;
 }
     if (status !== undefined) update.status = status;
 
@@ -366,8 +393,33 @@ if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
     // fallback: 1 week later same time
     return from.plus({ days: 7 }).set({ hour, minute, second: 0, millisecond: 0 }).toJSDate();
   }
+  
+    if (schedule.kind === "monthly") {
+    const domRaw = Number(schedule.dayOfMonth);
+    if (!Number.isFinite(domRaw) || domRaw < 1 || domRaw > 31) return null;
 
-  return null;
+    // Luxon will clamp invalid dates in some cases; we want predictable behavior:
+    // If the month doesn't have that day (e.g., 31 in Feb), run on the LAST day of that month.
+    const desiredDom = Math.trunc(domRaw);
+
+    // Helper: get last day of month for a DateTime
+    const lastDayOfMonth = (dt: any) => dt.endOf("month").day;
+
+    // Try this month, then next month
+    for (let addMonths = 0; addMonths <= 12; addMonths++) {
+      const base = from.plus({ months: addMonths }).startOf("month");
+      const last = lastDayOfMonth(base);
+      const day = Math.min(desiredDom, last);
+
+      const candidate = base.set({ day, hour, minute, second: 0, millisecond: 0 });
+
+      if (candidate > from) return candidate.toJSDate();
+    }
+
+    return null;
+  }
+  
+    return null;
 }
 
 // POST /api/miniapp/reminders/:id/done - Mark as done

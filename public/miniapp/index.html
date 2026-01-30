@@ -2983,56 +2983,74 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
   const [text, setText] = React.useState(reminder?.text || "");
   const [date, setDate] = React.useState("");
   const [time, setTime] = React.useState("");
-  const [scheduleKind, setScheduleKind] = React.useState(reminder?.schedule?.kind || "once");
-  const [intervalMinutes, setIntervalMinutes] = React.useState(reminder?.schedule?.intervalMinutes || 30);
 
-  // NEW: weekly day picker state (Sun=0..Sat=6)
+  const [scheduleKind, setScheduleKind] = React.useState(reminder?.schedule?.kind || "once");
+  const [intervalMinutes, setIntervalMinutes] = React.useState(
+    reminder?.schedule?.intervalMinutes || 30
+  );
+
+  // Weekly day picker state (Sun=0..Sat=6)
   const [weeklyDays, setWeeklyDays] = React.useState([]);
 
+  // Monthly day-of-month (1..31)
+  const [monthlyDay, setMonthlyDay] = React.useState(1);
+
   React.useEffect(() => {
-    console.log("Modal opened - adding modal-open class");
     document.body.classList.add("modal-open");
-    return () => {
-      console.log("Modal closed - removing modal-open class");
-      document.body.classList.remove("modal-open");
-    };
+    return () => document.body.classList.remove("modal-open");
   }, []);
 
   React.useEffect(() => {
-    // When editing an existing reminder
     if (reminder) {
       const d = new Date(reminder.nextRunAt);
       setDate(d.toISOString().split("T")[0]);
       setTime(d.toTimeString().slice(0, 5));
 
-      // Prefill schedule kind + interval
       const k = reminder?.schedule?.kind || "once";
       setScheduleKind(k);
 
+      // Interval
       if (k === "interval") {
         const mins = Number(reminder?.schedule?.intervalMinutes ?? 30);
         setIntervalMinutes(Number.isFinite(mins) && mins > 0 ? mins : 30);
       }
 
-      // Prefill weekly days from schedule, otherwise default to nextRunAt weekday
-      const days = reminder?.schedule?.daysOfWeek;
-      if (Array.isArray(days) && days.length) {
-        setWeeklyDays(
-          days
-            .map((n) => Number(n))
-            .filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
-        );
+      // Weekly
+      if (k === "weekly") {
+        const days = reminder?.schedule?.daysOfWeek;
+        if (Array.isArray(days) && days.length) {
+          setWeeklyDays(
+            days
+              .map((n) => Number(n))
+              .filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
+          );
+        } else {
+          setWeeklyDays([d.getDay()]);
+        }
       } else {
+        // keep weeklyDays sensible if user switches to weekly
         setWeeklyDays([d.getDay()]);
+      }
+
+      // Monthly (use schedule.dayOfMonth if present, else default to chosen date's day)
+      if (k === "monthly") {
+        const dom = Number(reminder?.schedule?.dayOfMonth);
+        const fallbackDom = d.getDate();
+        const normalized = Number.isFinite(dom) && dom >= 1 && dom <= 31 ? dom : fallbackDom;
+        setMonthlyDay(normalized);
+      } else {
+        // keep monthlyDay sensible if user switches to monthly
+        setMonthlyDay(d.getDate());
       }
     } else {
       // Creating a new reminder
       const now = new Date();
       setDate(now.toISOString().split("T")[0]);
       setTime("09:00");
-      setWeeklyDays([now.getDay()]);
       setScheduleKind("once");
       setIntervalMinutes(30);
+      setWeeklyDays([now.getDay()]);
+      setMonthlyDay(now.getDate());
     }
   }, [reminder]);
 
@@ -3055,25 +3073,21 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
 
     const zone = userTimezone || "America/Chicago";
 
-    // nextRunAt is a timestamp (UTC ISO) built from the date + time the user picked.
-    // (If the user chooses weekly/daily, schedule drives future repeats.)
+    // Build a UTC ISO timestamp from the chosen local date+time.
+    // Schedule determines repeats after the first run.
     const nextRunAt = DateTime.fromISO(`${date}T${time}`, { zone }).toUTC().toISO();
 
-    // Build schedule payload that matches backend validation rules
     let schedule;
 
     if (scheduleKind === "once") {
       schedule = { kind: "once" };
-    } else if (scheduleKind === "interval") {
-      const mins = Number(intervalMinutes);
-      if (!Number.isFinite(mins) || mins <= 0) {
-        tg.showAlert("Please enter a valid interval in minutes.");
-        return;
-      }
-      schedule = { kind: "interval", intervalMinutes: mins };
-    } else if (scheduleKind === "weekly") {
-      // Backend requires schedule.daysOfWeek for weekly reminders.
-      // If user selected none, default to the weekday of the chosen date.
+    }
+
+    if (scheduleKind === "daily") {
+      schedule = { kind: "daily", timeOfDay: time };
+    }
+
+    if (scheduleKind === "weekly") {
       const chosenWeekday = new Date(`${date}T00:00:00`).getDay(); // 0..6
       const days = Array.isArray(weeklyDays)
         ? weeklyDays.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
@@ -3084,9 +3098,30 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
         timeOfDay: time,
         daysOfWeek: days.length ? Array.from(new Set(days)) : [chosenWeekday],
       };
-    } else {
-      // daily
-      schedule = { kind: "daily", timeOfDay: time };
+    }
+
+    if (scheduleKind === "monthly") {
+      // If user leaves it blank or invalid, default to day-of-month from chosen date.
+      const fallbackDom = new Date(`${date}T00:00:00`).getDate();
+      const dom = Number(monthlyDay);
+
+      const normalizedDom =
+        Number.isFinite(dom) && dom >= 1 && dom <= 31 ? Math.trunc(dom) : fallbackDom;
+
+      schedule = {
+        kind: "monthly",
+        timeOfDay: time,
+        dayOfMonth: normalizedDom,
+      };
+    }
+
+    if (scheduleKind === "interval") {
+      const mins = Number(intervalMinutes);
+      if (!Number.isFinite(mins) || mins <= 0) {
+        tg.showAlert("Please enter a valid interval in minutes.");
+        return;
+      }
+      schedule = { kind: "interval", intervalMinutes: Math.trunc(mins) };
     }
 
     await onSave({
@@ -3102,7 +3137,7 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{reminder ? "Edit Reminder" : "New Reminder"}</h2>
-          <button className="modal-close" onClick={onClose}>
+          <button className="modal-close" onClick={onClose} type="button">
             ×
           </button>
         </div>
@@ -3128,6 +3163,7 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
+
             <div className="form-group">
               <label className="form-label">Time</label>
               <input
@@ -3149,6 +3185,7 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
               <option value="once">Once</option>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
               <option value="interval">Custom Interval</option>
             </select>
           </div>
@@ -3177,6 +3214,24 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
 
               <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
                 If you select none, it defaults to the weekday of the chosen date.
+              </div>
+            </div>
+          )}
+
+          {scheduleKind === "monthly" && (
+            <div className="form-group">
+              <label className="form-label">Day of month (1–31)</label>
+              <input
+                type="number"
+                className="form-input"
+                min="1"
+                max="31"
+                value={monthlyDay}
+                onChange={(e) => setMonthlyDay(Number(e.target.value))}
+              />
+              <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
+                If a month doesn&apos;t have that day (e.g. 31 in February), your backend should run
+                it on the last day of that month.
               </div>
             </div>
           )}
