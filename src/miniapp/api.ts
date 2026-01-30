@@ -128,7 +128,7 @@ router.get("/reminders", async (req, res) => {
         {
           status: "sent",
           schedule: { $exists: true, $ne: null },
-          "schedule.kind": { $in: ["daily", "weekly", "monthly", "interval"] },
+          "schedule.kind": { $in: ["daily", "weekly", "monthly", "yearly", "interval"] },
           nextRunAt: { $lte: new Date(Date.now() + 24 * 60 * 60 * 1000) } // Due within next 24 hours
         }
       ];
@@ -293,6 +293,17 @@ if (schedule !== undefined) {
       return res
         .status(400)
         .json({ error: "Missing/invalid schedule.intervalMinutes for interval reminders" });
+    }
+  }
+  
+    if (kind === "yearly") {
+    const m = Number(schedule.anchorMonth);
+    const d = Number(schedule.anchorDay);
+    if (!Number.isFinite(m) || m < 1 || m > 12) {
+      return res.status(400).json({ error: "Missing/invalid schedule.anchorMonth for yearly reminders" });
+    }
+    if (!Number.isFinite(d) || d < 1 || d > 31) {
+      return res.status(400).json({ error: "Missing/invalid schedule.anchorDay for yearly reminders" });
     }
   }
 

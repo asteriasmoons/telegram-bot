@@ -2994,6 +2994,10 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
 
   // Monthly day-of-month (1..31)
   const [monthlyDay, setMonthlyDay] = React.useState(1);
+  
+    // NEW: yearly picker state
+  const [yearlyMonth, setYearlyMonth] = React.useState(1); // 1..12
+  const [yearlyDay, setYearlyDay] = React.useState(1);     // 1..31
 
   React.useEffect(() => {
     document.body.classList.add("modal-open");
@@ -3042,6 +3046,20 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
         // keep monthlyDay sensible if user switches to monthly
         setMonthlyDay(d.getDate());
       }
+      
+            // Prefill yearly anchors (fallback to nextRunAt month/day)
+      const sched = reminder?.schedule;
+      if (sched?.kind === "yearly") {
+        const m = Number(sched.anchorMonth);
+        const day = Number(sched.anchorDay);
+
+        setYearlyMonth(Number.isFinite(m) && m >= 1 && m <= 12 ? m : (d.getMonth() + 1));
+        setYearlyDay(Number.isFinite(day) && day >= 1 && day <= 31 ? day : d.getDate());
+      } else {
+        // if not yearly, still set sane defaults from the chosen date
+        setYearlyMonth(d.getMonth() + 1);
+        setYearlyDay(d.getDate());
+      }
     } else {
       // Creating a new reminder
       const now = new Date();
@@ -3051,6 +3069,8 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
       setIntervalMinutes(30);
       setWeeklyDays([now.getDay()]);
       setMonthlyDay(now.getDate());
+      setYearlyMonth(now.getMonth() + 1);
+      setYearlyDay(now.getDate());
     }
   }, [reminder]);
 
@@ -3065,72 +3085,94 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
     });
   };
 
-  const handleSave = async () => {
-    if (!text.trim()) {
-      tg.showAlert("Please enter a message");
+const handleSave = async () => {
+  if (!text.trim()) {
+    tg.showAlert("Please enter a message");
+    return;
+  }
+
+  const zone = userTimezone || "America/Chicago";
+
+  // Build a UTC ISO timestamp from the chosen local date+time.
+  // Schedule determines repeats after the first run.
+  const nextRunAt = DateTime.fromISO(`${date}T${time}`, { zone }).toUTC().toISO();
+
+  let schedule;
+
+  if (scheduleKind === "once") {
+    schedule = { kind: "once" };
+
+  } else if (scheduleKind === "daily") {
+    schedule = { kind: "daily", timeOfDay: time };
+
+  } else if (scheduleKind === "weekly") {
+    const chosenWeekday = new Date(`${date}T00:00:00`).getDay(); // 0..6
+    const days = Array.isArray(weeklyDays)
+      ? weeklyDays
+          .map((n) => Number(n))
+          .filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
+      : [];
+
+    schedule = {
+      kind: "weekly",
+      timeOfDay: time,
+      daysOfWeek: days.length ? Array.from(new Set(days)) : [chosenWeekday],
+    };
+
+  } else if (scheduleKind === "monthly") {
+    // If user leaves it blank or invalid, default to day-of-month from chosen date.
+    const fallbackDom = new Date(`${date}T00:00:00`).getDate();
+    const dom = Number(monthlyDay);
+
+    const normalizedDom =
+      Number.isFinite(dom) && dom >= 1 && dom <= 31 ? Math.trunc(dom) : fallbackDom;
+
+    schedule = {
+      kind: "monthly",
+      timeOfDay: time,
+      dayOfMonth: normalizedDom, // matches your API
+    };
+
+  } else if (scheduleKind === "yearly") {
+    const m = Number(yearlyMonth);
+    const day = Number(yearlyDay);
+
+    if (!Number.isFinite(m) || m < 1 || m > 12) {
+      tg.showAlert("Please choose a valid month.");
+      return;
+    }
+    if (!Number.isFinite(day) || day < 1 || day > 31) {
+      tg.showAlert("Please choose a valid day (1-31).");
       return;
     }
 
-    const zone = userTimezone || "America/Chicago";
+    schedule = {
+      kind: "yearly",
+      timeOfDay: time,
+      anchorMonth: m,
+      anchorDay: day,
+    };
 
-    // Build a UTC ISO timestamp from the chosen local date+time.
-    // Schedule determines repeats after the first run.
-    const nextRunAt = DateTime.fromISO(`${date}T${time}`, { zone }).toUTC().toISO();
-
-    let schedule;
-
-    if (scheduleKind === "once") {
-      schedule = { kind: "once" };
+  } else if (scheduleKind === "interval") {
+    const mins = Number(intervalMinutes);
+    if (!Number.isFinite(mins) || mins <= 0) {
+      tg.showAlert("Please enter a valid interval in minutes.");
+      return;
     }
+    schedule = { kind: "interval", intervalMinutes: Math.trunc(mins) };
 
-    if (scheduleKind === "daily") {
-      schedule = { kind: "daily", timeOfDay: time };
-    }
+  } else {
+    // safety fallback (should never happen)
+    schedule = { kind: "once" };
+  }
 
-    if (scheduleKind === "weekly") {
-      const chosenWeekday = new Date(`${date}T00:00:00`).getDay(); // 0..6
-      const days = Array.isArray(weeklyDays)
-        ? weeklyDays.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
-        : [];
-
-      schedule = {
-        kind: "weekly",
-        timeOfDay: time,
-        daysOfWeek: days.length ? Array.from(new Set(days)) : [chosenWeekday],
-      };
-    }
-
-    if (scheduleKind === "monthly") {
-      // If user leaves it blank or invalid, default to day-of-month from chosen date.
-      const fallbackDom = new Date(`${date}T00:00:00`).getDate();
-      const dom = Number(monthlyDay);
-
-      const normalizedDom =
-        Number.isFinite(dom) && dom >= 1 && dom <= 31 ? Math.trunc(dom) : fallbackDom;
-
-      schedule = {
-        kind: "monthly",
-        timeOfDay: time,
-        dayOfMonth: normalizedDom,
-      };
-    }
-
-    if (scheduleKind === "interval") {
-      const mins = Number(intervalMinutes);
-      if (!Number.isFinite(mins) || mins <= 0) {
-        tg.showAlert("Please enter a valid interval in minutes.");
-        return;
-      }
-      schedule = { kind: "interval", intervalMinutes: Math.trunc(mins) };
-    }
-
-    await onSave({
-      text,
-      nextRunAt,
-      schedule,
-      timezone: zone,
-    });
-  };
+  await onSave({
+    text,
+    nextRunAt,
+    schedule,
+    timezone: zone,
+  });
+};
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -3186,6 +3228,7 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
+                           <option value="yearly">Yearly</option>
               <option value="interval">Custom Interval</option>
             </select>
           </div>
@@ -3232,6 +3275,52 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
               <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
                 If a month doesn&apos;t have that day (e.g. 31 in February), your backend should run
                 it on the last day of that month.
+              </div>
+            </div>
+          )}
+          
+          {scheduleKind === "yearly" && (
+            <div className="form-group">
+              <label className="form-label">Yearly date</label>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Month</label>
+                  <select
+                    className="form-select"
+                    value={yearlyMonth}
+                    onChange={(e) => setYearlyMonth(Number(e.target.value))}
+                  >
+                    <option value={1}>January</option>
+                    <option value={2}>February</option>
+                    <option value={3}>March</option>
+                    <option value={4}>April</option>
+                    <option value={5}>May</option>
+                    <option value={6}>June</option>
+                    <option value={7}>July</option>
+                    <option value={8}>August</option>
+                    <option value={9}>September</option>
+                    <option value={10}>October</option>
+                    <option value={11}>November</option>
+                    <option value={12}>December</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Day</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={yearlyDay}
+                    onChange={(e) => setYearlyDay(Number(e.target.value))}
+                    min="1"
+                    max="31"
+                  />
+                </div>
+              </div>
+
+              <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
+                If the chosen month doesn’t have that day (like Feb 30), it will run on the last day of that month.
               </div>
             </div>
           )}
