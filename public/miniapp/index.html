@@ -381,6 +381,22 @@ body {
   flex-wrap: wrap;
 }
 
+/* --- Badge icon support (Reading books status badge) --- */
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Only affects icons inside the badge */
+.card-badge .badge-icon {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+  opacity: 0.95;
+  vertical-align: -0.12em;
+}
+
 /* -------- Reading Streak Button (ONLY) -------- */
 .streak-actions .btn.btn-success {
   background: var(--gradient-blue);
@@ -1656,10 +1672,14 @@ function BookCard({ book, onEdit, onDelete }) {
             </div>
           )}
         </div>
-
+   
         <span className="card-badge" style={{ background: badge.bg, color: badge.fg }}>
-          {badge.text}
-        </span>
+  {String(book.status || "").toLowerCase() === "finished" && (
+    <img src="/icons/check.svg" alt="" className="badge-icon" />
+  )}
+  {badge.text}
+</span>
+
       </div>
       
       {book.shortSummary && (
