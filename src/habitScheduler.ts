@@ -228,7 +228,7 @@ await bot.telegram.sendMessage(chatId, text, sendOpts);
 const pendingHabitCustomSnooze = new Map<number, { habitId: string; expiresAt: number }>();
 
 // In-memory pending habit log: userId -> { habitId, expiresAt }
-const pendingHabitLog = new Map<number, { habitId: string; expiresAt: number }>();
+const pendingHabitLog = new Map<number, { habitId: string; expiresAt: number; promptMessageId?: number }>();
 
 function parseDurationToMinutes(input: string): number | null {
   const raw = String(input || "").trim().toLowerCase();
@@ -280,14 +280,19 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
         return;
       }
 
-      pendingHabitLog.set(userId, { habitId, expiresAt: Date.now() + 2 * 60 * 1000 });
+const unit = String(habit.unit ?? "");
+const prompt = unit ? `Enter the amount you did (${unit}).` : "Enter the amount you did (number).";
 
-      const unit = String(habit.unit ?? "");
-      const prompt = unit ? `Enter the amount you did (${unit}).` : "Enter the amount you did (number).";
+const sent = await ctx.reply(prompt, Markup.forceReply());
 
-      await ctx.reply(prompt, Markup.forceReply());
-      return;
-    }
+pendingHabitLog.set(userId, {
+  habitId,
+  expiresAt: Date.now() + 2 * 60 * 1000,
+  promptMessageId: sent.message_id,
+});
+
+return;
+}
 
     // hb:szc:<habitId>
     if (parts[1] === "szc") {
@@ -346,56 +351,57 @@ bot.on("text", async (ctx) => {
   // -------------------------
   // HABIT LOG FLOW
   // -------------------------
-  const pendingLog = pendingHabitLog.get(userId);
-  if (pendingLog) {
-    // If Telegram didn’t attach a reply, still accept while pending.
-    // But if it IS a reply, it must be to the bot (prevents weird cross-chat issues).
-    if (reply && !isReplyToBot) return;
+const pendingLog = pendingHabitLog.get(userId);
+if (pendingLog) {
+  // If the user is replying to something, it must be the exact prompt we sent.
+  if (reply) {
+    if (!isReplyToBot) return;
 
-    if (Date.now() > pendingLog.expiresAt) {
-      pendingHabitLog.delete(userId);
-      await ctx.reply("Log timed out. Tap Log again if you still want to record a session.");
+    const replyToId = (reply as any)?.message_id;
+    if (pendingLog.promptMessageId && replyToId !== pendingLog.promptMessageId) {
+      // It's a reply, but not to our habit log prompt
       return;
     }
+  }
 
-    // If it IS a reply and it's clearly not for the log prompt, ignore.
-    // (This prevents other force-reply prompts from interfering.)
-    if (isReplyToBot && repliedText && !repliedText.toLowerCase().includes("enter the amount")) {
-      // Not the habit amount prompt -- ignore so other flows can handle it
-      return;
-    }
-
-    const habit = await Habit.findOne({ _id: pendingLog.habitId, userId }).lean();
-    if (!habit) {
-      pendingHabitLog.delete(userId);
-      await ctx.reply("That habit no longer exists.");
-      return;
-    }
-
-    const amount = parseNumber(String((ctx.message as any)?.text || ""));
-    if (!amount) {
-      await ctx.reply("I couldn’t read that number. Try again (like 10 or 1.5).");
-      return;
-    }
-
+  if (Date.now() > pendingLog.expiresAt) {
     pendingHabitLog.delete(userId);
-
-    try {
-      await HabitLog.create({
-        userId,
-        habitId: habit._id,
-        startedAt: new Date(),
-        amount,
-        unit: habit.unit, // locked to habit unit
-      });
-
-      await ctx.reply(`Logged: ${amount}${habit.unit ? " " + habit.unit : ""} for "${habit.name}".`);
-    } catch (err: any) {
-      console.error("HabitLog.create failed:", err);
-      await ctx.reply("I couldn't save that log due to a server error. Try again in a moment.");
-    }
+    await ctx.reply("Log timed out. Tap Log again if you still want to record a session.");
     return;
   }
+
+  const habit = await Habit.findOne({ _id: pendingLog.habitId, userId }).lean();
+  if (!habit) {
+    pendingHabitLog.delete(userId);
+    await ctx.reply("That habit no longer exists.");
+    return;
+  }
+
+  const amount = parseNumber(String((ctx.message as any)?.text || ""));
+  if (!amount) {
+    await ctx.reply("I couldn’t read that number. Try again (like 10 or 1.5).");
+    return;
+  }
+
+  pendingHabitLog.delete(userId);
+
+  try {
+    await HabitLog.create({
+      userId,
+      habitId: habit._id,
+      startedAt: new Date(),
+      amount,
+      unit: habit.unit,
+    });
+
+    await ctx.reply(`Logged: ${amount}${habit.unit ? " " + habit.unit : ""} for "${habit.name}".`);
+  } catch (err: any) {
+    console.error("HabitLog.create failed:", err);
+    await ctx.reply("I couldn't save that log due to a server error. Try again in a moment.");
+  }
+
+  return;
+}
 
   // -------------------------
   // HABIT CUSTOM SNOOZE FLOW
