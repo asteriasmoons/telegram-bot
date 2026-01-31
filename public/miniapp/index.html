@@ -2107,14 +2107,29 @@ function badgeForStatus(status) {
     : { text: "ACTIVE", className: "badge-habit-active" };
 }
 
-function HabitCard({
-  habit,
-  onEdit,
-  onDelete,
-  onTogglePause,
-  onOpenLog,
-  onOpenLogs,
-}) {
+function safeNum(n, fallback = 0) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : fallback;
+}
+
+function isSessionsUnit(unit) {
+  return String(unit || "").toLowerCase() === "sessions";
+}
+
+function badgeForCadence(cadence) {
+  return String(cadence || "daily").toLowerCase() === "weekly"
+    ? { text: "WEEKLY", className: "badge-habit-weekly" }
+    : { text: "DAILY", className: "badge-habit-daily" };
+}
+
+function badgeForStatus(status) {
+  return String(status || "active").toLowerCase() === "paused"
+    ? { text: "PAUSED", className: "badge-habit-paused" }
+    : { text: "ACTIVE", className: "badge-habit-active" };
+}
+
+// Habit Card
+function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLogs }) {
   const name = String(habit?.name || "").trim() || "(unnamed habit)";
   const description = String(habit?.description || "").trim();
 
@@ -2126,6 +2141,7 @@ function HabitCard({
   const unit = String(habit?.unit || "sessions");
 
   const scheduleKind = String(habit?.reminderSchedule?.kind || "off");
+
   const scheduleSummary =
     scheduleKind === "off"
       ? "Reminders: Off"
@@ -2143,10 +2159,11 @@ function HabitCard({
                 : "")
             : `Reminders: ${scheduleKind}`;
 
+  const cadenceLabel = String(habit?.cadence || "daily");
   const targetLine =
     targetAmount !== null && !isSessionsUnit(unit)
-      ? `Target: ${targetCount} sessions per ${habit?.cadence || "daily"} -- ${targetAmount} ${unit} per session`
-      : `Target: ${targetCount} sessions per ${habit?.cadence || "daily"}`;
+      ? `Target: ${targetCount} sessions per ${cadenceLabel} -- ${targetAmount} ${unit} per session`
+      : `Target: ${targetCount} sessions per ${cadenceLabel}`;
 
   return (
     <div className="card">
@@ -2156,7 +2173,7 @@ function HabitCard({
           {description ? <div className="habit-sub">{description}</div> : null}
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="habit-badges">
           <span className={`card-badge ${cadenceBadge.className}`}>{cadenceBadge.text}</span>
           <span className={`card-badge ${statusBadge.className}`}>{statusBadge.text}</span>
         </div>
@@ -2178,11 +2195,7 @@ function HabitCard({
           Edit
         </button>
 
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => onTogglePause(habit)}
-        >
+        <button className="btn btn-secondary" type="button" onClick={() => onTogglePause(habit)}>
           {String(habit?.status) === "paused" ? "Resume" : "Pause"}
         </button>
 
@@ -2195,24 +2208,35 @@ function HabitCard({
 }
 
 // Habit Editor Modal
-function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
+function fmtDateTimeLocalValue(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  const yyyy = dt.getFullYear();
+  const mm = pad(dt.getMonth() + 1);
+  const dd = pad(dt.getDate());
+  const hh = pad(dt.getHours());
+  const mi = pad(dt.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+function parseDateTimeLocalValue(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
+function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
   const isEdit = !!initialHabit?._id;
 
-  // Required by API
-  const [chatId, setChatId] = useState(
-    isEdit ? String(initialHabit.chatId || "") : String(currentUser?.chatId || currentUser?.userId || "")
-  );
-
-  const [name, setName] = useState(isEdit ? initialHabit.name || "" : "");
-  const [description, setDescription] = useState(isEdit ? initialHabit.description || "" : "");
+  const [name, setName] = useState(isEdit ? (initialHabit.name || "") : "");
+  const [description, setDescription] = useState(isEdit ? (initialHabit.description || "") : "");
 
   const [status, setStatus] = useState(isEdit ? (initialHabit.status || "active") : "active");
   const [cadence, setCadence] = useState(isEdit ? (initialHabit.cadence || "daily") : "daily");
 
-  const [targetCount, setTargetCount] = useState(
-    isEdit ? String(initialHabit.targetCount ?? 1) : "1"
-  );
-
+  const [targetCount, setTargetCount] = useState(isEdit ? String(initialHabit.targetCount ?? 1) : "1");
   const [unit, setUnit] = useState(isEdit ? (initialHabit.unit || "sessions") : "sessions");
 
   const [targetAmount, setTargetAmount] = useState(
@@ -2221,17 +2245,22 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
       : ""
   );
 
+  // You can default to userTimezone if provided, otherwise fall back
   const [timezone, setTimezone] = useState(
-    isEdit ? (initialHabit.timezone || "America/Chicago") : (currentUser?.timezone || "America/Chicago")
+    isEdit
+      ? (initialHabit.timezone || userTimezone || "America/Chicago")
+      : (userTimezone || "America/Chicago")
   );
 
-  // reminderSchedule (matches HabitReminderSchedule)
+  // reminderSchedule
   const [reminderKind, setReminderKind] = useState(
     isEdit ? (initialHabit.reminderSchedule?.kind || "off") : "off"
   );
 
   const [timesOfDay, setTimesOfDay] = useState(
-    isEdit ? (Array.isArray(initialHabit.reminderSchedule?.timesOfDay) ? initialHabit.reminderSchedule.timesOfDay : []) : []
+    isEdit
+      ? (Array.isArray(initialHabit.reminderSchedule?.timesOfDay) ? initialHabit.reminderSchedule.timesOfDay : [])
+      : []
   );
 
   const [everyHours, setEveryHours] = useState(
@@ -2251,7 +2280,9 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
   );
 
   const [daysOfWeek, setDaysOfWeek] = useState(
-    isEdit ? (Array.isArray(initialHabit.reminderSchedule?.daysOfWeek) ? initialHabit.reminderSchedule.daysOfWeek : []) : []
+    isEdit
+      ? (Array.isArray(initialHabit.reminderSchedule?.daysOfWeek) ? initialHabit.reminderSchedule.daysOfWeek : [])
+      : []
   );
 
   const [nextReminderAt, setNextReminderAt] = useState(
@@ -2264,6 +2295,7 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
   }, []);
 
   const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
   const toggleDay = (idx) => {
     setDaysOfWeek((prev) => {
       const s = new Set(Array.isArray(prev) ? prev : []);
@@ -2309,26 +2341,17 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
   };
 
   const save = async () => {
-    // Basic UI checks mirroring your API constraints
-    if (!String(chatId || "").trim() || !Number.isFinite(Number(chatId))) {
-      tg?.showAlert?.("chatId is required (numeric).");
-      return;
-    }
     if (!String(name || "").trim()) {
       tg?.showAlert?.("Habit name is required.");
       return;
     }
-    if (!String(timezone || "").trim()) {
-      tg?.showAlert?.("timezone is required.");
-      return;
-    }
+
     const tc = Number(targetCount);
     if (!Number.isFinite(tc) || tc < 1) {
       tg?.showAlert?.("targetCount must be >= 1.");
       return;
     }
 
-    // targetAmount optional, >= 0
     let ta = undefined;
     if (targetAmount !== "" && targetAmount !== null && targetAmount !== undefined) {
       const n = Number(targetAmount);
@@ -2341,7 +2364,6 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
 
     const reminderSchedule = buildReminderSchedule();
 
-    // For times: require at least 1 time (matches API)
     if (reminderSchedule.kind === "times") {
       const arr = Array.isArray(reminderSchedule.timesOfDay) ? reminderSchedule.timesOfDay : [];
       if (arr.length === 0) {
@@ -2351,7 +2373,6 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
     }
 
     const payload = {
-      chatId: Number(chatId),
       name: String(name).trim(),
       description: description ? String(description).trim() : undefined,
       status: status === "paused" ? "paused" : "active",
@@ -2359,13 +2380,13 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
       targetCount: Math.floor(tc),
       targetAmount: ta,
       unit,
-      timezone: String(timezone).trim(),
+      timezone: String(timezone || userTimezone || "America/Chicago").trim(),
       reminderSchedule,
       nextReminderAt: nextReminderAt ? parseDateTimeLocalValue(nextReminderAt)?.toISOString() : undefined,
     };
 
     try {
-      const path = isEdit ? `${HABITS_API_BASE}/habits/${initialHabit._id}` : `${HABITS_API_BASE}/habits`;
+      const path = isEdit ? `/api/habits/${initialHabit._id}` : `/api/habits`;
       const method = isEdit ? "PUT" : "POST";
 
       const res = await apiCall(path, {
@@ -2392,17 +2413,6 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
         </div>
 
         <div className="modal-body">
-          <div className="form-group">
-            <label className="form-label">Chat ID</label>
-            <input
-              className="form-input"
-              value={chatId}
-              onChange={(e) => setChatId(e.target.value)}
-              placeholder="Numeric chatId"
-            />
-            <div className="form-help">Required by your API for routing reminders to the right chat.</div>
-          </div>
-
           <div className="form-group">
             <label className="form-label">Habit Name</label>
             <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
@@ -2469,9 +2479,8 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
               min="0"
               value={targetAmount}
               onChange={(e) => setTargetAmount(e.target.value)}
-              placeholder={isSessionsUnit(unit) ? "Leave empty for sessions" : `Amount in ${unit}`}
+              placeholder={isSessionsUnit(unit) ? "Leave empty for sessions-only" : `Amount in ${unit}`}
             />
-            <div className="form-help">Matches `targetAmount` in Habit model. Leave blank if not needed.</div>
           </div>
 
           <div className="form-group">
@@ -2511,13 +2520,11 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
                 ))}
               </div>
 
-              <div style={{ marginTop: 10 }}>
+              <div className="times-add">
                 <button className="btn btn-secondary" type="button" onClick={addTime}>
                   Add Time
                 </button>
               </div>
-
-              <div className="form-help">Your API requires at least one time for kind=times.</div>
             </div>
           ) : null}
 
@@ -2554,7 +2561,6 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
                 <input type="time" className="form-input" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
                 <input type="time" className="form-input" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
               </div>
-              <div className="form-help">Matches `windowStart/windowEnd` in your schema. Your API validates HH:mm.</div>
             </div>
           ) : null}
 
@@ -2571,7 +2577,6 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
                 );
               })}
             </div>
-            <div className="form-help">Stored as `daysOfWeek` (0–6). Your API clamps it.</div>
           </div>
 
           <div className="form-group">
@@ -2582,7 +2587,6 @@ function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
               value={nextReminderAt}
               onChange={(e) => setNextReminderAt(e.target.value)}
             />
-            <div className="form-help">This maps to `nextReminderAt` in your Habit model and your API supports it.</div>
           </div>
         </div>
 
@@ -2929,11 +2933,9 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // list toggles
   const [includePaused, setIncludePaused] = useState(false);
   const [cadenceFilter, setCadenceFilter] = useState("all"); // all | daily | weekly
 
-  // modals
   const [showEditor, setShowEditor] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
 
@@ -2946,7 +2948,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const loadHabits = async () => {
     try {
       setLoading(true);
-      const url = `${HABITS_API_BASE}/habits${includePaused ? "?includePaused=1" : ""}`;
+      const url = `/api/habits${includePaused ? "?includePaused=1" : ""}`;
       const res = await apiCall(url);
       if (!res?.ok) throw new Error(res?.error || "Failed to load habits");
 
@@ -2981,7 +2983,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
 
   const delHabit = async (h) => {
     try {
-      const res = await apiCall(`${HABITS_API_BASE}/habits/${h._id}`, { method: "DELETE" });
+      const res = await apiCall(`/api/habits/${h._id}`, { method: "DELETE" });
       if (!res?.ok) throw new Error(res?.error || "Delete failed");
       tg?.showPopup?.({ message: "Habit deleted" });
       loadHabits();
@@ -2993,7 +2995,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const togglePause = async (h) => {
     try {
       const next = String(h.status) === "paused" ? "active" : "paused";
-      const res = await apiCall(`${HABITS_API_BASE}/habits/${h._id}`, {
+      const res = await apiCall(`/api/habits/${h._id}`, {
         method: "PUT",
         body: JSON.stringify({ status: next }),
       });
@@ -3018,9 +3020,18 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   return (
     <div>
       <div className="header">
-        <h1>Habits</h1>
+        <div>
+          <h1>Habits</h1>
+          {(() => {
+            const name = (userDisplayName || "").trim();
+            return name ? <div className="reminders-greeting">Hello {name}</div> : null;
+          })()}
+        </div>
 
         <div className="habits-header-actions">
+          <button className="btn btn-secondary" type="button" onClick={onBack}>
+            Back
+          </button>
           <button className="btn btn-primary" type="button" onClick={createHabit}>
             New
           </button>
@@ -3079,13 +3090,12 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
         ))
       )}
 
-      {/* Hidden hook for your global FAB mapping */}
       <button className="is-hidden" data-create-habit="1" onClick={createHabit} />
 
       {showEditor ? (
         <HabitEditorModal
           initialHabit={editingHabit}
-          currentUser={currentUser}
+          userTimezone={userTimezone}
           onClose={() => setShowEditor(false)}
           onSaved={loadHabits}
         />
@@ -6817,46 +6827,38 @@ return (
     </button>
 
     <div className="bottom-nav">
-      <button
-        className={`nav-item ${activeView === 'reminders' ? 'active' : ''}`}
-        onClick={() => setActiveView('reminders')}
-      >
-        <div className="nav-item-icon">
-  <img src="/icons/bell.svg" alt="" />
-</div>
-        <div className="nav-item-label">Reminders</div>
-      </button>
+  <button
+    className={`nav-item ${activeView === 'reminders' ? 'active' : ''}`}
+    onClick={() => goTo('reminders')}
+  >
+    <div className="nav-item-icon"><img src="/icons/bell.svg" alt="" /></div>
+    <div className="nav-item-label">Reminders</div>
+  </button>
 
-      <button
-        className={`nav-item ${activeView === 'calendar' ? 'active' : ''}`}
-        onClick={() => setActiveView('calendar')}
-      >
-        <div className="nav-item-icon">
-  <img src="/icons/calendar.svg" alt="" />
-</div>
-        <div className="nav-item-label">Calendar</div>
-      </button>
+  <button
+    className={`nav-item ${activeView === 'calendar' ? 'active' : ''}`}
+    onClick={() => goTo('calendar')}
+  >
+    <div className="nav-item-icon"><img src="/icons/calendar.svg" alt="" /></div>
+    <div className="nav-item-label">Calendar</div>
+  </button>
 
-      <button
-        className={`nav-item ${activeView === 'journal' ? 'active' : ''}`}
-        onClick={() => setActiveView('journal')}
-      >
-        <div className="nav-item-icon">
-  <img src="/icons/page.svg" alt="" />
+  <button
+    className={`nav-item ${activeView === 'journal' ? 'active' : ''}`}
+    onClick={() => goTo('journal')}
+  >
+    <div className="nav-item-icon"><img src="/icons/page.svg" alt="" /></div>
+    <div className="nav-item-label">Journal</div>
+  </button>
+
+  <button
+    className={`nav-item ${activeView === 'reading' ? 'active' : ''}`}
+    onClick={() => goTo('reading')}
+  >
+    <div className="nav-item-icon"><img src="/icons/book.svg" alt="" /></div>
+    <div className="nav-item-label">Reading</div>
+  </button>
 </div>
-        <div className="nav-item-label">Journal</div>
-      </button>
-      
-      <button
-  className={`nav-item ${activeView === 'reading' ? 'active' : ''}`}
-  onClick={() => setActiveView('reading')}
->
-  <div className="nav-item-icon">
-    <img src="/icons/book.svg" alt="" />
-  </div>
-  <div className="nav-item-label">Reading</div>
-</button>
-    </div>
   </div>
 );
     }
