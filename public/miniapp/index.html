@@ -1894,6 +1894,46 @@ body::after {
     border: 1px solid rgba(255, 255, 255, 0.10) !important;
   }
 }
+
+/* =========================
+   FIXES ONLY -- DO NOT STYLE
+   ========================= */
+
+/* 1) REMOVE boxed background behind Habits header */
+.header {
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep a subtle separator only */
+.header {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* 2) STOP badge overlap -- force proper stacking */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Right-side badge container */
+.badge-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* Make badges behave like pills, not floaty ghosts */
+.card-badge {
+  position: static !important;
+  line-height: 1;
+  white-space: nowrap;
+}
   </style>
 </head>
 
