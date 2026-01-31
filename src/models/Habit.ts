@@ -11,41 +11,35 @@ export type HabitUnit =
   | "ml"
   | "pages"
   | "count"
-  | "sessions"; // useful for habits where "just did it" is the measure
+  | "sessions";
 
 export type HabitCadence = "daily" | "weekly";
 
-/**
- * Habit reminder schedule is about nudging you to DO the habit,
- * not about logging the completion itself.
- *
- * We keep this similar to ReminderSchedule but add "hourly" and "every_x_minutes"
- * because you asked for it.
- */
 export type HabitReminderKind =
-  | "off"          // no reminders, habit still exists for logging/streaks
-  | "times"        // specific times of day: ["09:00","21:00"]
-  | "hourly"       // every N hours within a window
-  | "every_x_minutes"; // every N minutes within a window
+  | "off"
+  | "times"
+  | "hourly"
+  | "every_x_minutes";
 
 export type HabitReminderSchedule = {
   kind: HabitReminderKind;
 
-  // kind: "times"
-  timesOfDay?: string[]; // ["HH:mm", ...]
+  timesOfDay?: string[];
 
-  // kind: "hourly"
-  everyHours?: number; // e.g., 2 => every 2 hours
+  everyHours?: number;
 
-  // kind: "every_x_minutes"
-  everyMinutes?: number; // e.g., 45 => every 45 minutes
+  everyMinutes?: number;
 
-  // Optional time window for hourly/minutes
-  windowStart?: string; // "HH:mm"
-  windowEnd?: string;   // "HH:mm"
+  windowStart?: string;
+  windowEnd?: string;
 
-  // Optional days restriction (0-6 Sun-Sat)
-  daysOfWeek?: number[]; // for weekly rhythms if you ever want it
+  daysOfWeek?: number[];
+};
+
+export type HabitLock = {
+  lockedAt?: Date;
+  lockExpiresAt?: Date;
+  lockedBy?: string;
 };
 
 export type HabitDoc = {
@@ -59,28 +53,21 @@ export type HabitDoc = {
 
   status: HabitStatus;
 
-  // Measurement / goal
-  cadence: HabitCadence;        // daily or weekly target
-  targetCount: number;          // how many sessions per cadence (e.g., 2 per day)
-  targetAmount?: number;        // amount per session (or per day, depending on your UI)
+  cadence: HabitCadence;
+  targetCount: number;
+  targetAmount?: number;
   unit: HabitUnit;
 
-  // Timezone for schedule computation and streak boundaries
   timezone: string;
 
-  // Reminder scheduler fields (separate from Reminder scheduler)
   reminderSchedule: HabitReminderSchedule;
-  nextReminderAt?: Date; // next time to send a habit reminder (if reminders are enabled)
+  nextReminderAt?: Date;
 
-  // Execution bookkeeping
   createdAt: Date;
   updatedAt: Date;
   lastRemindedAt?: Date;
-  
-    lock?: {
-    lockedAt?: Date;
-    lockExpiresAt?: Date;
-    lockedBy?: string;
+
+  lock?: HabitLock;
 };
 
 const HabitReminderScheduleSchema = new Schema<HabitReminderSchedule>(
@@ -105,7 +92,7 @@ const HabitReminderScheduleSchema = new Schema<HabitReminderSchedule>(
   { _id: false }
 );
 
-const HabitLockSchema = new Schema(
+const HabitLockSchema = new Schema<HabitLock>(
   {
     lockedAt: { type: Date, required: false },
     lockExpiresAt: { type: Date, required: false, index: true },
@@ -148,12 +135,19 @@ const HabitSchema = new Schema<HabitDoc>(
 
     timezone: { type: String, required: true },
 
-    reminderSchedule: { type: HabitReminderScheduleSchema, required: true, default: () => ({ kind: "off" }) },
+    reminderSchedule: {
+      type: HabitReminderScheduleSchema,
+      required: true,
+      default: () => ({ kind: "off" }),
+    },
+
     nextReminderAt: { type: Date, required: false, index: true },
     lastRemindedAt: { type: Date, required: false },
+
+    // ✅ lock belongs HERE (inside the schema fields)
+    lock: { type: HabitLockSchema, required: false, default: undefined },
   },
   { timestamps: true }
-      lock: { type: HabitLockSchema, required: false, default: undefined },
 );
 
 // Polling index for habit reminders
