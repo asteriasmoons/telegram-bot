@@ -333,87 +333,109 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
     }
   });
 
-  bot.on("text", async (ctx) => {
-    const userId = ctx.from?.id;
-    if (!userId) return;
+bot.on("text", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
 
-    const reply = (ctx.message as any)?.reply_to_message;
-    if (!reply || !reply.from?.is_bot) return;
+  // Optional: keep this if you ONLY want to accept replies-to-bot,
+  // but we’ll loosen it below in a controlled way.
+  const reply = (ctx.message as any)?.reply_to_message;
+  const repliedText = String(reply?.text || "");
+  const isReplyToBot = !!reply?.from?.is_bot;
 
-    const repliedText = String(reply.text || "");
+  // -------------------------
+  // HABIT LOG FLOW
+  // -------------------------
+  const pendingLog = pendingHabitLog.get(userId);
+  if (pendingLog) {
+    // If Telegram didn’t attach a reply, still accept while pending.
+    // But if it IS a reply, it must be to the bot (prevents weird cross-chat issues).
+    if (reply && !isReplyToBot) return;
 
-    // --- HABIT LOG FLOW ---
-    const pendingLog = pendingHabitLog.get(userId);
-    if (pendingLog) {
-      if (!repliedText.includes("Enter the amount you did")) return;
-
-      if (Date.now() > pendingLog.expiresAt) {
-        pendingHabitLog.delete(userId);
-        await ctx.reply("Log timed out. Tap Log again if you still want to record a session.");
-        return;
-      }
-
-      const habit = await Habit.findOne({ _id: pendingLog.habitId, userId }).lean();
-      if (!habit) {
-        pendingHabitLog.delete(userId);
-        await ctx.reply("That habit no longer exists.");
-        return;
-      }
-
-      const amount = parseNumber((ctx.message as any)?.text);
-      if (!amount) {
-        await ctx.reply("I couldn’t read that number. Try again (like 10 or 1.5).");
-        return;
-      }
-
+    if (Date.now() > pendingLog.expiresAt) {
       pendingHabitLog.delete(userId);
+      await ctx.reply("Log timed out. Tap Log again if you still want to record a session.");
+      return;
+    }
 
+    // If it IS a reply and it's clearly not for the log prompt, ignore.
+    // (This prevents other force-reply prompts from interfering.)
+    if (isReplyToBot && repliedText && !repliedText.toLowerCase().includes("enter the amount")) {
+      // Not the habit amount prompt -- ignore so other flows can handle it
+      return;
+    }
+
+    const habit = await Habit.findOne({ _id: pendingLog.habitId, userId }).lean();
+    if (!habit) {
+      pendingHabitLog.delete(userId);
+      await ctx.reply("That habit no longer exists.");
+      return;
+    }
+
+    const amount = parseNumber(String((ctx.message as any)?.text || ""));
+    if (!amount) {
+      await ctx.reply("I couldn’t read that number. Try again (like 10 or 1.5).");
+      return;
+    }
+
+    pendingHabitLog.delete(userId);
+
+    try {
       await HabitLog.create({
         userId,
         habitId: habit._id,
         startedAt: new Date(),
         amount,
-        unit: habit.unit, // keep locked to habit unit
+        unit: habit.unit, // locked to habit unit
       });
 
       await ctx.reply(`Logged: ${amount}${habit.unit ? " " + habit.unit : ""} for "${habit.name}".`);
-      return;
+    } catch (err: any) {
+      console.error("HabitLog.create failed:", err);
+      await ctx.reply("I couldn't save that log due to a server error. Try again in a moment.");
     }
+    return;
+  }
 
-    // --- HABIT CUSTOM SNOOZE FLOW ---
-    const pendingSz = pendingHabitCustomSnooze.get(userId);
-    if (pendingSz) {
-      if (!repliedText.includes("Type a snooze duration")) return;
+  // -------------------------
+  // HABIT CUSTOM SNOOZE FLOW
+  // -------------------------
+  const pendingSz = pendingHabitCustomSnooze.get(userId);
+  if (pendingSz) {
+    if (reply && !isReplyToBot) return;
 
-      if (Date.now() > pendingSz.expiresAt) {
-        pendingHabitCustomSnooze.delete(userId);
-        await ctx.reply("Custom snooze timed out. Tap Custom again if you still want to snooze.");
-        return;
-      }
-
-      const minutes = parseDurationToMinutes((ctx.message as any)?.text);
-      if (!minutes) {
-        await ctx.reply("I couldn’t read that. Try something like 10m, 2h, or 1d.");
-        return;
-      }
-
+    if (Date.now() > pendingSz.expiresAt) {
       pendingHabitCustomSnooze.delete(userId);
-
-      const habit = await Habit.findOne({ _id: pendingSz.habitId, userId }).lean();
-      if (!habit) {
-        await ctx.reply("That habit no longer exists.");
-        return;
-      }
-
-      const newTime = new Date(Date.now() + minutes * 60 * 1000);
-
-      await Habit.updateOne({ _id: pendingSz.habitId, userId }, { $set: { nextReminderAt: newTime } });
-
-      const tz = String(habit.timezone || "America/Chicago");
-      const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
-      await ctx.reply(`Snoozed. Next habit reminder: ${nextStr}`);
+      await ctx.reply("Custom snooze timed out. Tap Custom again if you still want to snooze.");
       return;
     }
+
+    if (isReplyToBot && repliedText && !repliedText.toLowerCase().includes("type a snooze duration")) {
+      return;
+    }
+
+    const minutes = parseDurationToMinutes(String((ctx.message as any)?.text || ""));
+    if (!minutes) {
+      await ctx.reply("I couldn’t read that. Try something like 10m, 2h, or 1d.");
+      return;
+    }
+
+    pendingHabitCustomSnooze.delete(userId);
+
+    const habit = await Habit.findOne({ _id: pendingSz.habitId, userId }).lean();
+    if (!habit) {
+      await ctx.reply("That habit no longer exists.");
+      return;
+    }
+
+    const newTime = new Date(Date.now() + minutes * 60 * 1000);
+    await Habit.updateOne({ _id: pendingSz.habitId, userId }, { $set: { nextReminderAt: newTime } });
+
+    const tz = String(habit.timezone || "America/Chicago");
+    const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
+    await ctx.reply(`Snoozed. Next habit reminder: ${nextStr}`);
+    return;
+  }
   });
 }
 
