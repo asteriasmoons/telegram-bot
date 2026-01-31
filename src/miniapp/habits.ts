@@ -75,10 +75,6 @@ const {
   nextReminderAt,
 } = req.body || {};
 
-// DM default: chatId is the userId
-const chatId = userId;
-
-    if (!Number.isFinite(Number(chatId))) return bad(res, "chatId is required");
     if (typeof name !== "string" || !name.trim()) return bad(res, "name is required");
     if (typeof timezone !== "string" || !timezone.trim()) return bad(res, "timezone is required");
 
@@ -118,7 +114,7 @@ const chatId = userId;
 
     const doc = await Habit.create({
       userId,
-      chatId: Number(chatId),
+      chatId: userId,
 
       name: name.trim(),
       description: typeof description === "string" ? description.trim() : undefined,
