@@ -2943,7 +2943,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const loadHabits = async () => {
     try {
       setLoading(true);
-      const url = `/api/habits${includePaused ? "?includePaused=1" : ""}`;
+      const url = `habits${includePaused ? "?includePaused=1" : ""}`;
       const res = await apiCall(url);
       if (!res?.ok) throw new Error(res?.error || "Failed to load habits");
 
