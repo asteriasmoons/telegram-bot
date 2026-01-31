@@ -2132,34 +2132,13 @@ function isSessionsUnit(unit) {
   return String(unit || "").toLowerCase() === "sessions";
 }
 
-function badgeForCadence(cadence) {
+function habitBadgeForCadence(cadence) {
   return String(cadence || "daily").toLowerCase() === "weekly"
     ? { text: "WEEKLY", className: "badge-habit-weekly" }
     : { text: "DAILY", className: "badge-habit-daily" };
 }
 
-function badgeForStatus(status) {
-  return String(status || "active").toLowerCase() === "paused"
-    ? { text: "PAUSED", className: "badge-habit-paused" }
-    : { text: "ACTIVE", className: "badge-habit-active" };
-}
-
-function safeNum(n, fallback = 0) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : fallback;
-}
-
-function isSessionsUnit(unit) {
-  return String(unit || "").toLowerCase() === "sessions";
-}
-
-function badgeForCadence(cadence) {
-  return String(cadence || "daily").toLowerCase() === "weekly"
-    ? { text: "WEEKLY", className: "badge-habit-weekly" }
-    : { text: "DAILY", className: "badge-habit-daily" };
-}
-
-function badgeForStatus(status) {
+function habitBadgeForStatus(status) {
   return String(status || "active").toLowerCase() === "paused"
     ? { text: "PAUSED", className: "badge-habit-paused" }
     : { text: "ACTIVE", className: "badge-habit-active" };
@@ -2170,8 +2149,8 @@ function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLo
   const name = String(habit?.name || "").trim() || "(unnamed habit)";
   const description = String(habit?.description || "").trim();
 
-  const cadenceBadge = badgeForCadence(habit?.cadence);
-  const statusBadge = badgeForStatus(habit?.status);
+  const cadenceBadge = habitBadgeForCadence(habit?.cadence);
+  const statusBadge = habitBadgeForStatus(habit?.status);
 
   const targetCount = safeNum(habit?.targetCount, 1);
   const targetAmount = habit?.targetAmount === undefined ? null : safeNum(habit?.targetAmount, 0);
@@ -2245,25 +2224,6 @@ function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLo
 }
 
 // Habit Editor Modal
-function fmtDateTimeLocalValue(d) {
-  const dt = d instanceof Date ? d : new Date(d);
-  if (isNaN(dt.getTime())) return "";
-  const pad = (n) => String(n).padStart(2, "0");
-  const yyyy = dt.getFullYear();
-  const mm = pad(dt.getMonth() + 1);
-  const dd = pad(dt.getDate());
-  const hh = pad(dt.getHours());
-  const mi = pad(dt.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
-
-function parseDateTimeLocalValue(v) {
-  if (!v) return null;
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return null;
-  return d;
-}
-
 function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
   const isEdit = !!initialHabit?._id;
 
