@@ -1943,6 +1943,43 @@ if (!isTelegram) {
 tg.ready();
 tg.expand();
 
+// ===== CRASH OVERLAY (PASTE AT TOP OF SCRIPT) =====
+(function () {
+  function show(msg) {
+    try {
+      let el = document.getElementById("__crash_overlay__");
+      if (!el) {
+        el = document.createElement("pre");
+        el.id = "__crash_overlay__";
+        el.style.position = "fixed";
+        el.style.left = "0";
+        el.style.right = "0";
+        el.style.top = "0";
+        el.style.bottom = "0";
+        el.style.padding = "12px";
+        el.style.margin = "0";
+        el.style.background = "#0b0b0f";
+        el.style.color = "#ffb3c7";
+        el.style.fontSize = "12px";
+        el.style.whiteSpace = "pre-wrap";
+        el.style.zIndex = "999999";
+        el.style.overflow = "auto";
+        document.body.appendChild(el);
+      }
+      el.textContent = String(msg);
+    } catch {}
+  }
+
+  window.addEventListener("error", (e) => {
+    show("JS ERROR:\n" + (e?.error?.stack || e?.message || String(e)));
+  });
+
+  window.addEventListener("unhandledrejection", (e) => {
+    const r = e?.reason;
+    show("UNHANDLED PROMISE REJECTION:\n" + (r?.stack || r?.message || String(r)));
+  });
+})();
+
 // --- Telegram real viewport height fix (standalone fullscreen vs chat sheet) ---
 function syncTelegramViewportHeight() {
   try {
