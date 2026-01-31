@@ -2381,7 +2381,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
     };
 
     try {
-      const path = isEdit ? `/api/habits/${initialHabit._id}` : `/api/habits`;
+      const path = isEdit ? `/habits/${initialHabit._id}` : `/habits`;
       const method = isEdit ? "PUT" : "POST";
 
       const res = await apiCall(path, {
