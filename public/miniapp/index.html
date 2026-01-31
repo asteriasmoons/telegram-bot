@@ -2124,6 +2124,46 @@ function habitBadgeForStatus(status) {
 }
 
 
+function debugHabitsApi(endpoint, options) {
+  // what Habits THINKS it's calling
+  const endpointType = typeof endpoint;
+  const endpointValue =
+    endpointType === "string" ? endpoint :
+    (() => { try { return JSON.stringify(endpoint); } catch { return String(endpoint); } })();
+
+  // what your helper WILL fetch
+  // (this matches your helper exactly)
+  const finalUrl = `${API_BASE}${endpoint}`;
+
+  console.log("[HABITS apiCall debug]", {
+    endpointType,
+    endpointRaw: endpoint,
+    endpointValue,
+    finalUrl,
+    method: options?.method || "GET",
+  });
+
+  return apiCall(endpoint, options).catch((err) => {
+    console.log("[HABITS apiCall error]", {
+      message: err?.message,
+      endpointType,
+      endpointRaw: endpoint,
+      finalUrl,
+    });
+
+    // show the REAL info in Telegram so you don't need Safari inspector
+    tg?.showAlert?.(
+      "Habits API failed.\n\n" +
+      "endpointType: " + endpointType + "\n" +
+      "endpoint: " + endpointValue + "\n\n" +
+      "finalUrl:\n" + finalUrl + "\n\n" +
+      "error:\n" + (err?.message || String(err))
+    );
+
+    throw err;
+  });
+}
+
 // =========================
 // HABITS UI (FIXED for iOS WebView strict input formats)
 // Assumes you already have: apiCall, tg, safeNum, isSessionsUnit,
