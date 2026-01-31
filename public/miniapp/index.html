@@ -2264,6 +2264,7 @@ function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLo
   );
 }
 
+
 // Habit Editor Modal
 function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
   const isEdit = !!initialHabit?._id;
@@ -2322,7 +2323,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
   );
 
   const [nextReminderAt, setNextReminderAt] = useState(
-    isEdit && initialHabit.nextReminderAt ? safeDateTimeLocalValue(initialHabit.nextReminderAt) : ""
+    isEdit && initialHabit.nextReminderAt ? fmtDateTimeLocalValue(initialHabit.nextReminderAt) : ""
   );
 
   useEffect(() => {
@@ -2349,9 +2350,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
     const base = { kind: reminderKind };
 
     if (reminderKind === "times") {
-      const cleaned = (timesOfDay || [])
-        .map((t) => normTimeHHmm(String(t || "")))
-        .filter(Boolean);
+      const cleaned = (timesOfDay || []).map((t) => String(t || "").trim()).filter(Boolean);
       return { ...base, timesOfDay: cleaned, daysOfWeek: daysOfWeek || [] };
     }
 
@@ -2359,8 +2358,8 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       return {
         ...base,
         everyHours: Math.max(1, Math.floor(Number(everyHours) || 1)),
-        windowStart: windowStart ? normTimeHHmm(String(windowStart)) || undefined : undefined,
-        windowEnd: windowEnd ? normTimeHHmm(String(windowEnd)) || undefined : undefined,
+        windowStart: windowStart ? String(windowStart).trim() : undefined,
+        windowEnd: windowEnd ? String(windowEnd).trim() : undefined,
         daysOfWeek: daysOfWeek || [],
       };
     }
@@ -2369,8 +2368,8 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       return {
         ...base,
         everyMinutes: Math.max(1, Math.floor(Number(everyMinutes) || 1)),
-        windowStart: windowStart ? normTimeHHmm(String(windowStart)) || undefined : undefined,
-        windowEnd: windowEnd ? normTimeHHmm(String(windowEnd)) || undefined : undefined,
+        windowStart: windowStart ? String(windowStart).trim() : undefined,
+        windowEnd: windowEnd ? String(windowEnd).trim() : undefined,
         daysOfWeek: daysOfWeek || [],
       };
     }
@@ -2410,13 +2409,6 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       }
     }
 
-    // nextReminderAt: only send if it parses cleanly
-    let nextIso = undefined;
-    if (nextReminderAt) {
-      const parsed = parseDateTimeLocalValue(nextReminderAt);
-      if (parsed) nextIso = parsed.toISOString();
-    }
-
     const payload = {
       name: String(name).trim(),
       description: description ? String(description).trim() : undefined,
@@ -2427,30 +2419,29 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       unit,
       timezone: String(timezone || userTimezone || "America/Chicago").trim(),
       reminderSchedule,
-      nextReminderAt: nextIso,
+      nextReminderAt: nextReminderAt ? parseDateTimeLocalValue(nextReminderAt)?.toISOString() : undefined,
     };
 
     try {
-      const path = isEdit ? `/habits/${initialHabit._id}` : `/habits`;
-      const method = isEdit ? "PUT" : "POST";
-
-      const res = await apiCall(path, {
-        method,
-        body: JSON.stringify(payload),
-      });
-
-      if (!res?.ok) throw new Error(res?.error || "Save failed");
+      if (isEdit) {
+        await apiCall(`/habits/${initialHabit._id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await apiCall(`/habits`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
 
       tg?.showPopup?.({ message: isEdit ? "Habit updated" : "Habit created" });
       onSaved?.();
       onClose?.();
     } catch (e) {
-      tg?.showAlert?.(`Failed to save habit: ${e.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to save habit: ${e?.message || String(e)}`);
     }
   };
-
-  // IMPORTANT: iOS strictness: value must be valid string OR omit value
-  const nextReminderAtValue = nextReminderAt ? nextReminderAt : undefined;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -2553,22 +2544,19 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
               <label className="form-label">Times of Day</label>
 
               <div className="times-list">
-                {(timesOfDay || []).map((t, i) => {
-                  const safeT = normTimeHHmm(String(t || ""));
-                  return (
-                    <div className="times-item" key={i}>
-                      <input
-                        type="time"
-                        className="form-input"
-                        value={safeT ? safeT : undefined}
-                        onChange={(e) => updateTime(i, e.target.value)}
-                      />
-                      <button className="btn btn-danger" type="button" onClick={() => removeTime(i)}>
-                        Remove
-                      </button>
-                    </div>
-                  );
-                })}
+                {(timesOfDay || []).map((t, i) => (
+                  <div className="times-item" key={i}>
+                    <input
+                      type="time"
+                      className="form-input"
+                      value={t}
+                      onChange={(e) => updateTime(i, e.target.value)}
+                    />
+                    <button className="btn btn-danger" type="button" onClick={() => removeTime(i)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
 
               <div className="times-add">
@@ -2609,18 +2597,8 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">Window (optional)</label>
               <div className="times-item">
-                <input
-                  type="time"
-                  className="form-input"
-                  value={normTimeHHmm(windowStart) ? normTimeHHmm(windowStart) : undefined}
-                  onChange={(e) => setWindowStart(e.target.value)}
-                />
-                <input
-                  type="time"
-                  className="form-input"
-                  value={normTimeHHmm(windowEnd) ? normTimeHHmm(windowEnd) : undefined}
-                  onChange={(e) => setWindowEnd(e.target.value)}
-                />
+                <input type="time" className="form-input" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
+                <input type="time" className="form-input" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
               </div>
             </div>
           ) : null}
@@ -2645,7 +2623,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={nextReminderAtValue}
+              value={nextReminderAt}
               onChange={(e) => setNextReminderAt(e.target.value)}
             />
           </div>
@@ -2664,10 +2642,11 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
   );
 }
 
+
 // Habit Log Modal
 function HabitLogModal({ habit, onClose, onCreated }) {
   const unit = String(habit?.unit || "sessions");
-  const [startedAt, setStartedAt] = useState(safeDateTimeLocalValue(new Date()));
+  const [startedAt, setStartedAt] = useState(fmtDateTimeLocalValue(new Date()));
   const [endedAt, setEndedAt] = useState("");
   const [amount, setAmount] = useState(isSessionsUnit(unit) ? "" : "");
 
@@ -2700,7 +2679,7 @@ function HabitLogModal({ habit, onClose, onCreated }) {
     }
 
     try {
-      const res = await apiCall(`/habits/${habit._id}/logs`, {
+      await apiCall(`/habits/${habit._id}/logs`, {
         method: "POST",
         body: JSON.stringify({
           startedAt: s.toISOString(),
@@ -2709,18 +2688,13 @@ function HabitLogModal({ habit, onClose, onCreated }) {
         }),
       });
 
-      if (!res?.ok) throw new Error(res?.error || "Log create failed");
-
       tg?.showPopup?.({ message: "Session logged" });
       onCreated?.();
       onClose?.();
     } catch (e2) {
-      tg?.showAlert?.(`Failed to log session: ${e2.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to log session: ${e2?.message || String(e2)}`);
     }
   };
-
-  const startedAtValue = startedAt ? startedAt : undefined;
-  const endedAtValue = endedAt ? endedAt : undefined;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -2736,7 +2710,7 @@ function HabitLogModal({ habit, onClose, onCreated }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={startedAtValue}
+              value={startedAt}
               onChange={(e) => setStartedAt(e.target.value)}
             />
           </div>
@@ -2746,7 +2720,7 @@ function HabitLogModal({ habit, onClose, onCreated }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={endedAtValue}
+              value={endedAt}
               onChange={(e) => setEndedAt(e.target.value)}
             />
           </div>
@@ -2761,7 +2735,6 @@ function HabitLogModal({ habit, onClose, onCreated }) {
               onChange={(e) => setAmount(e.target.value)}
               placeholder={isSessionsUnit(unit) ? "Leave empty for sessions-only" : `Amount in ${unit}`}
             />
-            <div className="form-help">This maps to HabitLog.amount. Unit is locked to the habit’s unit by your API.</div>
           </div>
         </div>
 
@@ -2774,6 +2747,7 @@ function HabitLogModal({ habit, onClose, onCreated }) {
   );
 }
 
+
 // Habits Logs Modal
 function HabitLogsModal({ habit, onClose }) {
   const [logs, setLogs] = useState([]);
@@ -2785,11 +2759,10 @@ function HabitLogsModal({ habit, onClose }) {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await apiCall(`/habits/${habit._id}/logs?limit=50&skip=0`);
-      if (!res?.ok) throw new Error(res?.error || "Failed to load logs");
-      setLogs(Array.isArray(res.logs) ? res.logs : []);
+      const data = await apiCall(`/habits/${habit._id}/logs?limit=50&skip=0`);
+      setLogs(Array.isArray(data?.logs) ? data.logs : []);
     } catch (e) {
-      tg?.showAlert?.(`Failed to load logs: ${e.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to load logs: ${e?.message || String(e)}`);
       setLogs([]);
     } finally {
       setLoading(false);
@@ -2804,12 +2777,11 @@ function HabitLogsModal({ habit, onClose }) {
 
   const del = async (log) => {
     try {
-      const res = await apiCall(`/habits/${habit._id}/logs/${log._id}`, { method: "DELETE" });
-      if (!res?.ok) throw new Error(res?.error || "Delete failed");
+      await apiCall(`/habits/${habit._id}/logs/${log._id}`, { method: "DELETE" });
       tg?.showPopup?.({ message: "Log deleted" });
       load();
     } catch (e) {
-      tg?.showAlert?.(`Failed to delete log: ${e.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to delete log: ${e?.message || String(e)}`);
     }
   };
 
@@ -2887,12 +2859,13 @@ function HabitLogsModal({ habit, onClose }) {
   );
 }
 
+
 // Habits Log Edit Modal
 function HabitLogEditModal({ habit, log, onClose, onSaved }) {
   const unit = String(habit?.unit || "sessions");
 
-  const [startedAt, setStartedAt] = useState(log?.startedAt ? safeDateTimeLocalValue(log.startedAt) : safeDateTimeLocalValue(new Date()));
-  const [endedAt, setEndedAt] = useState(log?.endedAt ? safeDateTimeLocalValue(log.endedAt) : "");
+  const [startedAt, setStartedAt] = useState(log?.startedAt ? fmtDateTimeLocalValue(log.startedAt) : fmtDateTimeLocalValue(new Date()));
+  const [endedAt, setEndedAt] = useState(log?.endedAt ? fmtDateTimeLocalValue(log.endedAt) : "");
   const [amount, setAmount] = useState(log?.amount === undefined || log?.amount === null ? "" : String(log.amount));
 
   useEffect(() => {
@@ -2923,7 +2896,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
     }
 
     try {
-      const res = await apiCall(`/habits/${habit._id}/logs/${log._id}`, {
+      await apiCall(`/habits/${habit._id}/logs/${log._id}`, {
         method: "PUT",
         body: JSON.stringify({
           startedAt: s.toISOString(),
@@ -2932,17 +2905,13 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
         }),
       });
 
-      if (!res?.ok) throw new Error(res?.error || "Update failed");
       tg?.showPopup?.({ message: "Log updated" });
       onSaved?.();
       onClose?.();
     } catch (e2) {
-      tg?.showAlert?.(`Failed to update log: ${e2.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to update log: ${e2?.message || String(e2)}`);
     }
   };
-
-  const startedAtValue = startedAt ? startedAt : undefined;
-  const endedAtValue = endedAt ? endedAt : undefined;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -2958,7 +2927,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={startedAtValue}
+              value={startedAt}
               onChange={(e) => setStartedAt(e.target.value)}
             />
           </div>
@@ -2968,7 +2937,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={endedAtValue}
+              value={endedAt}
               onChange={(e) => setEndedAt(e.target.value)}
             />
           </div>
@@ -2995,6 +2964,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
   );
 }
 
+
 // Habits View
 function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const [habits, setHabits] = useState([]);
@@ -3015,18 +2985,24 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const loadHabits = async () => {
     try {
       setLoading(true);
-      // IMPORTANT: keep leading slash so your apiCall helper can resolve correctly
-      const url = `/habits${includePaused ? "?includePaused=1" : ""}`;
-      const res = await apiCall(url);
-      if (!res?.ok) throw new Error(res?.error || "Failed to load habits");
 
-      let list = Array.isArray(res.habits) ? res.habits : [];
+      // IMPORTANT: keep the leading slash
+      const url = `/habits${includePaused ? "?includePaused=1" : ""}`;
+
+      // apiCall returns data (same as your books/reminders code)
+      const data = await apiCall(url);
+
+      // Your backend returns: { ok: true, habits }
+      // But we don't rely on ok here; we just read habits safely.
+      let list = Array.isArray(data?.habits) ? data.habits : [];
+
       if (cadenceFilter !== "all") {
-        list = list.filter((h) => String(h.cadence || "daily") === cadenceFilter);
+        list = list.filter((h) => String(h?.cadence || "daily") === cadenceFilter);
       }
+
       setHabits(list);
     } catch (e) {
-      tg?.showAlert?.(`Failed to load habits: ${e.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to load habits: ${e?.message || String(e)}`);
       setHabits([]);
     } finally {
       setLoading(false);
@@ -3049,27 +3025,25 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
 
   const delHabit = async (h) => {
     try {
-      const res = await apiCall(`/habits/${h._id}`, { method: "DELETE" });
-      if (!res?.ok) throw new Error(res?.error || "Delete failed");
+      await apiCall(`/habits/${h._id}`, { method: "DELETE" });
       tg?.showPopup?.({ message: "Habit deleted" });
       loadHabits();
     } catch (e) {
-      tg?.showAlert?.(`Failed to delete habit: ${e.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to delete habit: ${e?.message || String(e)}`);
     }
   };
 
   const togglePause = async (h) => {
     try {
       const next = String(h.status) === "paused" ? "active" : "paused";
-      const res = await apiCall(`/habits/${h._id}`, {
+      await apiCall(`/habits/${h._id}`, {
         method: "PUT",
         body: JSON.stringify({ status: next }),
       });
-      if (!res?.ok) throw new Error(res?.error || "Update failed");
       tg?.showPopup?.({ message: next === "paused" ? "Paused" : "Resumed" });
       loadHabits();
     } catch (e) {
-      tg?.showAlert?.(`Failed to update habit: ${e.message || "Unknown error"}`);
+      tg?.showAlert?.(`Failed to update habit: ${e?.message || String(e)}`);
     }
   };
 
