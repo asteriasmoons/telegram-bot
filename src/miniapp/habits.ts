@@ -39,7 +39,7 @@ function bad(res: any, message: string, status = 400) {
  * GET /api/habits
  * List habits (optionally include paused with ?includePaused=1)
  */
-router.get("/habits", async (req, res) => {
+router.get("/", async (req, res) => {
   console.log("=== HABITS GET REQUEST START ===");
   console.log("req.userId:", req.userId);
   console.log("req.query:", req.query);
@@ -81,7 +81,7 @@ router.get("/habits", async (req, res) => {
  * POST /api/habits
  * Create a habit
  */
-router.post("/habits", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const userId = Number(req.userId);
 
@@ -165,7 +165,7 @@ const {
  * GET /api/habits/:id
  * Fetch a single habit
  */
-router.get("/habits/:id", async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const userId = Number(req.userId);
     const id = String(req.params.id);
@@ -185,7 +185,7 @@ router.get("/habits/:id", async (req, res) => {
  * PUT /api/habits/:id
  * Edit habit (including reminderSchedule + nextReminderAt)
  */
-router.put("/habits/:id", async (req, res) => {
+router.put("/:id", async (req, res) => {
   try {
     const userId = Number(req.userId);
     const id = String(req.params.id);
@@ -280,7 +280,7 @@ router.put("/habits/:id", async (req, res) => {
  * DELETE /api/habits/:id
  * HARD delete: habit + ALL logs (your requirement)
  */
-router.delete("/habits/:id", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const userId = Number(req.userId);
     const id = String(req.params.id);
@@ -305,7 +305,7 @@ router.delete("/habits/:id", async (req, res) => {
  * - ?from=ISO&to=ISO
  * - ?limit=50&skip=0
  */
-router.get("/habits/:id/logs", async (req, res) => {
+router.get("/:id/logs", async (req, res) => {
   try {
     const userId = Number(req.userId);
     const id = String(req.params.id);
@@ -345,7 +345,7 @@ router.get("/habits/:id/logs", async (req, res) => {
  * Optional: endedAt, amount
  * unit comes from habit by default unless explicitly set (I keep it strict: prefer habit’s unit)
  */
-router.post("/habits/:id/logs", async (req, res) => {
+router.post("/:id/logs", async (req, res) => {
   try {
     const userId = Number(req.userId);
     const id = String(req.params.id);
@@ -395,7 +395,7 @@ router.post("/habits/:id/logs", async (req, res) => {
  * PUT /api/habits/:id/logs/:logId
  * Edit a log session (start/end/amount)
  */
-router.put("/habits/:id/logs/:logId", async (req, res) => {
+router.put("/:id/logs/:logId", async (req, res) => {
   try {
     const userId = Number(req.userId);
     const habitId = String(req.params.id);
@@ -460,7 +460,7 @@ router.put("/habits/:id/logs/:logId", async (req, res) => {
  * DELETE /api/habits/:id/logs/:logId
  * Delete a single log session
  */
-router.delete("/habits/:id/logs/:logId", async (req, res) => {
+router.delete("/:id/logs/:logId", async (req, res) => {
   try {
     const userId = Number(req.userId);
     const habitId = String(req.params.id);
