@@ -1,5 +1,6 @@
 // src/habitScheduler.ts
-import { Telegraf, Markup } from "telegraf";
+import type { Telegraf } from "telegraf";
+import { Markup } from "telegraf";
 import mongoose from "mongoose";
 import { DateTime } from "luxon";
 
@@ -108,7 +109,7 @@ function computeNextForHabitLuxon(h: any): Date | null {
     const startToday = nowZ.set({ hour: wStart.hour, minute: wStart.minute, second: 0, millisecond: 0 });
     const endToday = nowZ.set({ hour: wEnd.hour, minute: wEnd.minute, second: 0, millisecond: 0 });
 
-    // No overnight windows in this implementation
+    // No overnight windows
     if (endToday <= startToday) return null;
 
     return { startToday, endToday };
@@ -173,10 +174,7 @@ function computeNextForHabitLuxon(h: any): Date | null {
 }
 
 /**
- * Habit reminder buttons:
- * - Log => prompts for amount (and logs a session)
- * - Snooze 15m
- * - Custom snooze
+ * Habit reminder buttons
  */
 function habitActionKeyboard(habitId: string) {
   return Markup.inlineKeyboard([
@@ -210,17 +208,9 @@ async function sendHabitReminder(bot: Telegraf<any>, h: any) {
   await bot.telegram.sendMessage(chatId, text, habitActionKeyboard(String(h._id)));
 }
 
-// In-memory pending custom snooze: userId -> { habitId, expiresAt, promptMessageId }
-const pendingHabitCustomSnooze = new Map<
-  number,
-  { habitId: string; expiresAt: number; promptMessageId?: number }
->();
-
-// In-memory pending habit log: userId -> { habitId, expiresAt, promptMessageId }
-const pendingHabitLog = new Map<
-  number,
-  { habitId: string; expiresAt: number; promptMessageId?: number }
->();
+// In-memory pending flows
+const pendingHabitCustomSnooze = new Map<number, { habitId: string; expiresAt: number; promptMessageId?: number }>();
+const pendingHabitLog = new Map<number, { habitId: string; expiresAt: number; promptMessageId?: number }>();
 
 function parseDurationToMinutes(input: string): number | null {
   const raw = String(input || "").trim().toLowerCase();
@@ -244,11 +234,17 @@ function parseNumber(input: string): number | null {
   return n;
 }
 
+// Ensure we only install handlers once
+let habitFlowsInstalled = false;
+
 /**
- * Install habit action + reply flows.
- * IMPORTANT: call this EARLY (immediately after bot creation) so other middleware can't swallow messages.
+ * Install the interactive habit flows (button clicks + capturing the typed reply).
+ * CALL THIS ONCE right after createBot(token), BEFORE any other "text" handlers.
  */
 export function installHabitFlows(bot: Telegraf<any>) {
+  if (habitFlowsInstalled) return;
+  habitFlowsInstalled = true;
+
   // 1) Button clicks
   bot.action(/^hb:/, async (ctx) => {
     const data = (ctx.callbackQuery as any)?.data as string;
@@ -263,8 +259,6 @@ export function installHabitFlows(bot: Telegraf<any>) {
     if (parts[1] === "log") {
       const habitId = parts[2];
       if (!habitId) return;
-
-      console.log("[habits] hb:log clicked", { userId, habitId });
 
       const habit = await Habit.findOne({ _id: habitId, userId }).lean();
       if (!habit) {
@@ -298,7 +292,7 @@ export function installHabitFlows(bot: Telegraf<any>) {
       }
 
       const sent = await ctx.reply(
-        "Type a snooze duration like:\n- 10m\n- 2h\n- 1d\n(You can also just type a number for minutes.)",
+        "Type a snooze duration like:\n- 10m\n- 2h\n- 1d\n(Or just a number for minutes.)",
         Markup.forceReply()
       );
 
@@ -315,7 +309,6 @@ export function installHabitFlows(bot: Telegraf<any>) {
     if (parts[1] === "sz") {
       const habitId = parts[2];
       const minutes = Number(parts[3]);
-
       if (!habitId || !Number.isFinite(minutes) || minutes <= 0) return;
 
       const habit = await Habit.findOne({ _id: habitId, userId }).lean();
@@ -334,10 +327,8 @@ export function installHabitFlows(bot: Telegraf<any>) {
     }
   });
 
-  // 2) Reply capture (THIS is what fixes your "nothing happens")
-  // Use bot.use so it can run BEFORE other handlers, but ONLY if you install it early.
+  // 2) Capture typed replies BEFORE other text handlers swallow them
   bot.use(async (ctx, next) => {
-    // Only care about text messages
     const msg: any = (ctx as any).message;
     const text = msg?.text;
     if (!text) return next();
@@ -352,15 +343,13 @@ export function installHabitFlows(bot: Telegraf<any>) {
     // ---- HABIT LOG FLOW ----
     const pendingLog = pendingHabitLog.get(userId);
     if (pendingLog) {
-      console.log("[habits] pendingLog seen", { userId, replyToId, expected: pendingLog.promptMessageId });
-
       if (Date.now() > pendingLog.expiresAt) {
         pendingHabitLog.delete(userId);
         await ctx.reply("Log timed out. Tap Log again if you still want to record a session.");
         return;
       }
 
-      // If Telegram attached a reply, require it to be to OUR prompt
+      // If Telegram attached reply info, enforce it matches OUR prompt
       if (reply) {
         if (!isReplyToBot) return;
         if (pendingLog.promptMessageId && replyToId !== pendingLog.promptMessageId) return;
@@ -387,7 +376,7 @@ export function installHabitFlows(bot: Telegraf<any>) {
           habitId: habit._id,
           startedAt: new Date(),
           amount,
-          unit: habit.unit, // locked to habit unit
+          unit: habit.unit,
         });
 
         await ctx.reply(`Logged: ${amount}${habit.unit ? " " + habit.unit : ""} for "${habit.name}".`);
@@ -396,14 +385,12 @@ export function installHabitFlows(bot: Telegraf<any>) {
         await ctx.reply("I couldn't save that log due to a server error. Try again in a moment.");
       }
 
-      return; // DO NOT next() -- we consumed the message
+      return; // consumed
     }
 
     // ---- CUSTOM SNOOZE FLOW ----
     const pendingSz = pendingHabitCustomSnooze.get(userId);
     if (pendingSz) {
-      console.log("[habits] pendingSz seen", { userId, replyToId, expected: pendingSz.promptMessageId });
-
       if (Date.now() > pendingSz.expiresAt) {
         pendingHabitCustomSnooze.delete(userId);
         await ctx.reply("Custom snooze timed out. Tap Custom again if you still want to snooze.");
@@ -438,15 +425,10 @@ export function installHabitFlows(bot: Telegraf<any>) {
       return;
     }
 
-    // Not a habit reply -- let the rest of the bot handle it
     return next();
   });
 }
 
-// Install ONLY the Telegraf handlers (actions + text replies).
-// Call this once when the bot is created (bot.ts).
-export function installHabitFlows(bot: Telegraf<any>) {
-}
 export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) {
   const pollEveryMs = opts.pollEveryMs ?? opts.pollIntervalMs ?? 10_000;
 
@@ -485,22 +467,12 @@ export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions =
           if (next) {
             await Habit.updateOne(
               { _id: h._id },
-              {
-                $set: {
-                  nextReminderAt: next,
-                  lastRemindedAt: now(),
-                },
-              }
+              { $set: { nextReminderAt: next, lastRemindedAt: now() } }
             );
           } else {
             await Habit.updateOne(
               { _id: h._id },
-              {
-                $set: {
-                  nextReminderAt: undefined,
-                  lastRemindedAt: now(),
-                },
-              }
+              { $set: { nextReminderAt: undefined, lastRemindedAt: now() } }
             );
           }
         } catch (err) {
