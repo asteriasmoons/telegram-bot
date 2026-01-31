@@ -2142,6 +2142,49 @@ function habitBadgeForStatus(status) {
     : { text: "ACTIVE", className: "badge-habit-active" };
 }
 
+
+// =========================
+// HABITS UI (FIXED for iOS WebView strict input formats)
+// Assumes you already have: apiCall, tg, safeNum, isSessionsUnit,
+// habitBadgeForCadence, habitBadgeForStatus,
+// fmtDateTimeLocalValue, parseDateTimeLocalValue
+// =========================
+
+// --- helpers (local) ---
+function normTimeHHmm(v) {
+  // iOS is strict: must be "HH:mm" or omit value entirely.
+  if (typeof v !== "string") return "";
+  const t = v.trim();
+  if (!t) return "";
+  // Accept "H:mm" and pad it
+  const m1 = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (m1) {
+    const hh = String(m1[1]).padStart(2, "0");
+    const mm = String(m1[2]).padStart(2, "0");
+    const hhNum = Number(hh), mmNum = Number(mm);
+    if (hhNum >= 0 && hhNum <= 23 && mmNum >= 0 && mmNum <= 59) return `${hh}:${mm}`;
+    return "";
+  }
+  // Accept "HH:mm" only
+  if (/^\d{2}:\d{2}$/.test(t)) {
+    const [hh, mm] = t.split(":").map(Number);
+    if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) return t;
+  }
+  return "";
+}
+
+function safeDateTimeLocalValue(v) {
+  // For <input type="datetime-local"> iOS is strict:
+  // must be "YYYY-MM-DDTHH:mm" OR omit value
+  const s = fmtDateTimeLocalValue(v);
+  // if fmt returns "" or something unexpected, treat as empty
+  if (typeof s !== "string") return "";
+  if (!s) return "";
+  // quick validation: "YYYY-MM-DDTHH:mm"
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) return "";
+  return s;
+}
+
 // Habit Card
 function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLogs }) {
   const name = String(habit?.name || "").trim() || "(unnamed habit)";
@@ -2240,14 +2283,12 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       : ""
   );
 
-  // You can default to userTimezone if provided, otherwise fall back
   const [timezone, setTimezone] = useState(
     isEdit
       ? (initialHabit.timezone || userTimezone || "America/Chicago")
       : (userTimezone || "America/Chicago")
   );
 
-  // reminderSchedule
   const [reminderKind, setReminderKind] = useState(
     isEdit ? (initialHabit.reminderSchedule?.kind || "off") : "off"
   );
@@ -2281,7 +2322,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
   );
 
   const [nextReminderAt, setNextReminderAt] = useState(
-    isEdit && initialHabit.nextReminderAt ? fmtDateTimeLocalValue(initialHabit.nextReminderAt) : ""
+    isEdit && initialHabit.nextReminderAt ? safeDateTimeLocalValue(initialHabit.nextReminderAt) : ""
   );
 
   useEffect(() => {
@@ -2308,7 +2349,9 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
     const base = { kind: reminderKind };
 
     if (reminderKind === "times") {
-      const cleaned = (timesOfDay || []).map((t) => String(t || "").trim()).filter(Boolean);
+      const cleaned = (timesOfDay || [])
+        .map((t) => normTimeHHmm(String(t || "")))
+        .filter(Boolean);
       return { ...base, timesOfDay: cleaned, daysOfWeek: daysOfWeek || [] };
     }
 
@@ -2316,8 +2359,8 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       return {
         ...base,
         everyHours: Math.max(1, Math.floor(Number(everyHours) || 1)),
-        windowStart: windowStart ? String(windowStart).trim() : undefined,
-        windowEnd: windowEnd ? String(windowEnd).trim() : undefined,
+        windowStart: windowStart ? normTimeHHmm(String(windowStart)) || undefined : undefined,
+        windowEnd: windowEnd ? normTimeHHmm(String(windowEnd)) || undefined : undefined,
         daysOfWeek: daysOfWeek || [],
       };
     }
@@ -2326,8 +2369,8 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       return {
         ...base,
         everyMinutes: Math.max(1, Math.floor(Number(everyMinutes) || 1)),
-        windowStart: windowStart ? String(windowStart).trim() : undefined,
-        windowEnd: windowEnd ? String(windowEnd).trim() : undefined,
+        windowStart: windowStart ? normTimeHHmm(String(windowStart)) || undefined : undefined,
+        windowEnd: windowEnd ? normTimeHHmm(String(windowEnd)) || undefined : undefined,
         daysOfWeek: daysOfWeek || [],
       };
     }
@@ -2367,6 +2410,13 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       }
     }
 
+    // nextReminderAt: only send if it parses cleanly
+    let nextIso = undefined;
+    if (nextReminderAt) {
+      const parsed = parseDateTimeLocalValue(nextReminderAt);
+      if (parsed) nextIso = parsed.toISOString();
+    }
+
     const payload = {
       name: String(name).trim(),
       description: description ? String(description).trim() : undefined,
@@ -2377,7 +2427,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       unit,
       timezone: String(timezone || userTimezone || "America/Chicago").trim(),
       reminderSchedule,
-      nextReminderAt: nextReminderAt ? parseDateTimeLocalValue(nextReminderAt)?.toISOString() : undefined,
+      nextReminderAt: nextIso,
     };
 
     try {
@@ -2398,6 +2448,9 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       tg?.showAlert?.(`Failed to save habit: ${e.message || "Unknown error"}`);
     }
   };
+
+  // IMPORTANT: iOS strictness: value must be valid string OR omit value
+  const nextReminderAtValue = nextReminderAt ? nextReminderAt : undefined;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -2500,19 +2553,22 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
               <label className="form-label">Times of Day</label>
 
               <div className="times-list">
-                {(timesOfDay || []).map((t, i) => (
-                  <div className="times-item" key={i}>
-                    <input
-                      type="time"
-                      className="form-input"
-                      value={t}
-                      onChange={(e) => updateTime(i, e.target.value)}
-                    />
-                    <button className="btn btn-danger" type="button" onClick={() => removeTime(i)}>
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                {(timesOfDay || []).map((t, i) => {
+                  const safeT = normTimeHHmm(String(t || ""));
+                  return (
+                    <div className="times-item" key={i}>
+                      <input
+                        type="time"
+                        className="form-input"
+                        value={safeT ? safeT : undefined}
+                        onChange={(e) => updateTime(i, e.target.value)}
+                      />
+                      <button className="btn btn-danger" type="button" onClick={() => removeTime(i)}>
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="times-add">
@@ -2553,8 +2609,18 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">Window (optional)</label>
               <div className="times-item">
-                <input type="time" className="form-input" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
-                <input type="time" className="form-input" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
+                <input
+                  type="time"
+                  className="form-input"
+                  value={normTimeHHmm(windowStart) ? normTimeHHmm(windowStart) : undefined}
+                  onChange={(e) => setWindowStart(e.target.value)}
+                />
+                <input
+                  type="time"
+                  className="form-input"
+                  value={normTimeHHmm(windowEnd) ? normTimeHHmm(windowEnd) : undefined}
+                  onChange={(e) => setWindowEnd(e.target.value)}
+                />
               </div>
             </div>
           ) : null}
@@ -2579,7 +2645,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={nextReminderAt}
+              value={nextReminderAtValue}
               onChange={(e) => setNextReminderAt(e.target.value)}
             />
           </div>
@@ -2601,7 +2667,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
 // Habit Log Modal
 function HabitLogModal({ habit, onClose, onCreated }) {
   const unit = String(habit?.unit || "sessions");
-  const [startedAt, setStartedAt] = useState(fmtDateTimeLocalValue(new Date()));
+  const [startedAt, setStartedAt] = useState(safeDateTimeLocalValue(new Date()));
   const [endedAt, setEndedAt] = useState("");
   const [amount, setAmount] = useState(isSessionsUnit(unit) ? "" : "");
 
@@ -2653,6 +2719,9 @@ function HabitLogModal({ habit, onClose, onCreated }) {
     }
   };
 
+  const startedAtValue = startedAt ? startedAt : undefined;
+  const endedAtValue = endedAt ? endedAt : undefined;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -2667,7 +2736,7 @@ function HabitLogModal({ habit, onClose, onCreated }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={startedAt}
+              value={startedAtValue}
               onChange={(e) => setStartedAt(e.target.value)}
             />
           </div>
@@ -2677,7 +2746,7 @@ function HabitLogModal({ habit, onClose, onCreated }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={endedAt}
+              value={endedAtValue}
               onChange={(e) => setEndedAt(e.target.value)}
             />
           </div>
@@ -2710,7 +2779,7 @@ function HabitLogsModal({ habit, onClose }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [editingLog, setEditingLog] = useState(null); // log object
+  const [editingLog, setEditingLog] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
 
   const load = async () => {
@@ -2822,8 +2891,8 @@ function HabitLogsModal({ habit, onClose }) {
 function HabitLogEditModal({ habit, log, onClose, onSaved }) {
   const unit = String(habit?.unit || "sessions");
 
-  const [startedAt, setStartedAt] = useState(log?.startedAt ? fmtDateTimeLocalValue(log.startedAt) : fmtDateTimeLocalValue(new Date()));
-  const [endedAt, setEndedAt] = useState(log?.endedAt ? fmtDateTimeLocalValue(log.endedAt) : "");
+  const [startedAt, setStartedAt] = useState(log?.startedAt ? safeDateTimeLocalValue(log.startedAt) : safeDateTimeLocalValue(new Date()));
+  const [endedAt, setEndedAt] = useState(log?.endedAt ? safeDateTimeLocalValue(log.endedAt) : "");
   const [amount, setAmount] = useState(log?.amount === undefined || log?.amount === null ? "" : String(log.amount));
 
   useEffect(() => {
@@ -2872,6 +2941,9 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
     }
   };
 
+  const startedAtValue = startedAt ? startedAt : undefined;
+  const endedAtValue = endedAt ? endedAt : undefined;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -2886,7 +2958,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={startedAt}
+              value={startedAtValue}
               onChange={(e) => setStartedAt(e.target.value)}
             />
           </div>
@@ -2896,7 +2968,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
             <input
               type="datetime-local"
               className="form-input"
-              value={endedAt}
+              value={endedAtValue}
               onChange={(e) => setEndedAt(e.target.value)}
             />
           </div>
@@ -2929,7 +3001,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const [loading, setLoading] = useState(true);
 
   const [includePaused, setIncludePaused] = useState(false);
-  const [cadenceFilter, setCadenceFilter] = useState("all"); // all | daily | weekly
+  const [cadenceFilter, setCadenceFilter] = useState("all");
 
   const [showEditor, setShowEditor] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
@@ -2943,16 +3015,15 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const loadHabits = async () => {
     try {
       setLoading(true);
-      const url = `habits${includePaused ? "?includePaused=1" : ""}`;
+      // IMPORTANT: keep leading slash so your apiCall helper can resolve correctly
+      const url = `/habits${includePaused ? "?includePaused=1" : ""}`;
       const res = await apiCall(url);
       if (!res?.ok) throw new Error(res?.error || "Failed to load habits");
 
       let list = Array.isArray(res.habits) ? res.habits : [];
-
       if (cadenceFilter !== "all") {
         list = list.filter((h) => String(h.cadence || "daily") === cadenceFilter);
       }
-
       setHabits(list);
     } catch (e) {
       tg?.showAlert?.(`Failed to load habits: ${e.message || "Unknown error"}`);
