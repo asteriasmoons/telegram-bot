@@ -2151,38 +2151,57 @@ function habitBadgeForStatus(status) {
 // =========================
 
 // --- helpers (local) ---
-function normTimeHHmm(v) {
-  // iOS is strict: must be "HH:mm" or omit value entirely.
-  if (typeof v !== "string") return "";
-  const t = v.trim();
-  if (!t) return "";
-  // Accept "H:mm" and pad it
-  const m1 = t.match(/^(\d{1,2}):(\d{2})$/);
-  if (m1) {
-    const hh = String(m1[1]).padStart(2, "0");
-    const mm = String(m1[2]).padStart(2, "0");
-    const hhNum = Number(hh), mmNum = Number(mm);
-    if (hhNum >= 0 && hhNum <= 23 && mmNum >= 0 && mmNum <= 59) return `${hh}:${mm}`;
-    return "";
-  }
-  // Accept "HH:mm" only
-  if (/^\d{2}:\d{2}$/.test(t)) {
-    const [hh, mm] = t.split(":").map(Number);
-    if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) return t;
-  }
-  return "";
+function pad2(n) {
+  return String(n).padStart(2, "0");
 }
 
-function safeDateTimeLocalValue(v) {
-  // For <input type="datetime-local"> iOS is strict:
-  // must be "YYYY-MM-DDTHH:mm" OR omit value
-  const s = fmtDateTimeLocalValue(v);
-  // if fmt returns "" or something unexpected, treat as empty
-  if (typeof s !== "string") return "";
-  if (!s) return "";
-  // quick validation: "YYYY-MM-DDTHH:mm"
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) return "";
-  return s;
+// Returns "YYYY-MM-DDTHH:mm" in the user's LOCAL time.
+// Accepts: Date, ISO string, timestamp number.
+function fmtDateTimeLocalValue(input) {
+  const d = input instanceof Date ? input : new Date(input);
+
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+
+  const yyyy = d.getFullYear();
+  const mm = pad2(d.getMonth() + 1);
+  const dd = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const min = pad2(d.getMinutes());
+
+  // EXACT format required by iOS datetime-local:
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+// Parses "YYYY-MM-DDTHH:mm" (from datetime-local) into a Date in LOCAL time.
+// Returns Date or null.
+function parseDateTimeLocalValue(str) {
+  if (typeof str !== "string") return null;
+  const s = str.trim();
+  if (!s) return null;
+
+  // Must be EXACT:
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!m) return null;
+
+  const yyyy = Number(m[1]);
+  const mo = Number(m[2]);   // 1-12
+  const dd = Number(m[3]);   // 1-31
+  const hh = Number(m[4]);   // 0-23
+  const min = Number(m[5]);  // 0-59
+
+  if (
+    !Number.isFinite(yyyy) ||
+    !Number.isFinite(mo) || mo < 1 || mo > 12 ||
+    !Number.isFinite(dd) || dd < 1 || dd > 31 ||
+    !Number.isFinite(hh) || hh < 0 || hh > 23 ||
+    !Number.isFinite(min) || min < 0 || min > 59
+  ) return null;
+
+  // Construct LOCAL datetime (not UTC)
+  const d = new Date(yyyy, mo - 1, dd, hh, min, 0, 0);
+  if (isNaN(d.getTime())) return null;
+
+  return d;
 }
 
 // Habit Card
