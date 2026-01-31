@@ -29,6 +29,8 @@ import { registerTimezoneCommand } from "./commands/timezone";
 import { registerReading } from "./commands/reading";
 import { registerReadingStreakHandlers } from "./commands/readingStreaks";
 
+import { installHabitFlows } from "./habitScheduler";
+
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -36,6 +38,7 @@ import { addMinutes } from "./utils/time";
 
 export function createBot(token: string) {
   const bot = new Telegraf(token);
+  installHabitFlows(bot);
 
   bot.use(async (ctx, next) => {
     console.log("Update received:", ctx.updateType);

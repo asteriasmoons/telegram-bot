@@ -90,8 +90,6 @@ function nextAtTime(nowZ: DateTime, hhmm: string): DateTime | null {
  * - kind: "times" => timesOfDay (array HH:mm)
  * - kind: "hourly" => everyHours within optional windowStart/windowEnd
  * - kind: "every_x_minutes" => everyMinutes within optional windowStart/windowEnd
- *
- * Note: this function computes "next reminder time", it does NOT log sessions.
  */
 function computeNextForHabitLuxon(h: any): Date | null {
   const sched = h.reminderSchedule;
@@ -110,21 +108,18 @@ function computeNextForHabitLuxon(h: any): Date | null {
     const startToday = nowZ.set({ hour: wStart.hour, minute: wStart.minute, second: 0, millisecond: 0 });
     const endToday = nowZ.set({ hour: wEnd.hour, minute: wEnd.minute, second: 0, millisecond: 0 });
 
-    // No overnight windows here
+    // No overnight windows in this implementation
     if (endToday <= startToday) return null;
 
     return { startToday, endToday };
   }
 
-  // -------------------------
-  // TIMES
-  // -------------------------
   if (sched.kind === "times") {
     const times: string[] = Array.isArray(sched.timesOfDay) ? sched.timesOfDay : [];
     const parsed = times
       .map((t) => String(t || "").trim())
       .filter((t) => /^\d{2}:\d{2}$/.test(t))
-      .sort(); // HH:mm sorts lexicographically
+      .sort();
 
     if (parsed.length === 0) return null;
 
@@ -138,9 +133,6 @@ function computeNextForHabitLuxon(h: any): Date | null {
     return (first ?? tomorrow.plus({ hours: 9 })).toJSDate();
   }
 
-  // -------------------------
-  // HOURLY
-  // -------------------------
   if (sched.kind === "hourly") {
     const everyHours = Number(sched.everyHours);
     if (!Number.isFinite(everyHours) || everyHours <= 0) return null;
@@ -159,9 +151,6 @@ function computeNextForHabitLuxon(h: any): Date | null {
     return startToday.plus({ days: 1 }).toJSDate();
   }
 
-  // -------------------------
-  // EVERY X MINUTES
-  // -------------------------
   if (sched.kind === "every_x_minutes") {
     const everyMinutes = Number(sched.everyMinutes);
     if (!Number.isFinite(everyMinutes) || everyMinutes <= 0) return null;
@@ -185,7 +174,7 @@ function computeNextForHabitLuxon(h: any): Date | null {
 
 /**
  * Habit reminder buttons:
- * - Log => prompts for amount and logs a session
+ * - Log => prompts for amount (and logs a session)
  * - Snooze 15m
  * - Custom snooze
  */
@@ -221,11 +210,17 @@ async function sendHabitReminder(bot: Telegraf<any>, h: any) {
   await bot.telegram.sendMessage(chatId, text, habitActionKeyboard(String(h._id)));
 }
 
-// In-memory pending custom snooze: userId -> { habitId, expiresAt, promptMessageId? }
-const pendingHabitCustomSnooze = new Map<number, { habitId: string; expiresAt: number; promptMessageId?: number }>();
+// In-memory pending custom snooze: userId -> { habitId, expiresAt, promptMessageId }
+const pendingHabitCustomSnooze = new Map<
+  number,
+  { habitId: string; expiresAt: number; promptMessageId?: number }
+>();
 
-// In-memory pending habit log: userId -> { habitId, expiresAt, promptMessageId? }
-const pendingHabitLog = new Map<number, { habitId: string; expiresAt: number; promptMessageId?: number }>();
+// In-memory pending habit log: userId -> { habitId, expiresAt, promptMessageId }
+const pendingHabitLog = new Map<
+  number,
+  { habitId: string; expiresAt: number; promptMessageId?: number }
+>();
 
 function parseDurationToMinutes(input: string): number | null {
   const raw = String(input || "").trim().toLowerCase();
@@ -239,8 +234,7 @@ function parseDurationToMinutes(input: string): number | null {
   const minutes = unit === "m" ? value : unit === "h" ? value * 60 : value * 1440;
 
   const rounded = Math.round(minutes);
-  if (rounded <= 0) return null;
-  return rounded;
+  return rounded > 0 ? rounded : null;
 }
 
 function parseNumber(input: string): number | null {
@@ -250,152 +244,126 @@ function parseNumber(input: string): number | null {
   return n;
 }
 
-// Ensure we don't register handlers multiple times.
-let habitActionsRegistered = false;
+/**
+ * Install habit action + reply flows.
+ * IMPORTANT: call this EARLY (immediately after bot creation) so other middleware can't swallow messages.
+ */
+export function installHabitFlows(bot: Telegraf<any>) {
+  // 1) Button clicks
+  bot.action(/^hb:/, async (ctx) => {
+    const data = (ctx.callbackQuery as any)?.data as string;
+    const userId = ctx.from?.id;
 
-function registerHabitActionHandlers(bot: Telegraf<any>) {
-  if (habitActionsRegistered) return;
-  habitActionsRegistered = true;
+    await ctx.answerCbQuery().catch(() => {});
+    if (!userId || !data) return;
 
-  // -------------------------
-  // INLINE BUTTON HANDLERS
-  // -------------------------
-  bot.action(/^hb:/, async (ctx, next) => {
-    try {
-      const data = (ctx.callbackQuery as any)?.data as string;
-      const userId = ctx.from?.id;
+    const parts = data.split(":");
 
-      await ctx.answerCbQuery().catch(() => {});
-      if (!userId || !data) return next();
+    // hb:log:<habitId>
+    if (parts[1] === "log") {
+      const habitId = parts[2];
+      if (!habitId) return;
 
-      const parts = data.split(":");
+      console.log("[habits] hb:log clicked", { userId, habitId });
 
-      // hb:log:<habitId>
-      if (parts[1] === "log") {
-        const habitId = parts[2];
-        if (!habitId) return;
-
-        console.log("[habits] hb:log clicked", { userId, habitId });
-
-        const habit = await Habit.findOne({ _id: habitId, userId }).lean();
-        if (!habit) {
-          await ctx.reply("That habit no longer exists.");
-          return;
-        }
-
-        const unit = String(habit.unit ?? "");
-        const prompt = unit ? `Enter the amount you did (${unit}).` : "Enter the amount you did (number).";
-
-        const sent: any = await ctx.reply(prompt, Markup.forceReply());
-
-        pendingHabitLog.set(userId, {
-          habitId,
-          expiresAt: Date.now() + 2 * 60 * 1000,
-          promptMessageId: sent?.message_id,
-        });
-
+      const habit = await Habit.findOne({ _id: habitId, userId }).lean();
+      if (!habit) {
+        await ctx.reply("That habit no longer exists.");
         return;
       }
 
-      // hb:szc:<habitId>
-      if (parts[1] === "szc") {
-        const habitId = parts[2];
-        if (!habitId) return;
+      const unit = String(habit.unit ?? "");
+      const prompt = unit ? `Enter the amount you did (${unit}).` : "Enter the amount you did (number).";
 
-        console.log("[habits] hb:szc clicked", { userId, habitId });
+      const sent = await ctx.reply(prompt, Markup.forceReply());
 
-        const habit = await Habit.findOne({ _id: habitId, userId }).lean();
-        if (!habit) {
-          await ctx.reply("That habit no longer exists.");
-          return;
-        }
+      pendingHabitLog.set(userId, {
+        habitId,
+        expiresAt: Date.now() + 2 * 60 * 1000,
+        promptMessageId: sent.message_id,
+      });
 
-        const sent: any = await ctx.reply(
-          "Type a snooze duration like:\n- 10m\n- 2h\n- 1d\n(You can also just type a number for minutes.)",
-          Markup.forceReply()
-        );
+      return;
+    }
 
-        pendingHabitCustomSnooze.set(userId, {
-          habitId,
-          expiresAt: Date.now() + 2 * 60 * 1000,
-          promptMessageId: sent?.message_id,
-        });
+    // hb:szc:<habitId>
+    if (parts[1] === "szc") {
+      const habitId = parts[2];
+      if (!habitId) return;
 
+      const habit = await Habit.findOne({ _id: habitId, userId }).lean();
+      if (!habit) {
+        await ctx.reply("That habit no longer exists.");
         return;
       }
 
-      // hb:sz:<habitId>:<minutes>
-      if (parts[1] === "sz") {
-        const habitId = parts[2];
-        const minutes = Number(parts[3]);
+      const sent = await ctx.reply(
+        "Type a snooze duration like:\n- 10m\n- 2h\n- 1d\n(You can also just type a number for minutes.)",
+        Markup.forceReply()
+      );
 
-        if (!habitId || !Number.isFinite(minutes) || minutes <= 0) return;
+      pendingHabitCustomSnooze.set(userId, {
+        habitId,
+        expiresAt: Date.now() + 2 * 60 * 1000,
+        promptMessageId: sent.message_id,
+      });
 
-        console.log("[habits] hb:sz clicked", { userId, habitId, minutes });
+      return;
+    }
 
-        const habit = await Habit.findOne({ _id: habitId, userId }).lean();
-        if (!habit) {
-          await ctx.reply("That habit no longer exists.");
-          return;
-        }
+    // hb:sz:<habitId>:<minutes>
+    if (parts[1] === "sz") {
+      const habitId = parts[2];
+      const minutes = Number(parts[3]);
 
-        const newTime = new Date(Date.now() + minutes * 60 * 1000);
-        await Habit.updateOne({ _id: habitId, userId }, { $set: { nextReminderAt: newTime } });
+      if (!habitId || !Number.isFinite(minutes) || minutes <= 0) return;
 
-        const tz = String(habit.timezone || "America/Chicago");
-        const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
-        await ctx.reply(`Snoozed. Next habit reminder: ${nextStr}`);
+      const habit = await Habit.findOne({ _id: habitId, userId }).lean();
+      if (!habit) {
+        await ctx.reply("That habit no longer exists.");
         return;
       }
 
-      return next();
-    } catch (err) {
-      console.error("[habits] action handler error:", err);
-      return next();
+      const newTime = new Date(Date.now() + minutes * 60 * 1000);
+      await Habit.updateOne({ _id: habitId, userId }, { $set: { nextReminderAt: newTime } });
+
+      const tz = String(habit.timezone || "America/Chicago");
+      const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
+      await ctx.reply(`Snoozed. Next habit reminder: ${nextStr}`);
+      return;
     }
   });
 
-  // -------------------------
-  // TEXT HANDLER (MUST USE next())
-  // This is the fix that prevents your bot from "doing nothing".
-  // -------------------------
-  bot.on("text", async (ctx, next) => {
+  // 2) Reply capture (THIS is what fixes your "nothing happens")
+  // Use bot.use so it can run BEFORE other handlers, but ONLY if you install it early.
+  bot.use(async (ctx, next) => {
+    // Only care about text messages
+    const msg: any = (ctx as any).message;
+    const text = msg?.text;
+    if (!text) return next();
+
     const userId = ctx.from?.id;
     if (!userId) return next();
 
-    const text = String((ctx.message as any)?.text || "");
-    const reply = (ctx.message as any)?.reply_to_message;
+    const reply = msg?.reply_to_message;
+    const replyToId = reply?.message_id;
     const isReplyToBot = !!reply?.from?.is_bot;
-    const replyToId = (reply as any)?.message_id as number | undefined;
 
-    // Uncomment if you want to see flow decisions
-    console.log("[habits] text seen", {
-      userId,
-      text,
-      hasReply: !!reply,
-      isReplyToBot,
-      replyToId,
-      pendingLog: pendingHabitLog.has(userId),
-      pendingSnooze: pendingHabitCustomSnooze.has(userId),
-    });
-
-    // -------------------------
-    // HABIT LOG FLOW
-    // -------------------------
+    // ---- HABIT LOG FLOW ----
     const pendingLog = pendingHabitLog.get(userId);
     if (pendingLog) {
-      // If they replied to something, require it to be the *exact* prompt we sent.
-      if (reply) {
-        if (!isReplyToBot) return next();
-        if (pendingLog.promptMessageId && replyToId && replyToId !== pendingLog.promptMessageId) {
-          return next();
-        }
-      }
+      console.log("[habits] pendingLog seen", { userId, replyToId, expected: pendingLog.promptMessageId });
 
       if (Date.now() > pendingLog.expiresAt) {
         pendingHabitLog.delete(userId);
         await ctx.reply("Log timed out. Tap Log again if you still want to record a session.");
         return;
+      }
+
+      // If Telegram attached a reply, require it to be to OUR prompt
+      if (reply) {
+        if (!isReplyToBot) return;
+        if (pendingLog.promptMessageId && replyToId !== pendingLog.promptMessageId) return;
       }
 
       const habit = await Habit.findOne({ _id: pendingLog.habitId, userId }).lean();
@@ -419,35 +387,32 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
           habitId: habit._id,
           startedAt: new Date(),
           amount,
-          unit: habit.unit,
+          unit: habit.unit, // locked to habit unit
         });
 
         await ctx.reply(`Logged: ${amount}${habit.unit ? " " + habit.unit : ""} for "${habit.name}".`);
       } catch (err: any) {
-        console.error("[habits] HabitLog.create failed:", err);
+        console.error("HabitLog.create failed:", err);
         await ctx.reply("I couldn't save that log due to a server error. Try again in a moment.");
       }
 
-      return;
+      return; // DO NOT next() -- we consumed the message
     }
 
-    // -------------------------
-    // HABIT CUSTOM SNOOZE FLOW
-    // -------------------------
+    // ---- CUSTOM SNOOZE FLOW ----
     const pendingSz = pendingHabitCustomSnooze.get(userId);
     if (pendingSz) {
-      // If they replied to something, require it to be the *exact* prompt we sent.
-      if (reply) {
-        if (!isReplyToBot) return next();
-        if (pendingSz.promptMessageId && replyToId && replyToId !== pendingSz.promptMessageId) {
-          return next();
-        }
-      }
+      console.log("[habits] pendingSz seen", { userId, replyToId, expected: pendingSz.promptMessageId });
 
       if (Date.now() > pendingSz.expiresAt) {
         pendingHabitCustomSnooze.delete(userId);
         await ctx.reply("Custom snooze timed out. Tap Custom again if you still want to snooze.");
         return;
+      }
+
+      if (reply) {
+        if (!isReplyToBot) return;
+        if (pendingSz.promptMessageId && replyToId !== pendingSz.promptMessageId) return;
       }
 
       const minutes = parseDurationToMinutes(text);
@@ -473,14 +438,16 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
       return;
     }
 
-    // Not ours -- let other modules handle it.
+    // Not a habit reply -- let the rest of the bot handle it
     return next();
   });
 }
 
+// Install ONLY the Telegraf handlers (actions + text replies).
+// Call this once when the bot is created (bot.ts).
+export function installHabitFlows(bot: Telegraf<any>) {
+}
 export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) {
-  registerHabitActionHandlers(bot);
-
   const pollEveryMs = opts.pollEveryMs ?? opts.pollIntervalMs ?? 10_000;
 
   const lockSeconds =
@@ -549,10 +516,6 @@ export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions =
   };
 
   tick().catch(() => {});
-
-  const handle = setInterval(() => {
-    tick().catch(() => {});
-  }, pollEveryMs);
-
+  const handle = setInterval(() => tick().catch(() => {}), pollEveryMs);
   return () => clearInterval(handle);
 }
