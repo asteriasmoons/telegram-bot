@@ -1996,9 +1996,6 @@ syncTelegramViewportHeight();
 tg.onEvent("viewportChanged", syncTelegramViewportHeight);
 // ---------------------------------------------------------------------------
 
-    // API base URL
-    const API_BASE = window.location.origin + '/api/miniapp';
-
     // Helper function to make API calls
     async function apiCall(endpoint, options = {}) {
       const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -2101,8 +2098,6 @@ function statusLabelToValue(input) {
 // =========================
 // HABITS UI (matches your Habit.ts / HabitLog.ts / habits.ts API)
 // =========================
-
-const HABITS_API_BASE = "/api";
 
 function fmtDateTimeLocalValue(d) {
   const dt = d instanceof Date ? d : new Date(d);
@@ -2636,7 +2631,7 @@ function HabitLogModal({ habit, onClose, onCreated }) {
     }
 
     try {
-      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs`, {
+      const res = await apiCall(`/habits/${habit._id}/logs`, {
         method: "POST",
         body: JSON.stringify({
           startedAt: s.toISOString(),
@@ -2718,7 +2713,7 @@ function HabitLogsModal({ habit, onClose }) {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs?limit=50&skip=0`);
+      const res = await apiCall(`/habits/${habit._id}/logs?limit=50&skip=0`);
       if (!res?.ok) throw new Error(res?.error || "Failed to load logs");
       setLogs(Array.isArray(res.logs) ? res.logs : []);
     } catch (e) {
@@ -2737,7 +2732,7 @@ function HabitLogsModal({ habit, onClose }) {
 
   const del = async (log) => {
     try {
-      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs/${log._id}`, { method: "DELETE" });
+      const res = await apiCall(`/habits/${habit._id}/logs/${log._id}`, { method: "DELETE" });
       if (!res?.ok) throw new Error(res?.error || "Delete failed");
       tg?.showPopup?.({ message: "Log deleted" });
       load();
@@ -2856,7 +2851,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
     }
 
     try {
-      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs/${log._id}`, {
+      const res = await apiCall(`/habits/${habit._id}/logs/${log._id}`, {
         method: "PUT",
         body: JSON.stringify({
           startedAt: s.toISOString(),
@@ -2980,7 +2975,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
 
   const delHabit = async (h) => {
     try {
-      const res = await apiCall(`/api/habits/${h._id}`, { method: "DELETE" });
+      const res = await apiCall(`/habits/${h._id}`, { method: "DELETE" });
       if (!res?.ok) throw new Error(res?.error || "Delete failed");
       tg?.showPopup?.({ message: "Habit deleted" });
       loadHabits();
@@ -2992,7 +2987,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
   const togglePause = async (h) => {
     try {
       const next = String(h.status) === "paused" ? "active" : "paused";
-      const res = await apiCall(`/api/habits/${h._id}`, {
+      const res = await apiCall(`/habits/${h._id}`, {
         method: "PUT",
         body: JSON.stringify({ status: next }),
       });
@@ -3072,6 +3067,9 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
       ) : habits.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-text">No habits yet. Tap New.</div>
+          <div className="empty-state-icon">
+            <img src="/icons/habits.svg" alt="" />
+          </div>
         </div>
       ) : (
         habits.map((h) => (
