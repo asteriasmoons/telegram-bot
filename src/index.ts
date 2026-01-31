@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { createBot } from "./bot";
 import { startServer } from "./health";
 import { startScheduler, makeInstanceId } from "./scheduler";
+import { startHabitScheduler } from "./habitsScheduler";
 
 async function main() {
   const token = process.env.BOT_TOKEN;
@@ -68,6 +69,13 @@ async function main() {
     lockTtlMs: 60_000,       // Hold lock for 60 seconds (prevents duplicate sends)
     instanceId: makeInstanceId()
   });
+  
+  // Habit Scheduler
+startHabitScheduler(bot, {
+  pollEveryMs: 10_000,
+  lockTtlMs: 60_000,
+  instanceId: makeHabitInstanceId()
+});
 
   // Graceful shutdown
   process.once("SIGTERM", async () => {

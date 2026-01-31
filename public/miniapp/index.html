@@ -272,6 +272,155 @@ body {
   flex-wrap: wrap;
 }
 
+/* =========================
+   HABITS VIEW (matches Habit.ts + HabitLog.ts)
+   ========================= */
+
+.habits-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.habit-title {
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.habit-sub {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.habit-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.badge-habit-daily {
+  background: rgba(91, 141, 239, 0.15);
+  color: #5b8def;
+}
+.badge-habit-weekly {
+  background: rgba(233, 160, 72, 0.18);
+  color: #e9a048;
+}
+.badge-habit-active {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+.badge-habit-paused {
+  background: rgba(244, 67, 54, 0.12);
+  color: #f44336;
+}
+
+.habit-target {
+  margin-top: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.habit-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.habit-actions .btn {
+  flex: 1;
+  justify-content: center;
+  min-width: 140px;
+}
+
+/* Times list inside modal */
+.times-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.times-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.times-item input[type="time"] {
+  flex: 1;
+}
+
+.times-item .btn {
+  width: auto;
+  min-width: unset;
+  flex: 0;
+}
+
+/* Logs list */
+.logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.log-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.log-amount {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.log-time {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.log-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.log-actions .btn {
+  flex: 1;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.form-help {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 8px;
+}
+
+.modal-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 14px 0;
+}
+
 /* -------- Reading Progress -------- */
 .progress-wrap {
   margin-top: 14px;
@@ -1909,6 +2058,1052 @@ function statusLabelToValue(input) {
   if (s === "reading" || s === "active") return "reading";
   if (s === "finished" || s === "done") return "finished";
   return "tbr";
+}
+
+
+// =========================
+// HABITS UI (matches your Habit.ts / HabitLog.ts / habits.ts API)
+// =========================
+
+const HABITS_API_BASE = "/api";
+
+function fmtDateTimeLocalValue(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  const yyyy = dt.getFullYear();
+  const mm = pad(dt.getMonth() + 1);
+  const dd = pad(dt.getDate());
+  const hh = pad(dt.getHours());
+  const mi = pad(dt.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+function parseDateTimeLocalValue(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
+function safeNum(n, fallback = 0) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : fallback;
+}
+
+function isSessionsUnit(unit) {
+  return String(unit || "").toLowerCase() === "sessions";
+}
+
+function badgeForCadence(cadence) {
+  return String(cadence || "daily").toLowerCase() === "weekly"
+    ? { text: "WEEKLY", className: "badge-habit-weekly" }
+    : { text: "DAILY", className: "badge-habit-daily" };
+}
+
+function badgeForStatus(status) {
+  return String(status || "active").toLowerCase() === "paused"
+    ? { text: "PAUSED", className: "badge-habit-paused" }
+    : { text: "ACTIVE", className: "badge-habit-active" };
+}
+
+function HabitCard({
+  habit,
+  onEdit,
+  onDelete,
+  onTogglePause,
+  onOpenLog,
+  onOpenLogs,
+}) {
+  const name = String(habit?.name || "").trim() || "(unnamed habit)";
+  const description = String(habit?.description || "").trim();
+
+  const cadenceBadge = badgeForCadence(habit?.cadence);
+  const statusBadge = badgeForStatus(habit?.status);
+
+  const targetCount = safeNum(habit?.targetCount, 1);
+  const targetAmount = habit?.targetAmount === undefined ? null : safeNum(habit?.targetAmount, 0);
+  const unit = String(habit?.unit || "sessions");
+
+  const scheduleKind = String(habit?.reminderSchedule?.kind || "off");
+  const scheduleSummary =
+    scheduleKind === "off"
+      ? "Reminders: Off"
+      : scheduleKind === "times"
+        ? `Reminders: Times (${(habit?.reminderSchedule?.timesOfDay || []).join(", ") || "none"})`
+        : scheduleKind === "hourly"
+          ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyHours, 1)}h` +
+            (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
+              ? ` (${habit.reminderSchedule.windowStart}–${habit.reminderSchedule.windowEnd})`
+              : "")
+          : scheduleKind === "every_x_minutes"
+            ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyMinutes, 1)}m` +
+              (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
+                ? ` (${habit.reminderSchedule.windowStart}–${habit.reminderSchedule.windowEnd})`
+                : "")
+            : `Reminders: ${scheduleKind}`;
+
+  const targetLine =
+    targetAmount !== null && !isSessionsUnit(unit)
+      ? `Target: ${targetCount} sessions per ${habit?.cadence || "daily"} -- ${targetAmount} ${unit} per session`
+      : `Target: ${targetCount} sessions per ${habit?.cadence || "daily"}`;
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div>
+          <div className="habit-title">{name}</div>
+          {description ? <div className="habit-sub">{description}</div> : null}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <span className={`card-badge ${cadenceBadge.className}`}>{cadenceBadge.text}</span>
+          <span className={`card-badge ${statusBadge.className}`}>{statusBadge.text}</span>
+        </div>
+      </div>
+
+      <div className="habit-target">{targetLine}</div>
+      <div className="habit-target">{scheduleSummary}</div>
+
+      <div className="habit-actions">
+        <button className="btn btn-success" type="button" onClick={() => onOpenLog(habit)}>
+          Log Session
+        </button>
+
+        <button className="btn btn-secondary" type="button" onClick={() => onOpenLogs(habit)}>
+          View Logs
+        </button>
+
+        <button className="btn btn-primary" type="button" onClick={() => onEdit(habit)}>
+          Edit
+        </button>
+
+        <button
+          className="btn btn-secondary"
+          type="button"
+          onClick={() => onTogglePause(habit)}
+        >
+          {String(habit?.status) === "paused" ? "Resume" : "Pause"}
+        </button>
+
+        <button className="btn btn-danger" type="button" onClick={() => onDelete(habit)}>
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Habit Editor Modal
+function HabitEditorModal({ initialHabit, userDisplayName, onClose, onSaved }) {
+  const isEdit = !!initialHabit?._id;
+
+  // Required by API
+  const [chatId, setChatId] = useState(
+    isEdit ? String(initialHabit.chatId || "") : String(currentUser?.chatId || currentUser?.userId || "")
+  );
+
+  const [name, setName] = useState(isEdit ? initialHabit.name || "" : "");
+  const [description, setDescription] = useState(isEdit ? initialHabit.description || "" : "");
+
+  const [status, setStatus] = useState(isEdit ? (initialHabit.status || "active") : "active");
+  const [cadence, setCadence] = useState(isEdit ? (initialHabit.cadence || "daily") : "daily");
+
+  const [targetCount, setTargetCount] = useState(
+    isEdit ? String(initialHabit.targetCount ?? 1) : "1"
+  );
+
+  const [unit, setUnit] = useState(isEdit ? (initialHabit.unit || "sessions") : "sessions");
+
+  const [targetAmount, setTargetAmount] = useState(
+    isEdit && initialHabit.targetAmount !== undefined && initialHabit.targetAmount !== null
+      ? String(initialHabit.targetAmount)
+      : ""
+  );
+
+  const [timezone, setTimezone] = useState(
+    isEdit ? (initialHabit.timezone || "America/Chicago") : (currentUser?.timezone || "America/Chicago")
+  );
+
+  // reminderSchedule (matches HabitReminderSchedule)
+  const [reminderKind, setReminderKind] = useState(
+    isEdit ? (initialHabit.reminderSchedule?.kind || "off") : "off"
+  );
+
+  const [timesOfDay, setTimesOfDay] = useState(
+    isEdit ? (Array.isArray(initialHabit.reminderSchedule?.timesOfDay) ? initialHabit.reminderSchedule.timesOfDay : []) : []
+  );
+
+  const [everyHours, setEveryHours] = useState(
+    isEdit ? String(initialHabit.reminderSchedule?.everyHours ?? 2) : "2"
+  );
+
+  const [everyMinutes, setEveryMinutes] = useState(
+    isEdit ? String(initialHabit.reminderSchedule?.everyMinutes ?? 45) : "45"
+  );
+
+  const [windowStart, setWindowStart] = useState(
+    isEdit ? (initialHabit.reminderSchedule?.windowStart || "") : ""
+  );
+
+  const [windowEnd, setWindowEnd] = useState(
+    isEdit ? (initialHabit.reminderSchedule?.windowEnd || "") : ""
+  );
+
+  const [daysOfWeek, setDaysOfWeek] = useState(
+    isEdit ? (Array.isArray(initialHabit.reminderSchedule?.daysOfWeek) ? initialHabit.reminderSchedule.daysOfWeek : []) : []
+  );
+
+  const [nextReminderAt, setNextReminderAt] = useState(
+    isEdit && initialHabit.nextReminderAt ? fmtDateTimeLocalValue(initialHabit.nextReminderAt) : ""
+  );
+
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const toggleDay = (idx) => {
+    setDaysOfWeek((prev) => {
+      const s = new Set(Array.isArray(prev) ? prev : []);
+      if (s.has(idx)) s.delete(idx);
+      else s.add(idx);
+      return Array.from(s).sort((a, b) => a - b);
+    });
+  };
+
+  const addTime = () => setTimesOfDay((prev) => [...(Array.isArray(prev) ? prev : []), "09:00"]);
+  const updateTime = (i, v) => setTimesOfDay((prev) => prev.map((t, idx) => (idx === i ? v : t)));
+  const removeTime = (i) => setTimesOfDay((prev) => prev.filter((_, idx) => idx !== i));
+
+  const buildReminderSchedule = () => {
+    const base = { kind: reminderKind };
+
+    if (reminderKind === "times") {
+      const cleaned = (timesOfDay || []).map((t) => String(t || "").trim()).filter(Boolean);
+      return { ...base, timesOfDay: cleaned, daysOfWeek: daysOfWeek || [] };
+    }
+
+    if (reminderKind === "hourly") {
+      return {
+        ...base,
+        everyHours: Math.max(1, Math.floor(Number(everyHours) || 1)),
+        windowStart: windowStart ? String(windowStart).trim() : undefined,
+        windowEnd: windowEnd ? String(windowEnd).trim() : undefined,
+        daysOfWeek: daysOfWeek || [],
+      };
+    }
+
+    if (reminderKind === "every_x_minutes") {
+      return {
+        ...base,
+        everyMinutes: Math.max(1, Math.floor(Number(everyMinutes) || 1)),
+        windowStart: windowStart ? String(windowStart).trim() : undefined,
+        windowEnd: windowEnd ? String(windowEnd).trim() : undefined,
+        daysOfWeek: daysOfWeek || [],
+      };
+    }
+
+    return base; // off
+  };
+
+  const save = async () => {
+    // Basic UI checks mirroring your API constraints
+    if (!String(chatId || "").trim() || !Number.isFinite(Number(chatId))) {
+      tg?.showAlert?.("chatId is required (numeric).");
+      return;
+    }
+    if (!String(name || "").trim()) {
+      tg?.showAlert?.("Habit name is required.");
+      return;
+    }
+    if (!String(timezone || "").trim()) {
+      tg?.showAlert?.("timezone is required.");
+      return;
+    }
+    const tc = Number(targetCount);
+    if (!Number.isFinite(tc) || tc < 1) {
+      tg?.showAlert?.("targetCount must be >= 1.");
+      return;
+    }
+
+    // targetAmount optional, >= 0
+    let ta = undefined;
+    if (targetAmount !== "" && targetAmount !== null && targetAmount !== undefined) {
+      const n = Number(targetAmount);
+      if (!Number.isFinite(n) || n < 0) {
+        tg?.showAlert?.("targetAmount must be >= 0.");
+        return;
+      }
+      ta = n;
+    }
+
+    const reminderSchedule = buildReminderSchedule();
+
+    // For times: require at least 1 time (matches API)
+    if (reminderSchedule.kind === "times") {
+      const arr = Array.isArray(reminderSchedule.timesOfDay) ? reminderSchedule.timesOfDay : [];
+      if (arr.length === 0) {
+        tg?.showAlert?.("timesOfDay is required for reminderSchedule kind=times.");
+        return;
+      }
+    }
+
+    const payload = {
+      chatId: Number(chatId),
+      name: String(name).trim(),
+      description: description ? String(description).trim() : undefined,
+      status: status === "paused" ? "paused" : "active",
+      cadence: cadence === "weekly" ? "weekly" : "daily",
+      targetCount: Math.floor(tc),
+      targetAmount: ta,
+      unit,
+      timezone: String(timezone).trim(),
+      reminderSchedule,
+      nextReminderAt: nextReminderAt ? parseDateTimeLocalValue(nextReminderAt)?.toISOString() : undefined,
+    };
+
+    try {
+      const path = isEdit ? `${HABITS_API_BASE}/habits/${initialHabit._id}` : `${HABITS_API_BASE}/habits`;
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await apiCall(path, {
+        method,
+        body: JSON.stringify(payload),
+      });
+
+      if (!res?.ok) throw new Error(res?.error || "Save failed");
+
+      tg?.showPopup?.({ message: isEdit ? "Habit updated" : "Habit created" });
+      onSaved?.();
+      onClose?.();
+    } catch (e) {
+      tg?.showAlert?.(`Failed to save habit: ${e.message || "Unknown error"}`);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{isEdit ? "Edit Habit" : "New Habit"}</h2>
+          <button className="modal-close" onClick={onClose} type="button">×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Chat ID</label>
+            <input
+              className="form-input"
+              value={chatId}
+              onChange={(e) => setChatId(e.target.value)}
+              placeholder="Numeric chatId"
+            />
+            <div className="form-help">Required by your API for routing reminders to the right chat.</div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Habit Name</label>
+            <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Description (optional)</label>
+            <textarea
+              className="form-textarea form-textarea--sm"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="modal-divider" />
+
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="active">active</option>
+              <option value="paused">paused</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Cadence</label>
+            <select className="form-select" value={cadence} onChange={(e) => setCadence(e.target.value)}>
+              <option value="daily">daily</option>
+              <option value="weekly">weekly</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Target Count (sessions per cadence)</label>
+            <input
+              type="number"
+              className="form-input"
+              min="1"
+              value={targetCount}
+              onChange={(e) => setTargetCount(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Unit</label>
+            <select className="form-select" value={unit} onChange={(e) => setUnit(e.target.value)}>
+              <option value="sessions">sessions</option>
+              <option value="minutes">minutes</option>
+              <option value="hours">hours</option>
+              <option value="steps">steps</option>
+              <option value="cups">cups</option>
+              <option value="oz">oz</option>
+              <option value="ml">ml</option>
+              <option value="pages">pages</option>
+              <option value="count">count</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Target Amount (optional)</label>
+            <input
+              type="number"
+              className="form-input"
+              min="0"
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              placeholder={isSessionsUnit(unit) ? "Leave empty for sessions" : `Amount in ${unit}`}
+            />
+            <div className="form-help">Matches `targetAmount` in Habit model. Leave blank if not needed.</div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Timezone</label>
+            <input className="form-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
+          </div>
+
+          <div className="modal-divider" />
+
+          <div className="form-group">
+            <label className="form-label">Reminder Schedule Kind</label>
+            <select className="form-select" value={reminderKind} onChange={(e) => setReminderKind(e.target.value)}>
+              <option value="off">off</option>
+              <option value="times">times</option>
+              <option value="hourly">hourly</option>
+              <option value="every_x_minutes">every_x_minutes</option>
+            </select>
+          </div>
+
+          {reminderKind === "times" ? (
+            <div className="form-group">
+              <label className="form-label">Times of Day</label>
+
+              <div className="times-list">
+                {(timesOfDay || []).map((t, i) => (
+                  <div className="times-item" key={i}>
+                    <input
+                      type="time"
+                      className="form-input"
+                      value={t}
+                      onChange={(e) => updateTime(i, e.target.value)}
+                    />
+                    <button className="btn btn-danger" type="button" onClick={() => removeTime(i)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 10 }}>
+                <button className="btn btn-secondary" type="button" onClick={addTime}>
+                  Add Time
+                </button>
+              </div>
+
+              <div className="form-help">Your API requires at least one time for kind=times.</div>
+            </div>
+          ) : null}
+
+          {reminderKind === "hourly" ? (
+            <div className="form-group">
+              <label className="form-label">Every Hours</label>
+              <input
+                type="number"
+                min="1"
+                className="form-input"
+                value={everyHours}
+                onChange={(e) => setEveryHours(e.target.value)}
+              />
+            </div>
+          ) : null}
+
+          {reminderKind === "every_x_minutes" ? (
+            <div className="form-group">
+              <label className="form-label">Every Minutes</label>
+              <input
+                type="number"
+                min="1"
+                className="form-input"
+                value={everyMinutes}
+                onChange={(e) => setEveryMinutes(e.target.value)}
+              />
+            </div>
+          ) : null}
+
+          {reminderKind === "hourly" || reminderKind === "every_x_minutes" ? (
+            <div className="form-group">
+              <label className="form-label">Window (optional)</label>
+              <div className="times-item">
+                <input type="time" className="form-input" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
+                <input type="time" className="form-input" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
+              </div>
+              <div className="form-help">Matches `windowStart/windowEnd` in your schema. Your API validates HH:mm.</div>
+            </div>
+          ) : null}
+
+          <div className="form-group">
+            <label className="form-label">Days of Week (optional)</label>
+            <div className="weekday-picker">
+              {weekdayLabels.map((lab, idx) => {
+                const active = Array.isArray(daysOfWeek) && daysOfWeek.includes(idx);
+                const cls = `btn ${active ? "btn-primary" : "btn-secondary"}`;
+                return (
+                  <button key={idx} type="button" className={cls} onClick={() => toggleDay(idx)}>
+                    {lab}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="form-help">Stored as `daysOfWeek` (0–6). Your API clamps it.</div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Next Reminder At (optional override)</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={nextReminderAt}
+              onChange={(e) => setNextReminderAt(e.target.value)}
+            />
+            <div className="form-help">This maps to `nextReminderAt` in your Habit model and your API supports it.</div>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" type="button" onClick={save}>
+            {isEdit ? "Update" : "Create"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Habit Log Modal
+function HabitLogModal({ habit, onClose, onCreated }) {
+  const unit = String(habit?.unit || "sessions");
+  const [startedAt, setStartedAt] = useState(fmtDateTimeLocalValue(new Date()));
+  const [endedAt, setEndedAt] = useState("");
+  const [amount, setAmount] = useState(isSessionsUnit(unit) ? "" : "");
+
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const save = async () => {
+    const s = parseDateTimeLocalValue(startedAt);
+    if (!s) {
+      tg?.showAlert?.("startedAt is required and must be valid.");
+      return;
+    }
+
+    const e = endedAt ? parseDateTimeLocalValue(endedAt) : null;
+    if (e && e.getTime() < s.getTime()) {
+      tg?.showAlert?.("endedAt cannot be before startedAt.");
+      return;
+    }
+
+    let amt = undefined;
+    if (amount !== "" && amount !== null && amount !== undefined) {
+      const n = Number(amount);
+      if (!Number.isFinite(n) || n < 0) {
+        tg?.showAlert?.("amount must be >= 0.");
+        return;
+      }
+      amt = n;
+    }
+
+    try {
+      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs`, {
+        method: "POST",
+        body: JSON.stringify({
+          startedAt: s.toISOString(),
+          endedAt: e ? e.toISOString() : undefined,
+          amount: amt,
+        }),
+      });
+
+      if (!res?.ok) throw new Error(res?.error || "Log create failed");
+
+      tg?.showPopup?.({ message: "Session logged" });
+      onCreated?.();
+      onClose?.();
+    } catch (e2) {
+      tg?.showAlert?.(`Failed to log session: ${e2.message || "Unknown error"}`);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Log Session</h2>
+          <button className="modal-close" onClick={onClose} type="button">×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Started At</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={startedAt}
+              onChange={(e) => setStartedAt(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Ended At (optional)</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={endedAt}
+              onChange={(e) => setEndedAt(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Amount (optional)</label>
+            <input
+              type="number"
+              min="0"
+              className="form-input"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={isSessionsUnit(unit) ? "Leave empty for sessions-only" : `Amount in ${unit}`}
+            />
+            <div className="form-help">This maps to HabitLog.amount. Unit is locked to the habit’s unit by your API.</div>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" type="button" onClick={save}>Save Log</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Habits Logs Modal
+function HabitLogsModal({ habit, onClose }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [editingLog, setEditingLog] = useState(null); // log object
+  const [showEdit, setShowEdit] = useState(false);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs?limit=50&skip=0`);
+      if (!res?.ok) throw new Error(res?.error || "Failed to load logs");
+      setLogs(Array.isArray(res.logs) ? res.logs : []);
+    } catch (e) {
+      tg?.showAlert?.(`Failed to load logs: ${e.message || "Unknown error"}`);
+      setLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    load();
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const del = async (log) => {
+    try {
+      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs/${log._id}`, { method: "DELETE" });
+      if (!res?.ok) throw new Error(res?.error || "Delete failed");
+      tg?.showPopup?.({ message: "Log deleted" });
+      load();
+    } catch (e) {
+      tg?.showAlert?.(`Failed to delete log: ${e.message || "Unknown error"}`);
+    }
+  };
+
+  const openEdit = (log) => {
+    setEditingLog(log);
+    setShowEdit(true);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Logs: {String(habit?.name || "")}</h2>
+          <button className="modal-close" onClick={onClose} type="button">×</button>
+        </div>
+
+        <div className="modal-body">
+          {loading ? (
+            <div className="loading">
+              <div className="spinner" />
+              <div>Loading logs...</div>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-text">No logs yet.</div>
+            </div>
+          ) : (
+            <div className="logs-list">
+              {logs.map((log) => {
+                const unit = String(log?.unit || habit?.unit || "sessions");
+                const started = log?.startedAt ? new Date(log.startedAt) : null;
+                const ended = log?.endedAt ? new Date(log.endedAt) : null;
+
+                const amount = log?.amount === undefined || log?.amount === null
+                  ? ""
+                  : `${log.amount}${unit ? " " + unit : ""}`;
+
+                const timeLine =
+                  started && !isNaN(started.getTime())
+                    ? `${started.toLocaleString()}${ended && !isNaN(ended.getTime()) ? ` → ${ended.toLocaleString()}` : ""}`
+                    : "Unknown time";
+
+                return (
+                  <div className="log-row" key={log._id}>
+                    <div className="log-top">
+                      <div className="log-amount">{amount || "Session"}</div>
+                      <div className="log-time">{timeLine}</div>
+                    </div>
+
+                    <div className="log-actions">
+                      <button className="btn btn-primary" type="button" onClick={() => openEdit(log)}>Edit</button>
+                      <button className="btn btn-danger" type="button" onClick={() => del(log)}>Delete</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" type="button" onClick={onClose}>Close</button>
+        </div>
+
+        {showEdit && editingLog ? (
+          <HabitLogEditModal
+            habit={habit}
+            log={editingLog}
+            onClose={() => setShowEdit(false)}
+            onSaved={load}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// Habits Log Edit Modal
+function HabitLogEditModal({ habit, log, onClose, onSaved }) {
+  const unit = String(habit?.unit || "sessions");
+
+  const [startedAt, setStartedAt] = useState(log?.startedAt ? fmtDateTimeLocalValue(log.startedAt) : fmtDateTimeLocalValue(new Date()));
+  const [endedAt, setEndedAt] = useState(log?.endedAt ? fmtDateTimeLocalValue(log.endedAt) : "");
+  const [amount, setAmount] = useState(log?.amount === undefined || log?.amount === null ? "" : String(log.amount));
+
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const save = async () => {
+    const s = parseDateTimeLocalValue(startedAt);
+    if (!s) {
+      tg?.showAlert?.("startedAt must be valid.");
+      return;
+    }
+    const e = endedAt ? parseDateTimeLocalValue(endedAt) : null;
+    if (e && e.getTime() < s.getTime()) {
+      tg?.showAlert?.("endedAt cannot be before startedAt.");
+      return;
+    }
+
+    let amt = undefined;
+    if (amount !== "" && amount !== null && amount !== undefined) {
+      const n = Number(amount);
+      if (!Number.isFinite(n) || n < 0) {
+        tg?.showAlert?.("amount must be >= 0.");
+        return;
+      }
+      amt = n;
+    }
+
+    try {
+      const res = await apiCall(`${HABITS_API_BASE}/habits/${habit._id}/logs/${log._id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          startedAt: s.toISOString(),
+          endedAt: e ? e.toISOString() : null,
+          amount: amt === undefined ? "" : amt,
+        }),
+      });
+
+      if (!res?.ok) throw new Error(res?.error || "Update failed");
+      tg?.showPopup?.({ message: "Log updated" });
+      onSaved?.();
+      onClose?.();
+    } catch (e2) {
+      tg?.showAlert?.(`Failed to update log: ${e2.message || "Unknown error"}`);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Edit Log</h2>
+          <button className="modal-close" onClick={onClose} type="button">×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Started At</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={startedAt}
+              onChange={(e) => setStartedAt(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Ended At (optional)</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={endedAt}
+              onChange={(e) => setEndedAt(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Amount (optional)</label>
+            <input
+              type="number"
+              min="0"
+              className="form-input"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={isSessionsUnit(unit) ? "Leave empty for sessions-only" : `Amount in ${unit}`}
+            />
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" type="button" onClick={save}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Habits View
+function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
+  const [habits, setHabits] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // list toggles
+  const [includePaused, setIncludePaused] = useState(false);
+  const [cadenceFilter, setCadenceFilter] = useState("all"); // all | daily | weekly
+
+  // modals
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingHabit, setEditingHabit] = useState(null);
+
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [logHabit, setLogHabit] = useState(null);
+
+  const [showLogsModal, setShowLogsModal] = useState(false);
+  const [logsHabit, setLogsHabit] = useState(null);
+
+  const loadHabits = async () => {
+    try {
+      setLoading(true);
+      const url = `${HABITS_API_BASE}/habits${includePaused ? "?includePaused=1" : ""}`;
+      const res = await apiCall(url);
+      if (!res?.ok) throw new Error(res?.error || "Failed to load habits");
+
+      let list = Array.isArray(res.habits) ? res.habits : [];
+
+      if (cadenceFilter !== "all") {
+        list = list.filter((h) => String(h.cadence || "daily") === cadenceFilter);
+      }
+
+      setHabits(list);
+    } catch (e) {
+      tg?.showAlert?.(`Failed to load habits: ${e.message || "Unknown error"}`);
+      setHabits([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === "habits") loadHabits();
+  }, [activeView, includePaused, cadenceFilter]);
+
+  const createHabit = () => {
+    setEditingHabit(null);
+    setShowEditor(true);
+  };
+
+  const editHabit = (h) => {
+    setEditingHabit(h);
+    setShowEditor(true);
+  };
+
+  const delHabit = async (h) => {
+    try {
+      const res = await apiCall(`${HABITS_API_BASE}/habits/${h._id}`, { method: "DELETE" });
+      if (!res?.ok) throw new Error(res?.error || "Delete failed");
+      tg?.showPopup?.({ message: "Habit deleted" });
+      loadHabits();
+    } catch (e) {
+      tg?.showAlert?.(`Failed to delete habit: ${e.message || "Unknown error"}`);
+    }
+  };
+
+  const togglePause = async (h) => {
+    try {
+      const next = String(h.status) === "paused" ? "active" : "paused";
+      const res = await apiCall(`${HABITS_API_BASE}/habits/${h._id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res?.ok) throw new Error(res?.error || "Update failed");
+      tg?.showPopup?.({ message: next === "paused" ? "Paused" : "Resumed" });
+      loadHabits();
+    } catch (e) {
+      tg?.showAlert?.(`Failed to update habit: ${e.message || "Unknown error"}`);
+    }
+  };
+
+  const openLog = (h) => {
+    setLogHabit(h);
+    setShowLogModal(true);
+  };
+
+  const openLogs = (h) => {
+    setLogsHabit(h);
+    setShowLogsModal(true);
+  };
+
+  return (
+    <div>
+      <div className="header">
+        <h1>Habits</h1>
+
+        <div className="habits-header-actions">
+          <button className="btn btn-primary" type="button" onClick={createHabit}>
+            New
+          </button>
+        </div>
+      </div>
+
+      <div className="quick-actions">
+        <div
+          className={`quick-action ${cadenceFilter === "all" ? "active" : ""}`}
+          onClick={() => setCadenceFilter("all")}
+        >
+          All
+        </div>
+        <div
+          className={`quick-action ${cadenceFilter === "daily" ? "active" : ""}`}
+          onClick={() => setCadenceFilter("daily")}
+        >
+          Daily
+        </div>
+        <div
+          className={`quick-action ${cadenceFilter === "weekly" ? "active" : ""}`}
+          onClick={() => setCadenceFilter("weekly")}
+        >
+          Weekly
+        </div>
+
+        <div
+          className={`quick-action ${includePaused ? "active" : ""}`}
+          onClick={() => setIncludePaused((v) => !v)}
+          style={{ marginLeft: "auto" }}
+        >
+          Include Paused
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading habits...</div>
+        </div>
+      ) : habits.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-text">No habits yet. Tap New.</div>
+        </div>
+      ) : (
+        habits.map((h) => (
+          <HabitCard
+            key={h._id}
+            habit={h}
+            onEdit={editHabit}
+            onDelete={delHabit}
+            onTogglePause={togglePause}
+            onOpenLog={openLog}
+            onOpenLogs={openLogs}
+          />
+        ))
+      )}
+
+      {/* Hidden hook for your global FAB mapping */}
+      <button className="is-hidden" data-create-habit="1" onClick={createHabit} />
+
+      {showEditor ? (
+        <HabitEditorModal
+          initialHabit={editingHabit}
+          currentUser={currentUser}
+          onClose={() => setShowEditor(false)}
+          onSaved={loadHabits}
+        />
+      ) : null}
+
+      {showLogModal && logHabit ? (
+        <HabitLogModal
+          habit={logHabit}
+          onClose={() => setShowLogModal(false)}
+          onCreated={loadHabits}
+        />
+      ) : null}
+
+      {showLogsModal && logsHabit ? (
+        <HabitLogsModal habit={logsHabit} onClose={() => setShowLogsModal(false)} />
+      ) : null}
+    </div>
+  );
 }
 
 
@@ -4591,7 +5786,7 @@ const data = await apiCall(
     }
 
     // Reminders View
-function RemindersView({ activeView, userTimezone, userDisplayName }) {
+function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits }) {
       const [reminders, setReminders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showHistory, setShowHistory] = useState(false);
@@ -4704,9 +5899,23 @@ useEffect(() => {
     })()}
   </div>
 
-  <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
-    <span>History</span>
-    <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
+  <div className="header-actions">
+    {/* HABITS ICON BUTTON */}
+    <button
+      type="button"
+      className="icon-btn"
+      aria-label="Habits"
+      title="Habits"
+      onClick={() => setActiveView("habits")}
+    >
+      <img src="/icons/plus.svg" alt="" />
+    </button>
+
+    {/* HISTORY TOGGLE */}
+    <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
+      <span>History</span>
+      <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
+    </div>
   </div>
 </div>
 
@@ -5438,6 +6647,7 @@ function App() {
   // ---------------------
   const [userDisplayName, setUserDisplayName] = useState("");
 
+
   // --------------------
   // LOAD USER SETTINGS (NEW)
   // --------------------
@@ -5470,6 +6680,10 @@ if (data?.settings?.displayName !== undefined) {
     setActiveView(previousView || "reminders");
   }
   
+  function openHabitsFromReminders() {
+  goTo("habits");
+}
+  
   function openJournalTag(tag) {
   const clean = String(tag || "").trim().toLowerCase().replace(/^#/, "");
   if (!clean) return;
@@ -5490,6 +6704,12 @@ if (activeView === 'reminders') {
   const btn = document.querySelector('[data-create-reminder="1"]');
   if (btn) btn.click();
 }
+
+else if (activeView === 'habits') {
+  const btn =
+document.querySelector('[data-create-habit="1"]');
+  if (btn) btn.click();
+} 
 
 else if (activeView === 'calendar') {
   const btn = document.querySelector('[data-create-event="1"]');
@@ -5517,8 +6737,21 @@ return (
   activeView={activeView}
   userTimezone={userTimezone}
   userDisplayName={userDisplayName}
+  onOpenHabits={openHabitsFromReminders}
 />
       </div>
+      
+      <div
+  className={`view-container ${activeView === 'habits' ? 'active' : ''}`}
+  data-view="habits"
+>
+  <HabitsView
+    activeView={activeView}
+    userTimezone={userTimezone}
+    userDisplayName={userDisplayName}
+    onBack={goBack}
+  />
+</div>
 
       <div
         className={`view-container ${activeView === 'calendar' ? 'active' : ''}`}
