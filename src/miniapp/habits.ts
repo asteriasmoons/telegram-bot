@@ -314,33 +314,32 @@ const {
       sched.daysOfWeek = clampDaysOfWeek(sched.daysOfWeek);
     }
     
-    const computedNext =
+const computedNext =
   status === "paused" || sched.kind === "off"
     ? undefined
     : computeNextReminderAtFromSchedule(timezone.trim(), sched);
 
-    const doc = await Habit.create({
-      userId,
-      chatId: userId,
-      nextReminderAt: nextReminderAt
-  ? new Date(nextReminderAt)
-  : computedNext,
+const doc = await Habit.create({
+  userId,
+  chatId: userId,
 
-      name: name.trim(),
-      description: typeof description === "string" ? description.trim() : undefined,
+  name: name.trim(),
+  description: typeof description === "string" ? description.trim() : undefined,
 
-      status: status === "paused" ? "paused" : "active",
+  status: status === "paused" ? "paused" : "active",
 
-      cadence: cadence === "weekly" ? "weekly" : "daily",
-      targetCount: tc,
-      targetAmount: Number.isFinite(Number(targetAmount)) ? Number(targetAmount) : undefined,
-      unit: unit || "sessions",
+  cadence: cadence === "weekly" ? "weekly" : "daily",
+  targetCount: tc,
+  targetAmount: Number.isFinite(Number(targetAmount)) ? Number(targetAmount) : undefined,
+  unit: unit || "sessions",
 
-      timezone: timezone.trim(),
+  timezone: timezone.trim(),
 
-      reminderSchedule: sched,
-      nextReminderAt: nextReminderAt ? new Date(nextReminderAt) : undefined,
-    });
+  reminderSchedule: sched,
+
+  // ✅ only ONE nextReminderAt field
+  nextReminderAt: nextReminderAt ? new Date(nextReminderAt) : computedNext,
+});
 
     res.json({ ok: true, habit: doc.toObject() });
   } catch (e: any) {
