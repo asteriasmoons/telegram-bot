@@ -8,26 +8,6 @@ import { HabitLog } from "../models/HabitLog";
 const router = Router();
 
 /**
- * IMPORTANT:
- * Replace this with however you currently authenticate/identify the Telegram user.
- * Common patterns:
- * - req.user.id (if you already attach it in middleware)
- * - req.tgUserId (custom)
- * - header "x-user-id" or "x-telegram-user-id"
- *
- * I'm keeping it explicit and strict so you don't accidentally write habits to the wrong user.
- */
-function requireUserId(req: any): number {
-  const userId = Number(req.userId);
-  if (!Number.isFinite(userId) || userId <= 0) {
-    const err: any = new Error("Unauthorized");
-    err.status = 401;
-    throw err;
-  }
-  return userId;
-}
-
-/**
  * Fix for your TS errors:
  * isObjectId must exist in this file.
  */
@@ -61,7 +41,7 @@ function bad(res: any, message: string, status = 400) {
  */
 router.get("/habits", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const includePaused = String(req.query.includePaused || "") === "1";
 
     const q: any = { userId };
@@ -80,7 +60,7 @@ router.get("/habits", async (req, res) => {
  */
 router.post("/habits", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
 
 const {
   name,
@@ -168,7 +148,7 @@ const chatId = userId;
  */
 router.get("/habits/:id", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -188,7 +168,7 @@ router.get("/habits/:id", async (req, res) => {
  */
 router.put("/habits/:id", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -283,7 +263,7 @@ router.put("/habits/:id", async (req, res) => {
  */
 router.delete("/habits/:id", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -308,7 +288,7 @@ router.delete("/habits/:id", async (req, res) => {
  */
 router.get("/habits/:id/logs", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -348,7 +328,7 @@ router.get("/habits/:id/logs", async (req, res) => {
  */
 router.post("/habits/:id/logs", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -398,7 +378,7 @@ router.post("/habits/:id/logs", async (req, res) => {
  */
 router.put("/habits/:id/logs/:logId", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const habitId = String(req.params.id);
     const logId = String(req.params.logId);
 
@@ -463,7 +443,7 @@ router.put("/habits/:id/logs/:logId", async (req, res) => {
  */
 router.delete("/habits/:id/logs/:logId", async (req, res) => {
   try {
-    const userId = requireUserId(req);
+    const userId = Number(req.userId);
     const habitId = String(req.params.id);
     const logId = String(req.params.logId);
 
