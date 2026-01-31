@@ -5,6 +5,8 @@ import mongoose from "mongoose";
 import { Habit } from "../models/Habit";
 import { HabitLog } from "../models/HabitLog";
 
+import { DateTime } from "luxon";
+
 const router = Router();
 
 /**
@@ -33,6 +35,183 @@ function clampDaysOfWeek(days: any): number[] {
 
 function bad(res: any, message: string, status = 400) {
   return res.status(status).json({ ok: false, error: message });
+}
+
+function parseTimeOfDay(timeOfDay?: string): { hour: number; minute: number } | null {
+  if (!timeOfDay) return null;
+  const t = String(timeOfDay).trim();
+  if (!/^\d{2}:\d{2}$/.test(t)) return null;
+
+  const [hh, mm] = t.split(":").map((x) => Number(x));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+
+  return { hour: hh, minute: mm };
+}
+
+function luxonWeekdayToDOW0to6(dt: DateTime): number {
+  // Luxon weekday: 1=Mon..7=Sun
+  return dt.weekday === 7 ? 0 : dt.weekday; // Sun->0, Mon->1..Sat->6
+}
+
+function isAllowedDay(dt: DateTime, daysOfWeek: any): boolean {
+  const arr = Array.isArray(daysOfWeek) ? daysOfWeek : [];
+  if (arr.length === 0) return true;
+  const dow = luxonWeekdayToDOW0to6(dt);
+  return arr.includes(dow);
+}
+
+function getWindow(nowZ: DateTime, sched: any) {
+  const ws = String(sched?.windowStart || "").trim();
+  const we = String(sched?.windowEnd || "").trim();
+  const wStart = parseTimeOfDay(ws);
+  const wEnd = parseTimeOfDay(we);
+  if (!wStart || !wEnd) return null;
+
+  const startToday = nowZ.set({ hour: wStart.hour, minute: wStart.minute, second: 0, millisecond: 0 });
+  const endToday = nowZ.set({ hour: wEnd.hour, minute: wEnd.minute, second: 0, millisecond: 0 });
+
+  // No overnight windows in this implementation
+  if (endToday <= startToday) return null;
+
+  return { startToday, endToday };
+}
+
+function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: any): Date | undefined {
+  const sched = reminderSchedule;
+  if (!sched || !sched.kind || sched.kind === "off") return undefined;
+
+  const tz = String(timezone || "America/Chicago");
+  const nowZ = DateTime.now().setZone(tz);
+
+  const days = Array.isArray(sched.daysOfWeek) ? sched.daysOfWeek : [];
+
+  // -------------------------
+  // TIMES
+  // -------------------------
+  if (sched.kind === "times") {
+    const times: string[] = Array.isArray(sched.timesOfDay) ? sched.timesOfDay : [];
+    const parsed = times
+      .map((t) => String(t || "").trim())
+      .filter((t) => /^\d{2}:\d{2}$/.test(t))
+      .sort();
+
+    if (parsed.length === 0) return undefined;
+
+    // look up to 8 days ahead to find next allowed day+time
+    for (let dayOffset = 0; dayOffset <= 8; dayOffset++) {
+      const day = nowZ.plus({ days: dayOffset }).startOf("day");
+      if (!isAllowedDay(day, days)) continue;
+
+      for (const t of parsed) {
+        const tt = parseTimeOfDay(t);
+        if (!tt) continue;
+
+        const cand = day.set({ hour: tt.hour, minute: tt.minute, second: 0, millisecond: 0 });
+        if (cand > nowZ) return cand.toJSDate();
+      }
+    }
+
+    // fallback (shouldn't really happen)
+    return nowZ.plus({ days: 1 }).set({ hour: 9, minute: 0, second: 0, millisecond: 0 }).toJSDate();
+  }
+
+  // -------------------------
+  // HOURLY
+  // -------------------------
+  if (sched.kind === "hourly") {
+    const everyHours = Number(sched.everyHours);
+    if (!Number.isFinite(everyHours) || everyHours <= 0) return undefined;
+
+    const win = getWindow(nowZ, sched);
+
+    // If no window: just next = now + everyHours, but honor allowed days (skip forward if needed)
+    if (!win) {
+      let next = nowZ.plus({ hours: everyHours });
+      // if daysOfWeek restricted, bump day-by-day until allowed
+      for (let i = 0; i < 14 && !isAllowedDay(next, days); i++) next = next.plus({ days: 1 }).startOf("day").plus({ hours: everyHours });
+      return next.toJSDate();
+    }
+
+    const { startToday, endToday } = win;
+
+    // if today isn't allowed, jump to next allowed day at window start
+    if (!isAllowedDay(nowZ, days)) {
+      for (let i = 1; i <= 14; i++) {
+        const d = nowZ.plus({ days: i });
+        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+      }
+      return startToday.plus({ days: 1 }).toJSDate();
+    }
+
+    if (nowZ < startToday) return startToday.toJSDate();
+    if (nowZ >= endToday) {
+      // next allowed day start
+      for (let i = 1; i <= 14; i++) {
+        const d = nowZ.plus({ days: i });
+        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+      }
+      return startToday.plus({ days: 1 }).toJSDate();
+    }
+
+    const next = nowZ.plus({ hours: everyHours });
+    if (next < endToday) return next.toJSDate();
+
+    // move to next allowed day at window start
+    for (let i = 1; i <= 14; i++) {
+      const d = nowZ.plus({ days: i });
+      if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+    }
+
+    return startToday.plus({ days: 1 }).toJSDate();
+  }
+
+  // -------------------------
+  // EVERY X MINUTES
+  // -------------------------
+  if (sched.kind === "every_x_minutes") {
+    const everyMinutes = Number(sched.everyMinutes);
+    if (!Number.isFinite(everyMinutes) || everyMinutes <= 0) return undefined;
+
+    const win = getWindow(nowZ, sched);
+
+    if (!win) {
+      let next = nowZ.plus({ minutes: everyMinutes });
+      for (let i = 0; i < 14 && !isAllowedDay(next, days); i++) next = next.plus({ days: 1 }).startOf("day").plus({ minutes: everyMinutes });
+      return next.toJSDate();
+    }
+
+    const { startToday, endToday } = win;
+
+    if (!isAllowedDay(nowZ, days)) {
+      for (let i = 1; i <= 14; i++) {
+        const d = nowZ.plus({ days: i });
+        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+      }
+      return startToday.plus({ days: 1 }).toJSDate();
+    }
+
+    if (nowZ < startToday) return startToday.toJSDate();
+    if (nowZ >= endToday) {
+      for (let i = 1; i <= 14; i++) {
+        const d = nowZ.plus({ days: i });
+        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+      }
+      return startToday.plus({ days: 1 }).toJSDate();
+    }
+
+    const next = nowZ.plus({ minutes: everyMinutes });
+    if (next < endToday) return next.toJSDate();
+
+    for (let i = 1; i <= 14; i++) {
+      const d = nowZ.plus({ days: i });
+      if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+    }
+
+    return startToday.plus({ days: 1 }).toJSDate();
+  }
+
+  return undefined;
 }
 
 /**
@@ -134,10 +313,18 @@ const {
     if (sched.daysOfWeek) {
       sched.daysOfWeek = clampDaysOfWeek(sched.daysOfWeek);
     }
+    
+    const computedNext =
+  status === "paused" || sched.kind === "off"
+    ? undefined
+    : computeNextReminderAtFromSchedule(timezone.trim(), sched);
 
     const doc = await Habit.create({
       userId,
       chatId: userId,
+      nextReminderAt: nextReminderAt
+  ? new Date(nextReminderAt)
+  : computedNext,
 
       name: name.trim(),
       description: typeof description === "string" ? description.trim() : undefined,
@@ -261,6 +448,41 @@ router.put("/:id", async (req, res) => {
     if (b.nextReminderAt !== undefined) {
       patch.nextReminderAt = b.nextReminderAt ? new Date(b.nextReminderAt) : undefined;
     }
+    
+    // If habit is paused, clear nextReminderAt
+if (patch.status === "paused") {
+  patch.nextReminderAt = undefined;
+}
+
+// If reminders turned off, clear nextReminderAt
+if (patch.reminderSchedule?.kind === "off") {
+  patch.nextReminderAt = undefined;
+}
+
+// If caller did NOT explicitly send nextReminderAt,
+// but schedule/timezone/status changed to an "active reminders" state,
+// compute a fresh nextReminderAt.
+const callerProvidedNext = Object.prototype.hasOwnProperty.call(b, "nextReminderAt");
+
+const scheduleChanged = !!patch.reminderSchedule;
+const tzChanged = typeof patch.timezone === "string";
+const statusChanged = typeof patch.status === "string";
+
+if (!callerProvidedNext && (scheduleChanged || tzChanged || statusChanged)) {
+  // We need the effective values (patched or existing), so fetch current habit first.
+  const current = await Habit.findOne({ _id: id, userId }).lean();
+  if (!current) return bad(res, "Habit not found", 404);
+
+  const effectiveStatus = String(patch.status ?? current.status ?? "active");
+  const effectiveTz = String(patch.timezone ?? current.timezone ?? "America/Chicago");
+  const effectiveSched = patch.reminderSchedule ?? current.reminderSchedule;
+
+  if (effectiveStatus === "active" && effectiveSched?.kind && effectiveSched.kind !== "off") {
+    patch.nextReminderAt = computeNextReminderAtFromSchedule(effectiveTz, effectiveSched);
+  } else {
+    patch.nextReminderAt = undefined;
+  }
+}
 
     const updated = await Habit.findOneAndUpdate(
       { _id: id, userId },

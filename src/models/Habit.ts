@@ -76,6 +76,11 @@ export type HabitDoc = {
   createdAt: Date;
   updatedAt: Date;
   lastRemindedAt?: Date;
+  
+    lock?: {
+    lockedAt?: Date;
+    lockExpiresAt?: Date;
+    lockedBy?: string;
 };
 
 const HabitReminderScheduleSchema = new Schema<HabitReminderSchedule>(
@@ -96,6 +101,15 @@ const HabitReminderScheduleSchema = new Schema<HabitReminderSchedule>(
     windowEnd: { type: String, required: false },
 
     daysOfWeek: { type: [Number], required: false, default: [] },
+  },
+  { _id: false }
+);
+
+const HabitLockSchema = new Schema(
+  {
+    lockedAt: { type: Date, required: false },
+    lockExpiresAt: { type: Date, required: false, index: true },
+    lockedBy: { type: String, required: false },
   },
   { _id: false }
 );
@@ -139,6 +153,7 @@ const HabitSchema = new Schema<HabitDoc>(
     lastRemindedAt: { type: Date, required: false },
   },
   { timestamps: true }
+      lock: { type: HabitLockSchema, required: false, default: undefined },
 );
 
 // Polling index for habit reminders
