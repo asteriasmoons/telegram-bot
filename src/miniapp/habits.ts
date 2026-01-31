@@ -40,19 +40,42 @@ function bad(res: any, message: string, status = 400) {
  * List habits (optionally include paused with ?includePaused=1)
  */
 router.get("/habits", async (req, res) => {
+  console.log("=== HABITS GET REQUEST START ===");
+  console.log("req.userId:", req.userId);
+  console.log("req.query:", req.query);
+  console.log("req.headers:", req.headers);
+  
   try {
     const userId = Number(req.userId);
+    console.log("Parsed userId:", userId);
+    console.log("Is userId valid?", Number.isFinite(userId) && userId > 0);
+    
+    if (!Number.isFinite(userId) || userId <= 0) {
+      console.log("❌ FAILED: Invalid userId");
+      return res.status(401).json({ ok: false, error: "Unauthorized - invalid userId" });
+    }
+    
     const includePaused = String(req.query.includePaused || "") === "1";
+    console.log("includePaused:", includePaused);
 
     const q: any = { userId };
     if (!includePaused) q.status = "active";
+    console.log("MongoDB query:", JSON.stringify(q));
 
     const habits = await Habit.find(q).sort({ updatedAt: -1 }).lean();
+    console.log("✅ Found habits:", habits.length);
+    console.log("=== HABITS GET REQUEST SUCCESS ===");
+    
     res.json({ ok: true, habits });
   } catch (e: any) {
+    console.error("=== HABITS GET REQUEST ERROR ===");
+    console.error("Error:", e);
+    console.error("Error message:", e.message);
+    console.error("Error stack:", e.stack);
     res.status(e.status || 500).json({ ok: false, error: e.message || "Failed to list habits" });
   }
 });
+
 
 /**
  * POST /api/habits
