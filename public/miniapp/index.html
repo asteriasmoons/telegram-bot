@@ -1471,6 +1471,263 @@ img {
   font-size: 13px;
   border-radius: 10px;
 }
+
+/* =========================
+   GLASSY THEME PATCH
+   Paste at end of your CSS
+   ========================= */
+
+/* 1) New glass variables */
+:root {
+  /* Glass surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-strong: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.14);
+
+  /* Highlights / shadows */
+  --glass-highlight: rgba(255, 255, 255, 0.18);
+  --glass-shadow: rgba(0, 0, 0, 0.35);
+
+  /* Blur amount (tweak to taste) */
+  --glass-blur: 16px;
+
+  /* Slightly lighter base background for depth */
+  --bg-color: #07070a;
+}
+
+/* 2) Add a soft ambient backdrop behind everything */
+body {
+  background: var(--bg-color);
+  position: relative;
+}
+
+/* Subtle "aurora" glow behind the UI */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+
+  background:
+    radial-gradient(600px 420px at 15% 10%, rgba(91, 141, 239, 0.22), transparent 60%),
+    radial-gradient(540px 420px at 85% 15%, rgba(139, 125, 239, 0.18), transparent 62%),
+    radial-gradient(700px 520px at 50% 90%, rgba(76, 175, 80, 0.10), transparent 60%);
+  filter: blur(2px);
+  opacity: 0.85;
+}
+
+/* Adds a very faint "grain" so glass looks premium (optional but nice) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+}
+
+/* 3) Utility: glass surface treatment */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  box-shadow: 0 14px 40px var(--glass-shadow);
+}
+
+/* A glass "edge shine" (helps it read as glass) */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.18),
+    rgba(255,255,255,0.06) 35%,
+    rgba(255,255,255,0.00) 60%
+  );
+  opacity: 0.55;
+  mix-blend-mode: screen;
+}
+
+/* 4) Convert your primary surfaces to glass */
+
+/* Cards */
+.card {
+  position: relative; /* needed for ::before highlight */
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.35);
+}
+
+.card:hover {
+  border-color: rgba(91, 141, 239, 0.35);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+  transform: translateY(-2px);
+}
+
+/* Bottom nav glass bar */
+.bottom-nav {
+  background: rgba(20, 20, 26, 0.55);
+  border-top: 1px solid rgba(255,255,255,0.10);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(140%);
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(140%);
+}
+
+/* Header: glassy top edge (optional, subtle) */
+.header {
+  background: rgba(10,10,12,0.35);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Modals */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.modal {
+  position: relative;
+  background: rgba(25, 25, 32, 0.55);
+  border: 1px solid rgba(255,255,255,0.14);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(150%);
+  backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(150%);
+  box-shadow: 0 22px 70px rgba(0,0,0,0.6);
+}
+
+/* Inputs: glass fields */
+.form-input,
+.form-textarea,
+.form-select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  border-color: rgba(91, 141, 239, 0.55);
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Quick action pills: glass chips */
+.quick-action {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+
+.quick-action:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(91, 141, 239, 0.35);
+}
+
+.quick-action.active {
+  background: rgba(91, 141, 239, 0.22);
+  border-color: rgba(91, 141, 239, 0.50);
+  box-shadow: 0 10px 26px rgba(91, 141, 239, 0.18);
+}
+
+/* Tag pills: slightly more luminous */
+.tag-pill,
+.tag-chip {
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+
+/* Calendar event blocks: glass cards */
+.calendar-event,
+.calendar-no-events,
+.calendar-add-event,
+.tag-item,
+.journal-filter-bar,
+.qh-box,
+.share-code-box,
+.event-share-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+/* Icon buttons: glass */
+.icon-btn,
+.calendar-nav-btn,
+.calendar-add-icon-btn,
+.journal-filter-clear {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+
+.icon-btn:hover,
+.calendar-nav-btn:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(91, 141, 239, 0.35);
+}
+
+/* FAB: keep your gradient but make it "glossier" */
+.fab {
+  box-shadow:
+    0 10px 30px rgba(91, 141, 239, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.22);
+}
+
+/* Buttons: add subtle gloss */
+.btn {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.10);
+}
+
+/* Badges: slightly glassier */
+.card-badge {
+  border: 1px solid rgba(255,255,255,0.10);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+}
+
+/* Reduce harsh separators in glass UI */
+:root {
+  --border: rgba(255,255,255,0.10);
+}
+
+/* Safety: if backdrop-filter is unsupported, keep it readable */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .card,
+  .modal,
+  .bottom-nav,
+  .header,
+  .quick-action,
+  .form-input,
+  .form-textarea,
+  .form-select {
+    background: rgba(20, 20, 26, 0.92);
+  }
+}
   </style>
 </head>
 
