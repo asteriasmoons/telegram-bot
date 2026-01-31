@@ -82,19 +82,21 @@ router.post("/habits", async (req, res) => {
   try {
     const userId = requireUserId(req);
 
-    const {
-      chatId,
-      name,
-      description,
-      status,
-      cadence,
-      targetCount,
-      targetAmount,
-      unit,
-      timezone,
-      reminderSchedule,
-      nextReminderAt,
-    } = req.body || {};
+const {
+  name,
+  description,
+  status,
+  cadence,
+  targetCount,
+  targetAmount,
+  unit,
+  timezone,
+  reminderSchedule,
+  nextReminderAt,
+} = req.body || {};
+
+// DM default: chatId is the userId
+const chatId = userId;
 
     if (!Number.isFinite(Number(chatId))) return bad(res, "chatId is required");
     if (typeof name !== "string" || !name.trim()) return bad(res, "name is required");

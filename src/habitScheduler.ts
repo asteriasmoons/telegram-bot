@@ -216,7 +216,12 @@ async function sendHabitReminder(bot: Telegraf<any>, h: any) {
   const sendOpts: any = {};
   sendOpts.reply_markup = habitActionKeyboard(String(h._id)).reply_markup;
 
-  await bot.telegram.sendMessage(h.chatId, text, sendOpts);
+const chatId = Number(h.chatId ?? h.userId);
+if (!Number.isFinite(chatId) || chatId <= 0) {
+  throw new Error("Habit is missing chatId/userId");
+}
+
+await bot.telegram.sendMessage(chatId, text, sendOpts);
 }
 
 // In-memory pending custom snooze: userId -> { habitId, expiresAt }
