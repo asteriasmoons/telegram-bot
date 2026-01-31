@@ -1,3 +1,5 @@
+// src/miniapp/habits.ts
+
 import { Router } from "express";
 import mongoose from "mongoose";
 import { Habit } from "../models/Habit";
@@ -23,6 +25,15 @@ function requireUserId(req: any): number {
     throw err;
   }
   return userId;
+}
+
+/**
+ * Fix for your TS errors:
+ * isObjectId must exist in this file.
+ */
+function isObjectId(id: any): boolean {
+  if (typeof id !== "string") return false;
+  return mongoose.Types.ObjectId.isValid(id);
 }
 
 function okTimeHHmm(s: any) {
@@ -279,7 +290,7 @@ router.delete("/habits/:id", async (req, res) => {
     if (!habit) return bad(res, "Habit not found", 404);
 
     await Habit.deleteOne({ _id: id, userId });
-    await HabitLog.deleteMany({ habitId: id, userId });
+    await HabitLog.deleteMany({ habitId: id as any, userId });
 
     res.json({ ok: true });
   } catch (e: any) {
@@ -337,6 +348,7 @@ router.post("/habits/:id/logs", async (req, res) => {
   try {
     const userId = requireUserId(req);
     const id = String(req.params.id);
+
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
 
     const habit = await Habit.findOne({ _id: id, userId }).lean();
@@ -369,7 +381,7 @@ router.post("/habits/:id/logs", async (req, res) => {
       startedAt: s,
       endedAt: e,
       amount: amt,
-      unit: habit.unit, // keep consistent with the habit definition
+      unit: habit.unit,
     });
 
     res.json({ ok: true, log: log.toObject() });
@@ -425,7 +437,6 @@ router.put("/habits/:id/logs/:logId", async (req, res) => {
     // Keep unit locked to habit’s unit
     patch.unit = habit.unit;
 
-    // If both start and end are being set, validate ordering
     if (patch.startedAt && patch.endedAt && patch.endedAt.getTime() < patch.startedAt.getTime()) {
       return bad(res, "endedAt cannot be before startedAt");
     }

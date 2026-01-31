@@ -74,7 +74,7 @@ async function main() {
 startHabitScheduler(bot, {
   pollEveryMs: 10_000,
   lockTtlMs: 60_000,
-  instanceId: makeHabitInstanceId()
+  instanceId: makeInstanceId()
 });
 
   // Graceful shutdown
