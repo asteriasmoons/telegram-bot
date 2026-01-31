@@ -276,6 +276,7 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
 
       const habit = await Habit.findOne({ _id: habitId, userId }).lean();
       if (!habit) {
+      console.log("[habits] hb:log clicked", { userId, habitId });
         await ctx.reply("That habit no longer exists.");
         return;
       }
@@ -339,6 +340,11 @@ return;
   });
 
 bot.on("text", async (ctx) => {
+console.log("[habits] text seen", {
+  userId: ctx.from?.id,
+  text: (ctx.message as any)?.text,
+  hasReply: !!(ctx.message as any)?.reply_to_message,
+});
   const userId = ctx.from?.id;
   if (!userId) return;
 
