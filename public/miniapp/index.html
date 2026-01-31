@@ -2102,25 +2102,6 @@ function statusLabelToValue(input) {
 // HABITS UI (matches your Habit.ts / HabitLog.ts / habits.ts API)
 // =========================
 
-function fmtDateTimeLocalValue(d) {
-  const dt = d instanceof Date ? d : new Date(d);
-  if (isNaN(dt.getTime())) return "";
-  const pad = (n) => String(n).padStart(2, "0");
-  const yyyy = dt.getFullYear();
-  const mm = pad(dt.getMonth() + 1);
-  const dd = pad(dt.getDate());
-  const hh = pad(dt.getHours());
-  const mi = pad(dt.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
-
-function parseDateTimeLocalValue(v) {
-  if (!v) return null;
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return null;
-  return d;
-}
-
 function safeNum(n, fallback = 0) {
   const x = Number(n);
   return Number.isFinite(x) ? x : fallback;
