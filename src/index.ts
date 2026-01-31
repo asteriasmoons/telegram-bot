@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 import { createBot } from "./bot";
 import { startServer } from "./health";
 import { startScheduler, makeInstanceId } from "./scheduler";
-import { startHabitScheduler } from "./habitsScheduler";
+import { startHabitScheduler } from "./habitScheduler";
 
 async function main() {
   const token = process.env.BOT_TOKEN;

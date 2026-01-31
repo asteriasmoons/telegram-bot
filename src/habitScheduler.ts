@@ -1,3 +1,4 @@
+// src/habitScheduler.ts
 import { Telegraf, Markup } from "telegraf";
 import mongoose from "mongoose";
 import { DateTime } from "luxon";
@@ -28,6 +29,7 @@ function addSeconds(d: Date, seconds: number) {
 
 /**
  * Acquire lock on a habit so only one instance processes it.
+ * NOTE: Your Habit schema must include `lock.lockExpiresAt/lockedAt/lockedBy`.
  */
 async function acquireLock(habitId: any, instanceId: string, lockSeconds: number) {
   const lockedAt = now();
@@ -36,7 +38,7 @@ async function acquireLock(habitId: any, instanceId: string, lockSeconds: number
   const res = await Habit.updateOne(
     {
       _id: habitId,
-      status: "scheduled",
+      status: "active",
       $or: [{ "lock.lockExpiresAt": { $exists: false } }, { "lock.lockExpiresAt": { $lte: lockedAt } }],
     },
     {
@@ -76,10 +78,6 @@ function parseTimeOfDay(timeOfDay?: string): { hour: number; minute: number } | 
   return { hour: hh, minute: mm };
 }
 
-function fmtHHmm(dt: DateTime) {
-  return dt.toFormat("HH:mm");
-}
-
 function nextAtTime(nowZ: DateTime, hhmm: string): DateTime | null {
   const t = parseTimeOfDay(hhmm);
   if (!t) return null;
@@ -87,82 +85,99 @@ function nextAtTime(nowZ: DateTime, hhmm: string): DateTime | null {
 }
 
 /**
- * Habits recurrence:
- * - kind: "times" => schedule.timesOfDay (array HH:mm). Choose next > now, else tomorrow at earliest.
- * - kind: "interval" => everyMinutes within windowStart/windowEnd (HH:mm). Strict required window.
- * - kind: "none" => null (no scheduling)
- *
- * NOTE: Habits reminders are separate from Reminders schedule kinds.
+ * Habits reminder schedule (MATCHES your Habit.ts model):
+ * - kind: "off" => null
+ * - kind: "times" => timesOfDay (array HH:mm)
+ * - kind: "hourly" => everyHours within optional windowStart/windowEnd
+ * - kind: "every_x_minutes" => everyMinutes within optional windowStart/windowEnd
  */
 function computeNextForHabitLuxon(h: any): Date | null {
-  const sched = h.reminder;
-  if (!sched || !sched.kind || sched.kind === "none") return null;
+  const sched = h.reminderSchedule;
+  if (!sched || !sched.kind || sched.kind === "off") return null;
 
   const tz = String(h.timezone || "America/Chicago");
   const nowZ = DateTime.now().setZone(tz);
 
+  function getWindow() {
+    const ws = String(sched.windowStart || "").trim();
+    const we = String(sched.windowEnd || "").trim();
+    const wStart = parseTimeOfDay(ws);
+    const wEnd = parseTimeOfDay(we);
+    if (!wStart || !wEnd) return null;
+
+    const startToday = nowZ.set({ hour: wStart.hour, minute: wStart.minute, second: 0, millisecond: 0 });
+    const endToday = nowZ.set({ hour: wEnd.hour, minute: wEnd.minute, second: 0, millisecond: 0 });
+
+    // No overnight windows in this implementation
+    if (endToday <= startToday) return null;
+
+    return { startToday, endToday };
+  }
+
   // -------------------------
-  // TIMES: pick next time-of-day
+  // TIMES
   // -------------------------
   if (sched.kind === "times") {
     const times: string[] = Array.isArray(sched.timesOfDay) ? sched.timesOfDay : [];
     const parsed = times
       .map((t) => String(t || "").trim())
       .filter((t) => /^\d{2}:\d{2}$/.test(t))
-      .sort(); // HH:mm sorts correctly lexicographically
+      .sort(); // HH:mm sorts lexicographically
 
     if (parsed.length === 0) return null;
 
-    // candidates today
     for (const t of parsed) {
       const cand = nextAtTime(nowZ, t);
       if (cand && cand > nowZ) return cand.toJSDate();
     }
 
-    // otherwise tomorrow earliest time
     const tomorrow = nowZ.plus({ days: 1 }).startOf("day");
     const first = nextAtTime(tomorrow, parsed[0]);
     return (first ?? tomorrow.plus({ hours: 9 })).toJSDate();
   }
 
   // -------------------------
-  // INTERVAL: everyMinutes within a strict window
+  // HOURLY
   // -------------------------
-  if (sched.kind === "interval") {
-    const every = Number(sched.everyMinutes);
-    if (!Number.isFinite(every) || every <= 0) return null;
+  if (sched.kind === "hourly") {
+    const everyHours = Number(sched.everyHours);
+    if (!Number.isFinite(everyHours) || everyHours <= 0) return null;
 
-    const ws = String(sched.windowStart || "").trim();
-    const we = String(sched.windowEnd || "").trim();
+    const win = getWindow();
 
-    const wStart = parseTimeOfDay(ws);
-    const wEnd = parseTimeOfDay(we);
+    if (!win) return nowZ.plus({ hours: everyHours }).toJSDate();
 
-    if (!wStart || !wEnd) return null;
+    const { startToday, endToday } = win;
 
-    // Build today window boundaries in tz
-    const startToday = nowZ.set({ hour: wStart.hour, minute: wStart.minute, second: 0, millisecond: 0 });
-    const endToday = nowZ.set({ hour: wEnd.hour, minute: wEnd.minute, second: 0, millisecond: 0 });
-
-    // Require a sensible window: end must be after start (no overnight window for now)
-    if (endToday <= startToday) return null;
-
-    // If now before window: next = windowStart today
     if (nowZ < startToday) return startToday.toJSDate();
+    if (nowZ >= endToday) return startToday.plus({ days: 1 }).toJSDate();
 
-    // If now after window: next = windowStart tomorrow
-    if (nowZ >= endToday) {
-      const startTomorrow = startToday.plus({ days: 1 });
-      return startTomorrow.toJSDate();
-    }
-
-    // Now inside window: next = now + everyMinutes, but if it exceeds end => tomorrow start
-    const next = nowZ.plus({ minutes: every });
-
+    const next = nowZ.plus({ hours: everyHours });
     if (next < endToday) return next.toJSDate();
 
-    const startTomorrow = startToday.plus({ days: 1 });
-    return startTomorrow.toJSDate();
+    return startToday.plus({ days: 1 }).toJSDate();
+  }
+
+  // -------------------------
+  // EVERY X MINUTES
+  // -------------------------
+  if (sched.kind === "every_x_minutes") {
+    const everyMinutes = Number(sched.everyMinutes);
+    if (!Number.isFinite(everyMinutes) || everyMinutes <= 0) return null;
+
+    const win = getWindow();
+
+    if (!win) return nowZ.plus({ minutes: everyMinutes }).toJSDate();
+
+    const { startToday, endToday } = win;
+
+    if (nowZ < startToday) return startToday.toJSDate();
+    if (nowZ >= endToday) return startToday.plus({ days: 1 }).toJSDate();
+
+    const next = nowZ.plus({ minutes: everyMinutes });
+    if (next < endToday) return next.toJSDate();
+
+    return startToday.plus({ days: 1 }).toJSDate();
   }
 
   return null;
@@ -187,23 +202,21 @@ function habitActionKeyboard(habitId: string) {
 async function sendHabitReminder(bot: Telegraf<any>, h: any) {
   const habitName = String(h.name ?? "Habit");
   const unit = String(h.unit ?? "");
-  const amount = Number(h.amountPerSession ?? 0);
+  const amount = Number(h.targetAmount ?? 0);
+  const targetCount = Number(h.targetCount ?? 1);
+  const cadence = String(h.cadence ?? "daily");
 
-  // Keep this message simple + consistent (you can style later)
-  const text =
+  const targetLine =
     amount > 0 && unit
-      ? `Habit: ${habitName}\nTarget: ${amount} ${unit}\nTap Log when you complete a session.`
-      : `Habit: ${habitName}\nTap Log when you complete a session.`;
+      ? `Target: ${targetCount} × ${amount} ${unit} (${cadence})`
+      : `Target: ${targetCount} session${targetCount === 1 ? "" : "s"} (${cadence})`;
+
+  const text = `Habit: ${habitName}\n${targetLine}\nTap Log when you complete a session.`;
 
   const sendOpts: any = {};
   sendOpts.reply_markup = habitActionKeyboard(String(h._id)).reply_markup;
 
-  try {
-    await bot.telegram.sendMessage(h.chatId, text, sendOpts);
-  } catch (err: any) {
-    console.error(`Failed to send habit reminder ${h._id} to chat ${h.chatId}:`, err.message);
-    throw err;
-  }
+  await bot.telegram.sendMessage(h.chatId, text, sendOpts);
 }
 
 // In-memory pending custom snooze: userId -> { habitId, expiresAt }
@@ -262,12 +275,10 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
         return;
       }
 
-      // store pending for 2 minutes
       pendingHabitLog.set(userId, { habitId, expiresAt: Date.now() + 2 * 60 * 1000 });
 
       const unit = String(habit.unit ?? "");
-      const prompt =
-        unit ? `Enter the amount you did (${unit}).` : "Enter the amount you did (number).";
+      const prompt = unit ? `Enter the amount you did (${unit}).` : "Enter the amount you did (number).";
 
       await ctx.reply(prompt, Markup.forceReply());
       return;
@@ -307,7 +318,8 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
       }
 
       const newTime = new Date(Date.now() + minutes * 60 * 1000);
-      await Habit.updateOne({ _id: habitId, userId }, { $set: { nextRunAt: newTime, status: "scheduled" } });
+
+      await Habit.updateOne({ _id: habitId, userId }, { $set: { nextReminderAt: newTime } });
 
       const tz = String(habit.timezone || "America/Chicago");
       const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
@@ -349,15 +361,14 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
         return;
       }
 
-      // Clear pending before DB work to prevent double logs
       pendingHabitLog.delete(userId);
 
       await HabitLog.create({
         userId,
         habitId: habit._id,
-        loggedAt: new Date(),
+        startedAt: new Date(),
         amount,
-        unit: String(habit.unit ?? ""),
+        unit: habit.unit, // keep locked to habit unit
       });
 
       await ctx.reply(`Logged: ${amount}${habit.unit ? " " + habit.unit : ""} for "${habit.name}".`);
@@ -390,7 +401,8 @@ function registerHabitActionHandlers(bot: Telegraf<any>) {
       }
 
       const newTime = new Date(Date.now() + minutes * 60 * 1000);
-      await Habit.updateOne({ _id: pendingSz.habitId, userId }, { $set: { nextRunAt: newTime, status: "scheduled" } });
+
+      await Habit.updateOne({ _id: pendingSz.habitId, userId }, { $set: { nextReminderAt: newTime } });
 
       const tz = String(habit.timezone || "America/Chicago");
       const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
@@ -421,10 +433,11 @@ export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions =
       if (mongoose.connection.readyState !== 1) return;
 
       const due = await Habit.find({
-        status: "scheduled",
-        nextRunAt: { $lte: now() },
+        status: "active",
+        "reminderSchedule.kind": { $ne: "off" },
+        nextReminderAt: { $lte: now() },
       })
-        .sort({ nextRunAt: 1 })
+        .sort({ nextReminderAt: 1 })
         .limit(25);
 
       for (const h of due) {
@@ -434,7 +447,6 @@ export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions =
         try {
           await sendHabitReminder(bot, h);
 
-          // Compute next run strictly via habit rules
           const next = computeNextForHabitLuxon(h);
 
           if (next) {
@@ -442,18 +454,20 @@ export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions =
               { _id: h._id },
               {
                 $set: {
-                  nextRunAt: next,
-                  lastRunAt: now(),
-                  status: "scheduled",
+                  nextReminderAt: next,
+                  lastRemindedAt: now(),
                 },
               }
             );
           } else {
-            // If it has no scheduling (or can't compute), mark unscheduled
+            // Reminders are effectively off / not computable
             await Habit.updateOne(
               { _id: h._id },
               {
-                $set: { lastRunAt: now(), status: "idle" },
+                $set: {
+                  nextReminderAt: undefined,
+                  lastRemindedAt: now(),
+                },
               }
             );
           }
@@ -461,7 +475,7 @@ export function startHabitScheduler(bot: Telegraf<any>, opts: SchedulerOptions =
           console.error("Habit Scheduler send error:", err);
 
           // If send fails, push it out 5 minutes so it doesn't hammer.
-          await Habit.updateOne({ _id: h._id }, { $set: { nextRunAt: addMinutes(now(), 5) } });
+          await Habit.updateOne({ _id: h._id }, { $set: { nextReminderAt: addMinutes(now(), 5) } });
         } finally {
           await releaseLock(h._id, instanceId);
         }
