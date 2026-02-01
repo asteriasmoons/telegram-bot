@@ -1900,6 +1900,92 @@ img {
   flex: 0 0 14px !important;
   display: block !important;
 }
+
+/* =========================================================
+   PATCH: restore gradients + fix calendar trash + fix habits
+   Paste at VERY END
+   ========================================================= */
+
+/* ---------- HEADER: Prompt + Summary must stay gradient ---------- */
+/* (works whether they're .btn-prompt, .btn-summary, or just buttons with those classes) */
+.btn-prompt,
+.btn-summary {
+  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(91, 141, 239, 0.45) !important;
+  box-shadow: 0 8px 22px rgba(91, 141, 239, 0.22) !important;
+}
+
+/* If your header rule is still overriding, this wins */
+.header .btn-prompt,
+.header .btn-summary,
+.header button.btn-prompt,
+.header button.btn-summary {
+  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(91, 141, 239, 0.45) !important;
+}
+
+/* ---------- CALENDAR: trash can should NOT be in a square ---------- */
+.calendar-event-delete {
+  -webkit-appearance: none;
+  appearance: none;
+
+  background: transparent !important;
+  border: none !important;
+
+  padding: 6px !important;
+  border-radius: 999px !important;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-event-delete:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ---------- HABITS: force your intended button colors ---------- */
+/* Base: stop iOS "white default" rendering */
+.habit-actions button.btn {
+  -webkit-appearance: none;
+  appearance: none;
+
+  border: none !important;
+  border-radius: 12px !important;
+
+  color: #ffffff !important;
+}
+
+/* Log Session -- PURPLE */
+.habit-actions button.btn-log {
+  background: linear-gradient(135deg, #8000fe, #8000fe) !important;
+  box-shadow: 0 8px 22px rgba(123, 108, 255, 0.45) !important;
+}
+
+/* Edit -- TEAL */
+.habit-actions button.btn-edit {
+  background: linear-gradient(135deg, #00dbff, #00dbff) !important;
+  color: #062b2a !important;
+  box-shadow: 0 8px 22px rgba(47, 212, 201, 0.45) !important;
+}
+
+/* Delete -- PINK */
+.habit-actions button.btn-delete {
+  background: linear-gradient(135deg, #dc14ad, #dc14ad) !important;
+  box-shadow: 0 8px 22px rgba(255, 102, 179, 0.45) !important;
+}
+
+/* View / Pause -- neutral glass */
+.habit-actions button.btn-view,
+.habit-actions button.btn-pause {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+}
 </style>
 </head>
 
