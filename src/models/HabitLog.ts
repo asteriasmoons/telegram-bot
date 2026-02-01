@@ -1,5 +1,7 @@
+// src/models/HabitLog.ts
+
 import mongoose, { Schema, Model, Types } from "mongoose";
-import type { HabitUnit } from "./Habit";
+import { HABIT_UNITS, type HabitUnit } from "./Habit";
 
 export type HabitLogDoc = {
   _id: Types.ObjectId;
@@ -7,7 +9,7 @@ export type HabitLogDoc = {
   userId: number;
   habitId: Types.ObjectId;
 
-  // When did it happen (used for streak boundaries)
+  // When did it happen (used for period boundaries)
   startedAt: Date;
   endedAt?: Date;
 
@@ -34,7 +36,8 @@ const HabitLogSchema = new Schema<HabitLogDoc>(
     unit: {
       type: String,
       required: true,
-      enum: ["minutes", "hours", "steps", "cups", "oz", "ml", "pages", "count", "sessions"],
+      enum: HABIT_UNITS, // ✅ shared with Habit schema
+      default: "sessions",
     },
 
     note: { type: String, required: false, trim: true },
@@ -44,7 +47,7 @@ const HabitLogSchema = new Schema<HabitLogDoc>(
 
 // Common queries:
 // - logs for a habit (latest first)
-// - logs within a date range to compute streaks
+// - logs within a date range to compute daily/weekly completion
 HabitLogSchema.index({ habitId: 1, startedAt: -1 });
 HabitLogSchema.index({ userId: 1, startedAt: -1 });
 

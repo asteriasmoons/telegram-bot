@@ -2000,6 +2000,44 @@ body::after {
 .times-item .form-input {
   width: 100%;
 }
+
+.habit-completed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  margin-left: 6px;
+  padding: 3px 9px;
+
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: rgba(30, 30, 30, 0.85);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.badge-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
   </style>
 </head>
 
@@ -2368,9 +2406,21 @@ function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLo
         </div>
 
         <div className="habit-badges">
-          <span className={`card-badge ${cadenceBadge.className}`}>{cadenceBadge.text}</span>
-          <span className={`card-badge ${statusBadge.className}`}>{statusBadge.text}</span>
-        </div>
+  <span className={`card-badge ${cadenceBadge.className}`}>{cadenceBadge.text}</span>
+  <span className={`card-badge ${statusBadge.className}`}>{statusBadge.text}</span>
+
+  {habit?.progress?.completed ? (
+    <span className="card-badge badge-completed" title="Completed">
+      <img
+        className="badge-icon"
+        src="/icons/check.svg"
+        alt=""
+        aria-hidden="true"
+      />
+      Completed
+    </span>
+  ) : null}
+</div>
       </div>
 
       <div className="habit-target">{targetLine}</div>

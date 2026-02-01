@@ -1,25 +1,27 @@
+// src/models/Habit.ts
+
 import mongoose, { Schema, Model, Types } from "mongoose";
 
 export type HabitStatus = "active" | "paused";
 
-export type HabitUnit =
-  | "minutes"
-  | "hours"
-  | "steps"
-  | "cups"
-  | "oz"
-  | "ml"
-  | "pages"
-  | "count"
-  | "sessions";
+// ✅ Single source of truth for units (used by schema + types + other models)
+export const HABIT_UNITS = [
+  "minutes",
+  "hours",
+  "steps",
+  "cups",
+  "oz",
+  "ml",
+  "pages",
+  "count",
+  "sessions",
+] as const;
+
+export type HabitUnit = (typeof HABIT_UNITS)[number];
 
 export type HabitCadence = "daily" | "weekly";
 
-export type HabitReminderKind =
-  | "off"
-  | "times"
-  | "hourly"
-  | "every_x_minutes";
+export type HabitReminderKind = "off" | "times" | "hourly" | "every_x_minutes";
 
 export type HabitReminderSchedule = {
   kind: HabitReminderKind;
@@ -59,7 +61,8 @@ export type HabitDoc = {
   unit: HabitUnit;
 
   timezone: string;
-  
+
+  // ✅ weekly anchor datetime (optional unless your backend enforces it)
   startAt?: Date;
 
   reminderSchedule: HabitReminderSchedule;
@@ -124,19 +127,21 @@ const HabitSchema = new Schema<HabitDoc>(
       required: true,
       enum: ["daily", "weekly"],
       default: "daily",
+      index: true,
     },
 
     targetCount: { type: Number, required: true, min: 1, default: 1 },
     targetAmount: { type: Number, required: false, min: 0 },
+
     unit: {
       type: String,
       required: true,
-      enum: ["minutes", "hours", "steps", "cups", "oz", "ml", "pages", "count", "sessions"],
+      enum: HABIT_UNITS, // ✅ uses shared constant
       default: "sessions",
     },
 
     timezone: { type: String, required: true },
-    
+
     startAt: { type: Date, required: false, index: true },
 
     reminderSchedule: {
@@ -148,7 +153,6 @@ const HabitSchema = new Schema<HabitDoc>(
     nextReminderAt: { type: Date, required: false, index: true },
     lastRemindedAt: { type: Date, required: false },
 
-    // ✅ lock belongs HERE (inside the schema fields)
     lock: { type: HabitLockSchema, required: false, default: undefined },
   },
   { timestamps: true }
@@ -156,6 +160,9 @@ const HabitSchema = new Schema<HabitDoc>(
 
 // Polling index for habit reminders
 HabitSchema.index({ status: 1, nextReminderAt: 1 });
+
+// Helpful general index for common list filters
+HabitSchema.index({ userId: 1, status: 1, cadence: 1 });
 
 export const Habit: Model<HabitDoc> =
   (mongoose.models.Habit as Model<HabitDoc>) ||

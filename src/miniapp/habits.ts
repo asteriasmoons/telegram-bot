@@ -76,6 +76,51 @@ function getWindow(nowZ: DateTime, sched: any) {
   return { startToday, endToday };
 }
 
+function getDailyWindow(tz: string) {
+  const nowZ = DateTime.now().setZone(tz);
+  const start = nowZ.startOf("day");
+  const end = start.plus({ days: 1 });
+  return { start, end };
+}
+
+function getWeeklyAnchoredWindow(tz: string, startAt: any) {
+  const nowZ = DateTime.now().setZone(tz);
+
+  if (!startAt) {
+    // fallback: ISO week window if you ever have a weekly habit without startAt
+    const start = nowZ.startOf("week");
+    const end = start.plus({ weeks: 1 });
+    return { start, end };
+  }
+
+  const anchor = new Date(startAt);
+  if (isNaN(anchor.getTime())) {
+    const start = nowZ.startOf("week");
+    const end = start.plus({ weeks: 1 });
+    return { start, end };
+  }
+
+  const anchorZ = DateTime.fromJSDate(anchor, { zone: tz });
+  if (!anchorZ.isValid) {
+    const start = nowZ.startOf("week");
+    const end = start.plus({ weeks: 1 });
+    return { start, end };
+  }
+
+  // If anchor is in the future, current "week window" is anchor->anchor+1w
+  if (nowZ < anchorZ) {
+    const start = anchorZ;
+    const end = start.plus({ weeks: 1 });
+    return { start, end };
+  }
+
+  // Number of whole weeks since anchor
+  const weeks = Math.floor(nowZ.diff(anchorZ, "weeks").weeks);
+  const start = anchorZ.plus({ weeks });
+  const end = start.plus({ weeks: 1 });
+  return { start, end };
+}
+
 /**
  * Weekly anchor scheduler:
  * Uses startAt as an anchor datetime in the habit's timezone and repeats every 7 days.
@@ -285,10 +330,6 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
  * List habits (optionally include paused with ?includePaused=1)
  */
 router.get("/", async (req, res) => {
-  console.log("=== HABITS GET REQUEST START ===");
-  console.log("req.userId:", (req as any).userId);
-  console.log("req.query:", req.query);
-
   try {
     const userId = Number((req as any).userId);
     if (!Number.isFinite(userId) || userId <= 0) {
@@ -301,9 +342,49 @@ router.get("/", async (req, res) => {
     if (!includePaused) q.status = "active";
 
     const habits = await Habit.find(q).sort({ updatedAt: -1 }).lean();
-    res.json({ ok: true, habits });
+
+    const withProgress = await Promise.all(
+      habits.map(async (h: any) => {
+        const tz = String(h.timezone || "America/Chicago");
+        const cadence = String(h.cadence || "daily");
+        const targetCount = Math.max(1, Number(h.targetCount || 1));
+
+        let startZ: DateTime;
+        let endZ: DateTime;
+
+        if (cadence === "weekly") {
+          const w = getWeeklyAnchoredWindow(tz, (h as any).startAt);
+          startZ = w.start;
+          endZ = w.end;
+        } else {
+          const w = getDailyWindow(tz);
+          startZ = w.start;
+          endZ = w.end;
+        }
+
+        const count = await HabitLog.countDocuments({
+          userId: h.userId,
+          habitId: h._id,
+          startedAt: { $gte: startZ.toJSDate(), $lt: endZ.toJSDate() },
+        });
+
+        return {
+          ...h,
+          progress: {
+            cadence,
+            count,
+            targetCount,
+            completed: count >= targetCount,
+            periodStart: startZ.toISO(),
+            periodEnd: endZ.toISO(),
+          },
+        };
+      })
+    );
+
+    return res.json({ ok: true, habits: withProgress });
   } catch (e: any) {
-    res.status(e.status || 500).json({ ok: false, error: e.message || "Failed to list habits" });
+    return res.status(e.status || 500).json({ ok: false, error: e.message || "Failed to list habits" });
   }
 });
 
