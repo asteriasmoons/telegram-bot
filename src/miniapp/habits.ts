@@ -4,7 +4,6 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { Habit } from "../models/Habit";
 import { HabitLog } from "../models/HabitLog";
-
 import { DateTime } from "luxon";
 
 const router = Router();
@@ -77,6 +76,42 @@ function getWindow(nowZ: DateTime, sched: any) {
   return { startToday, endToday };
 }
 
+/**
+ * Weekly anchor scheduler:
+ * Uses startAt as an anchor datetime in the habit's timezone and repeats every 7 days.
+ */
+function computeNextWeeklyFromStartAt(timezone: string, startAt: any): Date | undefined {
+  if (!startAt) return undefined;
+
+  const tz = String(timezone || "America/Chicago");
+  const nowZ = DateTime.now().setZone(tz);
+
+  const start = new Date(startAt);
+  if (isNaN(start.getTime())) return undefined;
+
+  const startZ = DateTime.fromJSDate(start, { zone: tz });
+  if (!startZ.isValid) return undefined;
+
+  // If start is in the future, that's the next reminder
+  if (nowZ < startZ) return startZ.toJSDate();
+
+  // Whole weeks since anchor
+  const weeks = Math.floor(nowZ.diff(startZ, "weeks").weeks);
+
+  // Candidate this week at same local time
+  const candidate = startZ.plus({ weeks });
+
+  // If candidate still ahead, use it; otherwise next week
+  const next = candidate > nowZ ? candidate : startZ.plus({ weeks: weeks + 1 });
+
+  return next.toJSDate();
+}
+
+/**
+ * Daily-style schedule computation:
+ * - times / hourly / every_x_minutes
+ * - honors optional daysOfWeek + windowStart/windowEnd
+ */
 function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: any): Date | undefined {
   const sched = reminderSchedule;
   if (!sched || !sched.kind || sched.kind === "off") return undefined;
@@ -125,11 +160,12 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
 
     const win = getWindow(nowZ, sched);
 
-    // If no window: just next = now + everyHours, but honor allowed days (skip forward if needed)
+    // If no window: next = now + everyHours, but honor allowed days (skip forward if needed)
     if (!win) {
       let next = nowZ.plus({ hours: everyHours });
-      // if daysOfWeek restricted, bump day-by-day until allowed
-      for (let i = 0; i < 14 && !isAllowedDay(next, days); i++) next = next.plus({ days: 1 }).startOf("day").plus({ hours: everyHours });
+      for (let i = 0; i < 14 && !isAllowedDay(next, days); i++) {
+        next = next.plus({ days: 1 });
+      }
       return next.toJSDate();
     }
 
@@ -139,17 +175,26 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
     if (!isAllowedDay(nowZ, days)) {
       for (let i = 1; i <= 14; i++) {
         const d = nowZ.plus({ days: i });
-        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+        if (isAllowedDay(d, days)) {
+          return d
+            .startOf("day")
+            .set({ hour: startToday.hour, minute: startToday.minute, second: 0, millisecond: 0 })
+            .toJSDate();
+        }
       }
       return startToday.plus({ days: 1 }).toJSDate();
     }
 
     if (nowZ < startToday) return startToday.toJSDate();
     if (nowZ >= endToday) {
-      // next allowed day start
       for (let i = 1; i <= 14; i++) {
         const d = nowZ.plus({ days: i });
-        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+        if (isAllowedDay(d, days)) {
+          return d
+            .startOf("day")
+            .set({ hour: startToday.hour, minute: startToday.minute, second: 0, millisecond: 0 })
+            .toJSDate();
+        }
       }
       return startToday.plus({ days: 1 }).toJSDate();
     }
@@ -157,10 +202,14 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
     const next = nowZ.plus({ hours: everyHours });
     if (next < endToday) return next.toJSDate();
 
-    // move to next allowed day at window start
     for (let i = 1; i <= 14; i++) {
       const d = nowZ.plus({ days: i });
-      if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+      if (isAllowedDay(d, days)) {
+        return d
+          .startOf("day")
+          .set({ hour: startToday.hour, minute: startToday.minute, second: 0, millisecond: 0 })
+          .toJSDate();
+      }
     }
 
     return startToday.plus({ days: 1 }).toJSDate();
@@ -177,7 +226,9 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
 
     if (!win) {
       let next = nowZ.plus({ minutes: everyMinutes });
-      for (let i = 0; i < 14 && !isAllowedDay(next, days); i++) next = next.plus({ days: 1 }).startOf("day").plus({ minutes: everyMinutes });
+      for (let i = 0; i < 14 && !isAllowedDay(next, days); i++) {
+        next = next.plus({ days: 1 });
+      }
       return next.toJSDate();
     }
 
@@ -186,7 +237,12 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
     if (!isAllowedDay(nowZ, days)) {
       for (let i = 1; i <= 14; i++) {
         const d = nowZ.plus({ days: i });
-        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+        if (isAllowedDay(d, days)) {
+          return d
+            .startOf("day")
+            .set({ hour: startToday.hour, minute: startToday.minute, second: 0, millisecond: 0 })
+            .toJSDate();
+        }
       }
       return startToday.plus({ days: 1 }).toJSDate();
     }
@@ -195,7 +251,12 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
     if (nowZ >= endToday) {
       for (let i = 1; i <= 14; i++) {
         const d = nowZ.plus({ days: i });
-        if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+        if (isAllowedDay(d, days)) {
+          return d
+            .startOf("day")
+            .set({ hour: startToday.hour, minute: startToday.minute, second: 0, millisecond: 0 })
+            .toJSDate();
+        }
       }
       return startToday.plus({ days: 1 }).toJSDate();
     }
@@ -205,7 +266,12 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
 
     for (let i = 1; i <= 14; i++) {
       const d = nowZ.plus({ days: i });
-      if (isAllowedDay(d, days)) return d.startOf("day").plus({ hours: startToday.hour, minutes: startToday.minute }).toJSDate();
+      if (isAllowedDay(d, days)) {
+        return d
+          .startOf("day")
+          .set({ hour: startToday.hour, minute: startToday.minute, second: 0, millisecond: 0 })
+          .toJSDate();
+      }
     }
 
     return startToday.plus({ days: 1 }).toJSDate();
@@ -220,41 +286,26 @@ function computeNextReminderAtFromSchedule(timezone: string, reminderSchedule: a
  */
 router.get("/", async (req, res) => {
   console.log("=== HABITS GET REQUEST START ===");
-  console.log("req.userId:", req.userId);
+  console.log("req.userId:", (req as any).userId);
   console.log("req.query:", req.query);
-  console.log("req.headers:", req.headers);
-  
+
   try {
-    const userId = Number(req.userId);
-    console.log("Parsed userId:", userId);
-    console.log("Is userId valid?", Number.isFinite(userId) && userId > 0);
-    
+    const userId = Number((req as any).userId);
     if (!Number.isFinite(userId) || userId <= 0) {
-      console.log("❌ FAILED: Invalid userId");
       return res.status(401).json({ ok: false, error: "Unauthorized - invalid userId" });
     }
-    
+
     const includePaused = String(req.query.includePaused || "") === "1";
-    console.log("includePaused:", includePaused);
 
     const q: any = { userId };
     if (!includePaused) q.status = "active";
-    console.log("MongoDB query:", JSON.stringify(q));
 
     const habits = await Habit.find(q).sort({ updatedAt: -1 }).lean();
-    console.log("✅ Found habits:", habits.length);
-    console.log("=== HABITS GET REQUEST SUCCESS ===");
-    
     res.json({ ok: true, habits });
   } catch (e: any) {
-    console.error("=== HABITS GET REQUEST ERROR ===");
-    console.error("Error:", e);
-    console.error("Error message:", e.message);
-    console.error("Error stack:", e.stack);
     res.status(e.status || 500).json({ ok: false, error: e.message || "Failed to list habits" });
   }
 });
-
 
 /**
  * POST /api/habits
@@ -262,26 +313,26 @@ router.get("/", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
 
-const {
-  name,
-  description,
-  status,
-  cadence,
-  targetCount,
-  targetAmount,
-  unit,
-  timezone,
-  reminderSchedule,
-  nextReminderAt,
-} = req.body || {};
+    const {
+      name,
+      description,
+      status,
+      cadence,
+      targetCount,
+      targetAmount,
+      unit,
+      timezone,
+      reminderSchedule,
+      nextReminderAt,
+      startAt, // ✅ NEW
+    } = req.body || {};
 
     if (typeof name !== "string" || !name.trim()) return bad(res, "name is required");
     if (typeof timezone !== "string" || !timezone.trim()) return bad(res, "timezone is required");
 
-    const tc = Number(targetCount);
-    if (!Number.isFinite(tc) || tc < 1) return bad(res, "targetCount must be >= 1");
+    const tzTrim = timezone.trim();
 
     const sched = reminderSchedule || { kind: "off" };
     if (!sched.kind) sched.kind = "off";
@@ -313,33 +364,55 @@ const {
     if (sched.daysOfWeek) {
       sched.daysOfWeek = clampDaysOfWeek(sched.daysOfWeek);
     }
-    
-const computedNext =
-  status === "paused" || sched.kind === "off"
-    ? undefined
-    : computeNextReminderAtFromSchedule(timezone.trim(), sched);
 
-const doc = await Habit.create({
-  userId,
-  chatId: userId,
+    const effectiveCadence = cadence === "weekly" ? "weekly" : "daily";
+    const isPaused = status === "paused";
 
-  name: name.trim(),
-  description: typeof description === "string" ? description.trim() : undefined,
+    // ✅ weekly requires startAt ONLY if reminders are ON
+    if (!isPaused && effectiveCadence === "weekly" && sched.kind !== "off") {
+      if (!startAt) return bad(res, "startAt is required for weekly cadence");
+      const d = new Date(startAt);
+      if (isNaN(d.getTime())) return bad(res, "startAt must be a valid date");
+    }
 
-  status: status === "paused" ? "paused" : "active",
+    const tc = Number(targetCount);
+    if (!Number.isFinite(tc) || tc < 1) return bad(res, "targetCount must be >= 1");
 
-  cadence: cadence === "weekly" ? "weekly" : "daily",
-  targetCount: tc,
-  targetAmount: Number.isFinite(Number(targetAmount)) ? Number(targetAmount) : undefined,
-  unit: unit || "sessions",
+    // ✅ compute nextReminderAt (respects sched.kind === "off" for ALL cadences)
+    let computedNext: Date | undefined = undefined;
 
-  timezone: timezone.trim(),
+    if (!isPaused && sched.kind !== "off") {
+      if (effectiveCadence === "weekly") {
+        computedNext = computeNextWeeklyFromStartAt(tzTrim, startAt);
+      } else {
+        computedNext = computeNextReminderAtFromSchedule(tzTrim, sched);
+      }
+    }
 
-  reminderSchedule: sched,
+    const doc = await Habit.create({
+      userId,
+      chatId: userId,
 
-  // ✅ only ONE nextReminderAt field
-  nextReminderAt: nextReminderAt ? new Date(nextReminderAt) : computedNext,
-});
+      name: name.trim(),
+      description: typeof description === "string" ? description.trim() : undefined,
+
+      status: status === "paused" ? "paused" : "active",
+
+      cadence: effectiveCadence,
+
+      // ✅ store anchor only for weekly (optional if reminders off)
+      startAt: effectiveCadence === "weekly" && startAt ? new Date(startAt) : undefined,
+
+      targetCount: tc,
+      targetAmount: Number.isFinite(Number(targetAmount)) ? Number(targetAmount) : undefined,
+      unit: unit || "sessions",
+
+      timezone: tzTrim,
+      reminderSchedule: sched,
+
+      // ✅ only ONE nextReminderAt field
+      nextReminderAt: nextReminderAt ? new Date(nextReminderAt) : computedNext,
+    });
 
     res.json({ ok: true, habit: doc.toObject() });
   } catch (e: any) {
@@ -353,7 +426,7 @@ const doc = await Habit.create({
  */
 router.get("/:id", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -369,11 +442,11 @@ router.get("/:id", async (req, res) => {
 
 /**
  * PUT /api/habits/:id
- * Edit habit (including reminderSchedule + nextReminderAt)
+ * Edit habit (including reminderSchedule + nextReminderAt + weekly startAt)
  */
 router.put("/:id", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -388,6 +461,17 @@ router.put("/:id", async (req, res) => {
     if (b.status === "active" || b.status === "paused") patch.status = b.status;
 
     if (b.cadence === "daily" || b.cadence === "weekly") patch.cadence = b.cadence;
+
+    // ✅ startAt support (PUT)
+    if (b.startAt !== undefined) {
+      if (!b.startAt) {
+        patch.startAt = undefined;
+      } else {
+        const d = new Date(b.startAt);
+        if (isNaN(d.getTime())) return bad(res, "startAt must be a valid date");
+        patch.startAt = d;
+      }
+    }
 
     if (b.targetCount !== undefined) {
       const tc = Number(b.targetCount);
@@ -447,48 +531,74 @@ router.put("/:id", async (req, res) => {
     if (b.nextReminderAt !== undefined) {
       patch.nextReminderAt = b.nextReminderAt ? new Date(b.nextReminderAt) : undefined;
     }
-    
+
+    // ----------------------------------------------------
+    // ✅ Weekly cadence requires startAt validation (only if reminders ON)
+    // ----------------------------------------------------
+    const cadenceChanged = typeof patch.cadence === "string";
+    const startAtTouched = Object.prototype.hasOwnProperty.call(patch, "startAt");
+    const scheduleTouched = Object.prototype.hasOwnProperty.call(patch, "reminderSchedule");
+
+    if (cadenceChanged || startAtTouched || scheduleTouched) {
+      const current = await Habit.findOne({ _id: id, userId }).lean();
+      if (!current) return bad(res, "Habit not found", 404);
+
+      const effectiveCadence = String(patch.cadence ?? current.cadence ?? "daily");
+      const effectiveStartAt = patch.startAt ?? (current as any).startAt;
+      const effectiveSched = patch.reminderSchedule ?? (current as any).reminderSchedule;
+
+      const remindersOn = !!effectiveSched?.kind && effectiveSched.kind !== "off";
+
+      if (effectiveCadence === "weekly" && remindersOn) {
+        if (!effectiveStartAt) return bad(res, "startAt is required for weekly cadence");
+      } else if (effectiveCadence !== "weekly") {
+        // switching away from weekly → clear startAt unless explicitly touched
+        if (!startAtTouched) patch.startAt = undefined;
+      }
+    }
+
     // If habit is paused, clear nextReminderAt
-if (patch.status === "paused") {
-  patch.nextReminderAt = undefined;
-}
+    if (patch.status === "paused") {
+      patch.nextReminderAt = undefined;
+    }
 
-// If reminders turned off, clear nextReminderAt
-if (patch.reminderSchedule?.kind === "off") {
-  patch.nextReminderAt = undefined;
-}
+    // If reminders turned off, clear nextReminderAt
+    if (patch.reminderSchedule?.kind === "off") {
+      patch.nextReminderAt = undefined;
+    }
 
-// If caller did NOT explicitly send nextReminderAt,
-// but schedule/timezone/status changed to an "active reminders" state,
-// compute a fresh nextReminderAt.
-const callerProvidedNext = Object.prototype.hasOwnProperty.call(b, "nextReminderAt");
+    // If caller did NOT explicitly send nextReminderAt,
+    // recompute nextReminderAt when relevant changes happen.
+    const callerProvidedNext = Object.prototype.hasOwnProperty.call(b, "nextReminderAt");
 
-const scheduleChanged = !!patch.reminderSchedule;
-const tzChanged = typeof patch.timezone === "string";
-const statusChanged = typeof patch.status === "string";
+    const scheduleChanged = !!patch.reminderSchedule;
+    const tzChanged = typeof patch.timezone === "string";
+    const statusChanged = typeof patch.status === "string";
+    const cadenceChanged2 = typeof patch.cadence === "string";
+    const startAtChanged2 = Object.prototype.hasOwnProperty.call(patch, "startAt");
 
-if (!callerProvidedNext && (scheduleChanged || tzChanged || statusChanged)) {
-  // We need the effective values (patched or existing), so fetch current habit first.
-  const current = await Habit.findOne({ _id: id, userId }).lean();
-  if (!current) return bad(res, "Habit not found", 404);
+    if (!callerProvidedNext && (scheduleChanged || tzChanged || statusChanged || cadenceChanged2 || startAtChanged2)) {
+      const current = await Habit.findOne({ _id: id, userId }).lean();
+      if (!current) return bad(res, "Habit not found", 404);
 
-  const effectiveStatus = String(patch.status ?? current.status ?? "active");
-  const effectiveTz = String(patch.timezone ?? current.timezone ?? "America/Chicago");
-  const effectiveSched = patch.reminderSchedule ?? current.reminderSchedule;
+      const effectiveStatus = String(patch.status ?? current.status ?? "active");
+      const effectiveTz = String(patch.timezone ?? current.timezone ?? "America/Chicago");
+      const effectiveCadence = String(patch.cadence ?? current.cadence ?? "daily");
+      const effectiveSched = patch.reminderSchedule ?? current.reminderSchedule;
+      const effectiveStartAt = patch.startAt ?? (current as any).startAt;
 
-  if (effectiveStatus === "active" && effectiveSched?.kind && effectiveSched.kind !== "off") {
-    patch.nextReminderAt = computeNextReminderAtFromSchedule(effectiveTz, effectiveSched);
-  } else {
-    patch.nextReminderAt = undefined;
-  }
-}
+      const remindersOn = !!effectiveSched?.kind && effectiveSched.kind !== "off";
 
-    const updated = await Habit.findOneAndUpdate(
-      { _id: id, userId },
-      { $set: patch },
-      { new: true }
-    ).lean();
+      if (effectiveStatus !== "active" || !remindersOn) {
+        patch.nextReminderAt = undefined;
+      } else if (effectiveCadence === "weekly") {
+        patch.nextReminderAt = computeNextWeeklyFromStartAt(effectiveTz, effectiveStartAt);
+      } else {
+        patch.nextReminderAt = computeNextReminderAtFromSchedule(effectiveTz, effectiveSched);
+      }
+    }
 
+    const updated = await Habit.findOneAndUpdate({ _id: id, userId }, { $set: patch }, { new: true }).lean();
     if (!updated) return bad(res, "Habit not found", 404);
 
     res.json({ ok: true, habit: updated });
@@ -499,11 +609,11 @@ if (!callerProvidedNext && (scheduleChanged || tzChanged || statusChanged)) {
 
 /**
  * DELETE /api/habits/:id
- * HARD delete: habit + ALL logs (your requirement)
+ * HARD delete: habit + ALL logs
  */
 router.delete("/:id", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -522,13 +632,10 @@ router.delete("/:id", async (req, res) => {
 
 /**
  * GET /api/habits/:id/logs
- * Query logs. Supports:
- * - ?from=ISO&to=ISO
- * - ?limit=50&skip=0
  */
 router.get("/:id/logs", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -547,12 +654,7 @@ router.get("/:id/logs", async (req, res) => {
     const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
     const skip = Math.max(0, Number(req.query.skip || 0));
 
-    const logs = await HabitLog.find(q)
-      .sort({ startedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
+    const logs = await HabitLog.find(q).sort({ startedAt: -1 }).skip(skip).limit(limit).lean();
     res.json({ ok: true, logs });
   } catch (e: any) {
     res.status(e.status || 500).json({ ok: false, error: e.message || "Failed to list habit logs" });
@@ -561,14 +663,10 @@ router.get("/:id/logs", async (req, res) => {
 
 /**
  * POST /api/habits/:id/logs
- * Create a session log
- * Required: startedAt
- * Optional: endedAt, amount
- * unit comes from habit by default unless explicitly set (I keep it strict: prefer habit’s unit)
  */
 router.post("/:id/logs", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
     const id = String(req.params.id);
 
     if (!isObjectId(id)) return bad(res, "Invalid habit id");
@@ -614,11 +712,10 @@ router.post("/:id/logs", async (req, res) => {
 
 /**
  * PUT /api/habits/:id/logs/:logId
- * Edit a log session (start/end/amount)
  */
 router.put("/:id/logs/:logId", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
     const habitId = String(req.params.id);
     const logId = String(req.params.logId);
 
@@ -679,11 +776,10 @@ router.put("/:id/logs/:logId", async (req, res) => {
 
 /**
  * DELETE /api/habits/:id/logs/:logId
- * Delete a single log session
  */
 router.delete("/:id/logs/:logId", async (req, res) => {
   try {
-    const userId = Number(req.userId);
+    const userId = Number((req as any).userId);
     const habitId = String(req.params.id);
     const logId = String(req.params.logId);
 

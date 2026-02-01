@@ -59,6 +59,8 @@ export type HabitDoc = {
   unit: HabitUnit;
 
   timezone: string;
+  
+  startAt?: Date;
 
   reminderSchedule: HabitReminderSchedule;
   nextReminderAt?: Date;
@@ -134,6 +136,8 @@ const HabitSchema = new Schema<HabitDoc>(
     },
 
     timezone: { type: String, required: true },
+    
+    startAt: { type: Date, required: false, index: true },
 
     reminderSchedule: {
       type: HabitReminderScheduleSchema,

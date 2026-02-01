@@ -28,6 +28,30 @@ function addSeconds(d: Date, seconds: number) {
   return new Date(d.getTime() + seconds * 1000);
 }
 
+function computeNextWeeklyFromStartAt(h: any): Date | null {
+  if (!h.startAt) return null;
+
+  const tz = String(h.timezone || "America/Chicago");
+  const nowZ = DateTime.now().setZone(tz);
+
+  const startZ = DateTime.fromJSDate(new Date(h.startAt), { zone: tz });
+  if (!startZ.isValid) return null;
+
+  // If start is still in the future, that's the next reminder
+  if (nowZ < startZ) return startZ.toJSDate();
+
+  // How many whole weeks have passed since start?
+  const weeks = Math.floor(nowZ.diff(startZ, "weeks").weeks);
+
+  // Candidate: start + (weeks * 7d)
+  const candidate = startZ.plus({ weeks });
+
+  // If candidate is still ahead (rare), use it; otherwise next week
+  const next = candidate > nowZ ? candidate : startZ.plus({ weeks: weeks + 1 });
+
+  return next.toJSDate();
+}
+
 /**
  * Acquire lock on a habit so only one instance processes it.
  * NOTE: Your Habit schema must include `lock.lockExpiresAt/lockedAt/lockedBy`.
@@ -93,11 +117,23 @@ function nextAtTime(nowZ: DateTime, hhmm: string): DateTime | null {
  * - kind: "every_x_minutes" => everyMinutes within optional windowStart/windowEnd
  */
 function computeNextForHabitLuxon(h: any): Date | null {
-  const sched = h.reminderSchedule;
-  if (!sched || !sched.kind || sched.kind === "off") return null;
-
   const tz = String(h.timezone || "America/Chicago");
   const nowZ = DateTime.now().setZone(tz);
+
+  // ✅ Weekly cadence uses anchor datetime (startAt)
+  // This MUST run before the "kind === off" return,
+  // because weekly does not rely on reminderSchedule.kind.
+  if (String(h.cadence) === "weekly") {
+    const weeklyNext = computeNextWeeklyFromStartAt(h);
+    if (weeklyNext) return weeklyNext;
+
+    // Weekly but missing startAt → fallback so it still runs
+    return nowZ.plus({ weeks: 1 }).toJSDate();
+  }
+
+  // Everything below is for non-weekly cadence using reminderSchedule.kind
+  const sched = h.reminderSchedule;
+  if (!sched || !sched.kind || sched.kind === "off") return null;
 
   function getWindow() {
     const ws = String(sched.windowStart || "").trim();
@@ -109,9 +145,7 @@ function computeNextForHabitLuxon(h: any): Date | null {
     const startToday = nowZ.set({ hour: wStart.hour, minute: wStart.minute, second: 0, millisecond: 0 });
     const endToday = nowZ.set({ hour: wEnd.hour, minute: wEnd.minute, second: 0, millisecond: 0 });
 
-    // No overnight windows
     if (endToday <= startToday) return null;
-
     return { startToday, endToday };
   }
 
