@@ -11,38 +11,18 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/luxon@3/build/global/luxon.min.js"></script>
 
-  <!-- Paste your FULL CSS here (the styles block we separated out) -->
   <style>
-    * {
+/* =========================================================
+   LYSTARIA MINI APP -- CLEAN GLASS CSS (ONE OF EVERYTHING)
+   ========================================================= */
+
+/* -------------------------
+   0) Reset / Base
+   ------------------------- */
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-}
-
-:root {
-  --bg-color: #0a0a0a;
-  --card-bg: #1a1a1a;
-  --text-primary: #ffffff;
-  --text-secondary: #888888;
-  --accent: #5b8def;
-  --accent-hover: #4a7bd8;
-  --success: #4caf50;
-  --danger: #f44336;
-  --warning: #ff9800;
-  --border: rgba(255,255,255,0.16);
-  --shadow: rgba(0, 0, 0, 0.3);
-  
-  /* Telegram viewport height (will be set by JS) */
-  --tg-viewport-height: 100vh;
-  --gradient-blue: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: var(--bg-color);
-  color: var(--text-primary);
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
 }
 
 html, body {
@@ -50,13 +30,82 @@ html, body {
 }
 
 body {
-  overflow: hidden; /* prevent the page from trying to scroll the whole viewport */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden; /* app scroll is inside .app-content */
 }
 
+/* -------------------------
+   1) Tokens
+   ------------------------- */
+:root {
+  /* Base */
+  --bg-color: #07070a;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.55);
+
+  /* Glass surfaces */
+  --glass-surface: rgba(255, 255, 255, 0.06);
+  --glass-surface-strong: rgba(25, 25, 32, 0.58);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-border-strong: rgba(255, 255, 255, 0.22);
+  --glass-shadow: rgba(0, 0, 0, 0.55);
+  --glass-blur: 18px;
+
+  /* Accent */
+  --accent: #5b8def;
+  --accent-hover: #4a7bd8;
+
+  /* Status */
+  --success: #4caf50;
+  --danger: #f44336;
+  --warning: #ff9800;
+
+  /* Nav height space */
+  --bottom-nav-h: 96px;
+}
+
+/* -------------------------
+   2) Aurora background
+   ------------------------- */
+body {
+  background: var(--bg-color);
+  color: var(--text-primary);
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+  background:
+    radial-gradient(650px 450px at 12% 10%, rgba(91, 141, 239, 0.24), transparent 60%),
+    radial-gradient(600px 480px at 88% 18%, rgba(139, 125, 239, 0.20), transparent 62%),
+    radial-gradient(720px 540px at 50% 92%, rgba(224, 25, 212, 0.12), transparent 60%),
+    radial-gradient(720px 520px at 40% 70%, rgba(0, 219, 255, 0.10), transparent 62%);
+  filter: blur(2px);
+  opacity: 0.9;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+}
+
+/* -------------------------
+   3) App shell / scrolling
+   ------------------------- */
 #root {
   height: 100%;
-  min-height: 0; /* important: don't force viewport height */
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  min-height: 0;
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
 }
 
 .app-shell {
@@ -67,37 +116,49 @@ body {
 
 .app-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
 }
 
-/* Bottom Navigation */
+/* -------------------------
+   4) Bottom navigation
+   ------------------------- */
 .bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--card-bg);
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: space-around;
+
   padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
   z-index: 1000;
+
+  display: flex;
+  justify-content: space-around;
+
+  background: rgba(20, 20, 26, 0.55);
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(160%);
+  backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(160%);
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.35);
 }
 
 .nav-item {
   flex: 1;
+  padding: 8px;
+  border: none;
+  background: none;
+
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+
   cursor: pointer;
-  padding: 8px;
   color: var(--text-secondary);
   transition: all 0.2s;
-  border: none;
-  background: none;
 }
 
 .nav-item.active {
@@ -105,7 +166,19 @@ body {
 }
 
 .nav-item-icon {
-  font-size: 24px;
+  font-size: 0;
+  line-height: 0;
+}
+
+.nav-item-icon img {
+  width: 24px;
+  height: 24px;
+  opacity: 0.9;
+  object-fit: contain;
+}
+
+.nav-item.active .nav-item-icon img {
+  opacity: 1;
 }
 
 .nav-item-label {
@@ -113,7 +186,9 @@ body {
   font-weight: 600;
 }
 
-/* View Container */
+/* -------------------------
+   5) View container
+   ------------------------- */
 .view-container {
   display: none;
   animation: fadeIn 0.3s;
@@ -128,15 +203,22 @@ body {
   to { opacity: 1; }
 }
 
-/* Header */
+/* -------------------------
+   6) Header (glassy but subtle)
+   ------------------------- */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   margin-bottom: 24px;
   padding: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
+
+  background: rgba(10, 10, 14, 0.45);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.22);
 }
 
 .header h1 {
@@ -147,139 +229,61 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
-.toggle {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 14px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle-switch {
-  width: 44px;
-  height: 24px;
-  background: var(--border);
-  border-radius: 12px;
-  position: relative;
-  transition: background 0.2s;
-}
-
-.toggle-switch.active {
-  background: var(--accent);
-}
-
-.toggle-switch::after {
-  content: '';
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  background: white;
-  border-radius: 50%;
-  top: 3px;
-  left: 3px;
-  transition: left 0.2s;
-}
-
-.toggle-switch.active::after {
-  left: 23px;
-}
-
-/* Cards */
+/* -------------------------
+   7) Cards (global)
+   ------------------------- */
 .card {
-  background: var(--card-bg);
-  border-radius: 16px;
-  padding: 20px;
   margin: 0 16px 12px;
-  border: 1px solid var(--border);
+  padding: 20px;
+  border-radius: 16px;
+
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 14px 40px var(--glass-shadow);
+
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+
   transition: all 0.2s;
-  cursor: pointer;
 }
 
 .card:hover {
-  border-color: var(--accent);
+  border-color: rgba(91, 141, 239, 0.40);
+  box-shadow: 0 18px 54px rgba(0,0,0,0.52);
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px var(--shadow);
 }
 
+/* Optional glass edge shine */
+.card {
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.18),
+    rgba(255,255,255,0.06) 35%,
+    rgba(255,255,255,0.00) 60%
+  );
+  opacity: 0.55;
+  mix-blend-mode: screen;
+}
+
+/* -------------------------
+   8) Habit card structure
+   ------------------------- */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 12px;
   margin-bottom: 12px;
-}
-
-.card-time {
-  font-size: 13px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.card-badge {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-/* ONCE -- Blue */
-.badge-once {
-  background: rgba(59, 130, 246, 0.18);
-  color: #3b82f6;
-}
-
-/* DAILY -- Purple */
-.badge-daily {
-  background: rgba(168, 85, 247, 0.18);
-  color: #a855f7;
-}
-
-/* WEEKLY -- White */
-.badge-weekly {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-}
-
-/* MONTHLY -- Pink */
-.badge-monthly {
-  background: rgba(236, 72, 153, 0.18);
-  color: #ec4899;
-}
-
-/* INTERVAL -- Yellow */
-.badge-interval {
-  background: rgba(234, 179, 8, 0.22); /* slightly higher alpha for readability */
-  color: #eab308;
-}
-
-.card-text {
-  font-size: 15px;
-  line-height: 1.5;
-  margin-bottom: 16px;
-  color: var(--text-primary);
-  white-space: pre-line;
-  word-break: break-word;
-}
-
-.card-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* =========================
-   HABITS VIEW (matches Habit.ts + HabitLog.ts)
-   ========================= */
-
-.habits-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  overflow: visible;
 }
 
 .habit-title {
@@ -294,37 +298,144 @@ body {
   line-height: 1.35;
 }
 
-.habit-meta-row {
+/* Right-side badges column */
+.habit-badges {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 10px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  overflow: visible;
 }
 
-.badge-habit-daily {
-  background: rgba(91, 141, 239, 0.15);
-  color: #5b8def;
+/* -------------------------
+   9) Badges (one system)
+   ------------------------- */
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 10px;
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+
+  white-space: nowrap;
+  line-height: 1.25; /* prevents iOS clipping */
+
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+
+  -webkit-font-smoothing: antialiased;
+  transform: translateZ(0);
 }
+
+.card-badge .badge-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex: 0 0 14px;
+  object-fit: contain;
+  opacity: 0.95;
+}
+
+/* Cadence */
+.badge-habit-daily {
+  background: rgba(168, 85, 247, 0.18);
+  color: #a855f7;
+}
+
 .badge-habit-weekly {
   background: rgba(233, 160, 72, 0.18);
   color: #e9a048;
 }
+
+/* Status */
 .badge-habit-active {
   background: rgba(76, 175, 80, 0.15);
   color: #4caf50;
 }
+
 .badge-habit-paused {
   background: rgba(244, 67, 54, 0.12);
   color: #f44336;
 }
 
+/* Completed badge (glassy white, stable) */
+.badge-completed {
+  min-height: 26px; /* hard stop against iOS chop */
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* -------------------------
+   10) Habit text rows
+   ------------------------- */
 .habit-target {
   margin-top: 10px;
   color: var(--text-secondary);
   font-size: 13px;
 }
 
+/* -------------------------
+   11) Buttons (one base)
+   ------------------------- */
+.btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  user-select: none;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: scale(0.96);
+}
+
+.btn img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+/* Neutral glass button */
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.btn-secondary:hover {
+  border-color: rgba(91, 141, 239, 0.35);
+}
+
+/* Habit actions layout */
 .habit-actions {
   display: flex;
   gap: 10px;
@@ -334,25 +445,299 @@ body {
 
 .habit-actions .btn {
   flex: 1;
-  justify-content: center;
   min-width: 140px;
 }
 
-/* Times list inside modal */
-.times-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Habit action button colors (your vibe) */
+.habit-actions .btn-log {
+  background: linear-gradient(135deg, #8000fe, #8000fe);
+  color: #ffffff;
+  box-shadow: 0 8px 22px rgba(123, 108, 255, 0.45);
 }
 
+.habit-actions .btn-edit {
+  background: linear-gradient(135deg, #00dbff, #00dbff);
+  color: #062b2a;
+  box-shadow: 0 8px 22px rgba(47, 212, 201, 0.45);
+}
+
+.habit-actions .btn-delete {
+  background: linear-gradient(135deg, #dc14ad, #dc14ad);
+  color: #ffffff;
+  box-shadow: 0 8px 22px rgba(255, 102, 179, 0.45);
+}
+
+.habit-actions .btn-view,
+.habit-actions .btn-pause {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* -------------------------
+   12) FAB
+   ------------------------- */
+.fab {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  right: 24px;
+
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+
+  border: none;
+  color: white;
+  font-size: 24px;
+
+  cursor: pointer;
+  z-index: 999;
+
+  background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
+  box-shadow:
+    0 10px 30px rgba(91, 141, 239, 0.38),
+    inset 0 1px 0 rgba(255,255,255,0.22);
+
+  transition: all 0.2s;
+}
+
+.fab:hover {
+  transform: scale(1.06);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+/* -------------------------
+   13) Modal (glass)
+   ------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0,0,0,0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+
+  animation: fadeIn 0.2s;
+}
+
+.modal {
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+
+  border-radius: 20px;
+  padding: 24px;
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--glass-surface-strong);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 22px 70px rgba(0,0,0,0.65);
+
+  overflow: hidden; /* body scroll happens inside .modal-body */
+  animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-shrink: 0;
+}
+
+.modal-header h2 {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  flex-shrink: 0;
+}
+
+.modal-actions .btn {
+  flex: 1;
+  padding: 12px;
+}
+
+.modal-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 14px 0;
+}
+
+/* Prevent background scroll when modal open */
+body.modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: 0;
+  left: 0;
+}
+
+/* -------------------------
+   14) Forms (glass fields)
+   ------------------------- */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 12px 16px;
+
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+
+  color: var(--text-primary);
+  font-size: 15px;
+
+  transition: all 0.2s;
+
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+  border-color: rgba(91, 141, 239, 0.60);
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.form-textarea.form-textarea--sm {
+  min-height: 80px;
+}
+
+.form-help {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 8px;
+}
+
+/* iOS time/date normalization */
+input[type="time"].form-input,
+input[type="date"].form-input,
+input[type="datetime-local"].form-input {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 44px;
+  line-height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+input[type="time"].form-input::-webkit-date-and-time-value,
+input[type="date"].form-input::-webkit-date-and-time-value,
+input[type="datetime-local"].form-input::-webkit-date-and-time-value {
+  height: 44px;
+  line-height: 44px;
+}
+
+input[type="time"].form-input::-webkit-datetime-edit,
+input[type="date"].form-input::-webkit-datetime-edit,
+input[type="datetime-local"].form-input::-webkit-datetime-edit {
+  padding: 0;
+}
+
+/* -------------------------
+   15) Times rows (IMPORTANT)
+   Fix: weekly date + time getting cut off
+   ------------------------- */
 .times-item {
   display: flex;
   gap: 10px;
   align-items: center;
+  width: 100%;
+  flex-wrap: wrap; /* allows wrap instead of cut-off */
 }
 
-.times-item input[type="time"] {
-  flex: 1;
+.times-item input[type="date"].form-input {
+  flex: 1 1 210px;
+  min-width: 210px;
+}
+
+.times-item input[type="time"].form-input {
+  flex: 0 1 120px;
+  min-width: 120px;
+}
+
+/* Times list in modal */
+.times-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .times-item .btn {
@@ -361,7 +746,56 @@ body {
   flex: 0;
 }
 
-/* Logs list */
+/* Weekday picker */
+.weekday-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* -------------------------
+   16) Empty / Loading
+   ------------------------- */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.empty-state-icon img {
+  width: 64px;
+  height: 64px;
+  opacity: 0.3;
+}
+
+.empty-state-text {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.14);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* -------------------------
+   17) Logs list (habit logs)
+   ------------------------- */
 .logs-list {
   display: flex;
   flex-direction: column;
@@ -369,13 +803,14 @@ body {
 }
 
 .log-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   padding: 12px;
   border-radius: 14px;
+
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
 }
 
 .log-top {
@@ -400,1682 +835,27 @@ body {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: 10px;
 }
 
 .log-actions .btn {
   flex: 1;
-  justify-content: center;
   min-width: 120px;
 }
 
-.form-help {
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.35;
-  margin-top: 8px;
-}
-
-.modal-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 14px 0;
-}
-
-/* -------- Reading Progress -------- */
-.progress-wrap {
-  margin-top: 14px;
-  margin-bottom: 14px;
-}
-
-.progress-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 8px;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.progress-pct {
-  color: var(--text-primary);
-  font-weight: 700;
-  font-size: 13px;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
-  border-radius: 999px;
-  transition: width 0.2s ease;
-}
-
-.book-summary {
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: var(--text-secondary);
-  margin: 10px 0 12px;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Buttons */
-.btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--accent-hover);
-}
-
-.btn-success {
-  background: var(--success);
-  color: white;
-}
-
-.btn-danger {
-  background: var(--danger);
-  color: white;
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.btn:active {
-  transform: scale(0.95);
-}
-
-/* -------- Reading Streak Card -------- */
-.streak-row {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-.streak-stat {
-  flex: 1;
-  min-width: 140px;
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-}
-
-.streak-stat-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 6px;
-}
-
-.streak-stat-value {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-.streak-actions {
-  margin-top: 14px;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* --- Badge icon support (Reading books status badge) --- */
-.card-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Only affects icons inside the badge */
-.card-badge .badge-icon {
-  width: 12px;
-  height: 12px;
-  object-fit: contain;
-  opacity: 0.95;
-  vertical-align: -0.12em;
-}
-
-/* -------- Reading Streak Button (ONLY) -------- */
-.streak-actions .btn.btn-success {
-  background: var(--gradient-blue);
-  color: #fff;
-  border: 1px solid rgba(91, 141, 239, 0.45);
-  box-shadow: 0 6px 16px rgba(91, 141, 239, 0.22);
-}
-
-.streak-actions .btn.btn-success:hover {
-  filter: brightness(1.08);
-}
-
-.streak-actions .btn.btn-success:active {
-  transform: scale(0.96);
-  filter: brightness(0.95);
-}
-
-/* Disabled (when checked in or loading) */
-.streak-actions .btn.btn-success:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  filter: none;
-  transform: none;
-  box-shadow: none;
-}
-
-/* FAB */
-.fab {
-  position: fixed;
-  bottom: calc(96px + env(safe-area-inset-bottom));
-  right: 24px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
-  border: none;
-  color: white;
-  font-size: 24px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(91, 141, 239, 0.4);
-  transition: all 0.2s;
-  z-index: 999;
-}
-
-.fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(91, 141, 239, 0.6);
-}
-
-.fab:active {
-  transform: scale(0.95);
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  animation: fadeIn 0.2s;
-}
-
-.modal {
-  background: var(--card-bg);
-  border-radius: 20px;
-  padding: 24px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 80vh;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  animation: slideUp 0.3s;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  flex-shrink: 0;
-}
-
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-/* Prevent background scroll when modal is open */
-/* Prevent background scroll when modal is open */
-body.modal-open {
-  overflow: hidden !important;
-  position: fixed !important;
-  width: 100% !important;
-  height: 100% !important;
-  top: 0;
-  left: 0;
-}
-
-body.modal-open .app-content {
-  overflow: hidden !important;
-}
-
-
-
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  flex-shrink: 0;
-}
-
-
-@keyframes slideUp {
-  from {
-    transform: translateY(100px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.modal-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-/* Forms */
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.form-input,
-.form-textarea {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text-primary);
-  font-size: 15px;
-  transition: all 0.2s;
-}
-
-.form-input:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.form-textarea {
-  resize: vertical;
-  min-height: 100px;
-  font-family: inherit;
-}
-
-.form-textarea.form-textarea--sm {
-  min-height: 80px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.form-select {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text-primary);
-  font-size: 15px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.modal-actions .btn {
-  flex: 1;
-  justify-content: center;
-  padding: 12px;
-}
-
-/* ---- iOS time/date input normalization ---- */
-input[type="time"].form-input,
-input[type="date"].form-input {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 44px;          /* forces consistent vertical alignment */
-  line-height: 44px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-/* Center the displayed value inside iOS time/date controls */
-input[type="time"].form-input::-webkit-date-and-time-value,
-input[type="date"].form-input::-webkit-date-and-time-value {
-  height: 44px;
-  line-height: 44px;
-}
-
-/* Optional: reduces weird internal offsets on some iOS versions */
-input[type="time"].form-input::-webkit-datetime-edit,
-input[type="date"].form-input::-webkit-datetime-edit {
-  padding: 0;
-}
-
-/* Checkbox row (moved from inline styles) */
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-/* Empty state */
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-}
-
-.empty-state-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.3;
-}
-
-.empty-state-text {
-  font-size: 16px;
-  line-height: 1.6;
-}
-
-/* Loading */
-.loading {
-  text-align: center;
-  padding: 40px;
-  color: var(--text-secondary);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 16px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.reminders-greeting {
-  margin-top: 6px;
-  font-size: 14px;
-  opacity: 0.75;
-  letter-spacing: 0.2px;
-}
-
-/* Quick actions */
-.quick-actions {
-  display: flex;
-  gap: 8px;
-  margin: 0 16px 24px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-.quick-action {
-  padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.quick-action:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--accent);
-}
-
-.quick-action.active {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-/* Calendar Header */
-.calendar-header {
-  padding: 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-}
-
-.calendar-month {
-  font-size: 24px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.calendar-nav-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--text-primary);
-  font-size: 18px;
-  transition: all 0.2s;
-}
-
-.calendar-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--accent);
-}
-
-/* -------- Calendar View (moved from inline styles) -------- */
-
-.calendar-body {
-  padding: 16px;
-}
-
-.calendar-day {
-  margin-bottom: 16px;
-}
-
-.calendar-day-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.calendar-datebox {
-  min-width: 60px;
-  text-align: center;
-}
-
-.calendar-datebox-day {
-  font-size: 28px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1;
-}
-
-.calendar-datebox-day.is-today {
-  color: #5b8def;
-}
-
-.calendar-datebox-dow {
-  font-size: 12px;
-  color: #888;
-  text-transform: uppercase;
-  margin-top: 4px;
-}
-
-.calendar-events {
-  flex: 1;
-}
-
-.calendar-no-events {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.calendar-add-icon-btn {
-  background: rgba(91, 141, 239, 0.15);
-  border: none;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
-  color: #5b8def;
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.calendar-event {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-left: 4px solid #5b8def;
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.calendar-event:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.calendar-event-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.calendar-event-main {
-  flex: 1;
-}
-
-.calendar-event-allday {
-  display: inline-flex;
-  align-items: center;
-  background: rgba(76, 175, 80, 0.15);
-  color: #4caf50;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 6px;
-  margin-bottom: 4px;
-}
-
-.calendar-event-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.calendar-event-time {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.calendar-event-location {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
-
-.calendar-event-delete {
-  background: none;
-  border: none;
-  color: var(--danger);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px;
-}
-
-.calendar-add-event {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  width: 100%;
-  padding: 12px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.event-reminder-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--warning);
-  margin-left: 8px;
-  transform: translateY(-1px);
-  opacity: 0.9;
-}
-
-.calendar-header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.icon-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--accent);
-}
-
-.icon-btn img {
-  width: 18px;
-  height: 18px;
-  opacity: 0.9;
-}
-
-/* =========================
-   EVENT SHARE VIEW
-   ========================= */
-
-.event-share-wrap {
-  padding: 16px;
-}
-
-.event-share-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px;
-}
-
-.event-share-title {
-  font-size: 22px;
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-
-.event-share-meta {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-bottom: 14px;
-}
-
-.event-share-desc {
-  font-size: 15px;
-  line-height: 1.6;
-  margin-bottom: 16px;
-}
-
-.event-share-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-
-.event-share-input {
-  width: 100%;
-  margin-bottom: 12px;
-}
-
-.event-share-status {
-  margin-top: 14px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.event-share-status.success {
-  color: var(--success);
-}
-
-.event-share-status.error {
-  color: var(--danger);
-}
-
-.event-share-actions .btn {
-  flex: 1;
-  justify-content: center;
-}
-
-/* =========================
-   SHARE CODE MODAL
-   ========================= */
-
-.share-code-box {
-  padding: 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-}
-
-.share-code-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 8px;
-}
-
-.share-code-token {
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(0,0,0,0.35);
-  color: var(--text-primary);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-  word-break: break-all;
-  user-select: text;
-}
-
-.share-code-help {
-  margin-top: 10px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-/* Utility */
+/* -------------------------
+   18) Utility
+   ------------------------- */
 .is-hidden {
   display: none !important;
 }
 
-/* -------- Journal View -------- */
-
-.journal-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tag-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.tag-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-
-  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%);
-  color: white;
-  border: 1px solid rgba(91, 141, 239, 0.45);
-
-  /* optional: makes them pop slightly like the UI accent */
-  box-shadow: 0 4px 10px rgba(91, 141, 239, 0.18);
-}
-
-.journal-preview {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text-primary);
-  white-space: pre-line;
-  word-break: break-word;
-  opacity: 0.95;
-}
-
-/* Journal */
-.journal-body-preview {
-  display: -webkit-box;
-  -webkit-line-clamp: 4; /* preview lines */
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: pre-line;
-}
-
-/* Journal preview modal actions */
-.journal-preview-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.journal-preview-actions .btn {
-  width: 100%;
-  justify-content: center;
-}
-
-.tag-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-
-  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%);
-  color: white;
-  border: 1px solid rgba(91, 141, 239, 0.45);
-
-  margin-right: 8px;
-  margin-top: 8px;
-
-  box-shadow: 0 4px 10px rgba(91, 141, 239, 0.18);
-}
-
-.load-more-container {
-  margin: 16px;
-}
-
-.btn-prompt {
-  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%);
-  color: white;
-}
-
-.btn-prompt:hover {
-  filter: brightness(1.08);
-}
-
-.btn-prompt:active {
-  transform: scale(0.96);
-}
-
-.load-more-btn {
-  width: 100%;
-  justify-content: center;
-  padding: 12px;
-}
-
-/* -------- Journal Tags View -------- */
-
-.tags-search {
-  margin: 0 16px 16px;
-}
-
-.tags-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 0 16px 16px;
-}
-
-.tag-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.tag-item:hover {
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.tag-item-name {
-  font-weight: 800;
-}
-
-.tag-item-count {
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.journal-filter-bar {
-  margin: 0 16px 14px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.04);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.journal-filter-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.journal-filter-left img {
-  width: 16px;
-  height: 16px;
-  opacity: 0.9;
-}
-
-.journal-filter-text {
-  font-size: 13px;
-  color: var(--text-primary);
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.journal-filter-clear {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.06);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.journal-filter-clear:hover {
-  border-color: var(--accent);
-}
-
-/* ---------------- Icon System (SVG icons replacing emojis) ---------------- */
-
-/* Global sanity */
+/* Icon sanity */
 img {
   max-width: 100%;
   height: auto;
 }
-
-/* Inline icon sizing + alignment */
-.card-time img,
-.btn img,
-.nav-item-icon img,
-.empty-state-icon img,
-.calendar-add-icon-btn img,
-.calendar-event-location img,
-.calendar-event-delete img {
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.12em;
-  object-fit: contain;
-}
-
-/* --- Card time (date / time rows) --- */
-.card-time {
-  gap: 8px;
-}
-.card-time img {
-  width: 16px;
-  height: 16px;
-  opacity: 0.9;
-}
-
-/* --- Buttons with icons --- */
-.btn img {
-  width: 16px;
-  height: 16px;
-}
-
-/* --- Bottom navigation icons --- */
-.nav-item-icon {
-  font-size: 0; /* removes emoji-era baseline spacing */
-  line-height: 0;
-}
-.nav-item-icon img {
-  width: 24px;
-  height: 24px;
-  opacity: 0.9;
-}
-
-.nav-item.active .nav-item-icon img {
-  opacity: 1;
-}
-
-/* --- Empty states --- */
-.empty-state-icon img {
-  width: 64px;
-  height: 64px;
-  opacity: 0.3;
-}
-
-/* --- Calendar --- */
-.calendar-add-icon-btn img {
-  width: 18px;
-  height: 18px;
-}
-
-.calendar-event-location {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.calendar-event-location img {
-  width: 14px;
-  height: 14px;
-  opacity: 0.85;
-}
-
-.calendar-event-delete img {
-  width: 18px;
-  height: 18px;
-}
-
-/* =========================
-   SETTINGS VIEW POLISH
-   ========================= */
-
-/* Settings should not feel like tappable reminder cards */
-.settings-card {
-  cursor: default !important;
-  transform: none !important;
-}
-.settings-card:hover {
-  border-color: var(--border) !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
-
-/* Section titles inside settings */
-.settings-title {
-  font-size: 14px;
-  font-weight: 800;
-  margin-bottom: 10px;
-  letter-spacing: 0.2px;
-}
-
-.settings-help {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-  margin-bottom: 12px;
-}
-
-/* Save row aligns nicely and doesn't float */
-.settings-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-}
-
-/* Quiet Hours container (avoid "card inside card" look) */
-.qh-box {
-  margin-top: 14px;
-  padding: 16px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-}
-
-/* Quiet Hours header text */
-.qh-title {
-  font-size: 14px;
-  font-weight: 800;
-  margin-bottom: 8px;
-}
-
-.qh-sub {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-  margin-bottom: 12px;
-}
-
-/* Toggle row for quiet hours */
-.qh-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  margin-bottom: 12px;
-}
-
-.qh-toggle label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-/* Make checkbox not look tiny/off-center */
-.qh-toggle input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-}
-
-/* Two time inputs, clean and aligned */
-.qh-times {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-/* Label styling for Start/End */
-.qh-times .form-label {
-  margin-bottom: 6px;
-}
-
-/* Disable times visually if quiet hours off */
-.qh-disabled {
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-/* Quiet hours save button row */
-.qh-actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 10px;
-}
-
-/* Optional: smaller save button in settings so it doesn’t look chunky */
-.btn.btn-sm {
-  padding: 10px 14px;
-  font-size: 13px;
-  border-radius: 10px;
-}
-
-/* =========================================================
-   FULL GLASS COMMIT PATCH (paste at VERY END of your CSS)
-   ========================================================= */
-
-/* 0) Glass tokens (override your base tokens cleanly) */
-:root {
-  /* Base backdrop */
-  --bg-color: #07070a;
-
-  /* Replace harsh borders with glass borders */
-  --border: rgba(255, 255, 255, 0.12);
-
-  /* Glass surface tokens */
-  --glass-surface: rgba(255, 255, 255, 0.06);
-  --glass-surface-2: rgba(255, 255, 255, 0.09);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-border-strong: rgba(255, 255, 255, 0.22);
-
-  /* Shadows + highlights */
-  --glass-shadow: rgba(0, 0, 0, 0.45);
-  --glass-highlight: rgba(255, 255, 255, 0.16);
-
-  /* Blur */
-  --glass-blur: 18px;
-
-  /* Optional: keep your card-bg but make it "not used" visually */
-  --card-bg: rgba(255, 255, 255, 0.06);
-}
-
-/* 1) Ambient aurora background (makes glass read as glass) */
-body {
-  background: var(--bg-color);
-  position: relative;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -2;
-  background:
-    radial-gradient(650px 450px at 12% 10%, rgba(91, 141, 239, 0.24), transparent 60%),
-    radial-gradient(600px 480px at 88% 18%, rgba(139, 125, 239, 0.20), transparent 62%),
-    radial-gradient(720px 540px at 50% 92%, rgba(224, 25, 212, 0.12), transparent 60%),
-    radial-gradient(720px 520px at 40% 70%, rgba(0, 219, 255, 0.10), transparent 62%);
-  filter: blur(2px);
-  opacity: 0.9;
-}
-
-/* Subtle grain (optional but makes glass premium) */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
-}
-
-/* 2) Core glass "surface" mixin (applied via selectors below) */
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .card,
-  .bottom-nav,
-  .header,
-  .modal,
-  .quick-action,
-  .form-input,
-  .form-textarea,
-  .form-select,
-  .calendar-event,
-  .calendar-no-events,
-  .calendar-add-event,
-  .tag-item,
-  .journal-filter-bar,
-  .qh-box,
-  .share-code-box,
-  .event-share-card,
-  .log-row,
-  .streak-stat,
-  .settings-card {
-    background: var(--glass-surface) !important;
-    border: 1px solid var(--glass-border) !important;
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-    box-shadow: 0 14px 40px var(--glass-shadow);
-  }
-
-  /* stronger surfaces */
-  .modal {
-    background: rgba(25, 25, 32, 0.58) !important;
-    border-color: rgba(255, 255, 255, 0.18) !important;
-    box-shadow: 0 22px 70px rgba(0,0,0,0.65);
-  }
-
-  .bottom-nav {
-    background: rgba(20, 20, 26, 0.55) !important;
-    border-top: 1px solid rgba(255,255,255,0.10) !important;
-    -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(160%);
-    backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(160%);
-    box-shadow: 0 -10px 30px rgba(0,0,0,0.35);
-  }
-
-  .header {
-    background: rgba(10, 10, 14, 0.45) !important;
-    border-bottom: none;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.22);
-  }
-
-  /* 3) Glass edge shine (helps it read as glass) */
-  .card,
-  .modal,
-  .calendar-event,
-  .calendar-no-events,
-  .calendar-add-event,
-  .tag-item,
-  .journal-filter-bar,
-  .qh-box,
-  .share-code-box,
-  .event-share-card,
-  .log-row,
-  .streak-stat {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .card::before,
-  .modal::before,
-  .calendar-event::before,
-  .calendar-no-events::before,
-  .calendar-add-event::before,
-  .tag-item::before,
-  .journal-filter-bar::before,
-  .qh-box::before,
-  .share-code-box::before,
-  .event-share-card::before,
-  .log-row::before,
-  .streak-stat::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      rgba(255,255,255,0.18),
-      rgba(255,255,255,0.06) 35%,
-      rgba(255,255,255,0.00) 60%
-    );
-    opacity: 0.55;
-    mix-blend-mode: screen;
-  }
-
-  /* 4) Hover glow on glass */
-  .card:hover,
-  .tag-item:hover,
-  .calendar-event:hover {
-    border-color: rgba(91, 141, 239, 0.40) !important;
-    box-shadow: 0 18px 54px rgba(0,0,0,0.52);
-  }
-
-  /* 5) Inputs: glass fields */
-  .form-input,
-  .form-textarea,
-  .form-select {
-    background: rgba(255, 255, 255, 0.07) !important;
-    border-color: rgba(255,255,255,0.14) !important;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
-  }
-
-  .form-input:focus,
-  .form-textarea:focus,
-  .form-select:focus {
-    border-color: rgba(91, 141, 239, 0.60) !important;
-    box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18), inset 0 1px 0 rgba(255,255,255,0.12);
-    background: rgba(255, 255, 255, 0.09) !important;
-  }
-
-  /* 6) Buttons: subtle gloss (don’t ruin your gradients) */
-  .btn {
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
-  }
-
-  .btn-secondary {
-    background: rgba(255,255,255,0.08) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-    backdrop-filter: blur(12px) saturate(150%);
-  }
-
-  .btn-secondary:hover {
-    background: rgba(255,255,255,0.11) !important;
-    border-color: rgba(91, 141, 239, 0.35) !important;
-  }
-
-  /* 7) Badges: glass border (what you asked for) */
-  .card-badge,
-  .badge-habit-daily,
-  .badge-habit-weekly,
-  .badge-habit-active,
-  .badge-habit-paused,
-  .badge-once,
-  .badge-daily,
-  .badge-weekly,
-  .badge-monthly,
-  .badge-interval {
-    border: 1px solid rgba(255,255,255,0.14) !important;
-    -webkit-backdrop-filter: blur(10px) saturate(150%);
-    backdrop-filter: blur(10px) saturate(150%);
-  }
-
-  /* 8) Modal overlay: slightly glass */
-  .modal-overlay {
-    background: rgba(0,0,0,0.55) !important;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-  }
-
-  /* 9) FAB: glossier */
-  .fab {
-    box-shadow:
-      0 10px 30px rgba(91, 141, 239, 0.38),
-      inset 0 1px 0 rgba(255,255,255,0.22);
-  }
-}
-
-/* 10) Fallback if backdrop-filter unsupported */
-@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .card,
-  .bottom-nav,
-  .header,
-  .modal,
-  .calendar-event,
-  .calendar-no-events,
-  .calendar-add-event,
-  .tag-item,
-  .journal-filter-bar,
-  .qh-box,
-  .share-code-box,
-  .event-share-card,
-  .log-row,
-  .streak-stat {
-    background: rgba(20, 20, 26, 0.92) !important;
-    border: 1px solid rgba(255, 255, 255, 0.10) !important;
-  }
-}
-
-// BUTTON BASE
-.btn {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-}
-
-
-/* =========================
-   FIXES ONLY -- DO NOT STYLE
-   ========================= */
-
-/* 1) REMOVE boxed background behind Habits header */
-.header {
-  background: transparent !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-/* Keep a subtle separator only */
-.header {
-  border-bottom: 1px solid var(--glass-border);
-}
-
-/* 2) STOP badge overlap -- force proper stacking */
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-/* Right-side badge container */
-.badge-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-/* Make sure the header area and badge column can "paint" without being clipped */
-.card-header {
-  overflow: visible;
-}
-
-.habit-badges {
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-/* Completed badge: force clean layout + no baseline weirdness */
-.card-badge.badge-completed {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  white-space: nowrap;
-  line-height: 1;
-  padding: 6px 10px; /* a little more breathing room so it doesn’t look chopped */
-
-  border-radius: 999px;
-
-  /* glassy + readable on dark */
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(10px);
-
-  /* helps iOS WebView render it cleaner */
-  -webkit-font-smoothing: antialiased;
-}
-
-.card-badge.badge-completed .badge-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-  flex: 0 0 14px;
-}
-
-/* Make badges behave like pills, not floaty ghosts */
-.card-badge {
-  position: static !important;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-/* =========================
-   HABIT ACTION BUTTON LOCK
-   ========================= */
-
-.habit-actions button.btn {
-  background: none !important;
-}
-
-/* Log Session -- PURPLE */
-.habit-actions button.btn-log {
-  background: linear-gradient(135deg, #8000fe, #8000fe) !important;
-  color: #ffffff !important;
-  border: none !important;
-  box-shadow: 0 8px 22px rgba(123, 108, 255, 0.45) !important;
-}
-
-/* Edit -- TEAL */
-.habit-actions button.btn-edit {
-  background: linear-gradient(135deg, #00dbff, #00dbff) !important;
-  color: #062b2a !important;
-  border: none !important;
-  box-shadow: 0 8px 22px rgba(47, 212, 201, 0.45) !important;
-}
-
-/* Delete -- PINK */
-.habit-actions button.btn-delete {
-  background: linear-gradient(135deg, #dc14ad, #dc14ad) !important;
-  color: #ffffff !important;
-  border: none !important;
-  box-shadow: 0 8px 22px rgba(255, 102, 179, 0.45) !important;
-}
-
-/* View / Pause -- neutral glass */
-.habit-actions button.btn-view,
-.habit-actions button.btn-pause {
-  background: rgba(255, 255, 255, 0.12) !important;
-  color: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-}
-
-.times-item {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-
-.times-item .form-input {
-  width: 100%;
-}
-
-.habit-completed-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  margin-left: 6px;
-  padding: 3px 9px;
-
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-
-  border-radius: 999px;
-
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: rgba(30, 30, 30, 0.85);
-
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 2px 6px rgba(0, 0, 0, 0.12);
-}
-
-.card-badge.badge-completed {
-  display: inline-flex;
-  gap: 6px;
-  align-items: baseline; /* sits naturally with text */
-  line-height: 1.15;
-  padding: 6px 10px;
-}
-  </style>
+</style>
 </head>
 
 <body>
