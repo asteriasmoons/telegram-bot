@@ -1894,7 +1894,7 @@ body::after {
   }
 }
 
-// BUTTON BASE
+/* BUTTON BASE */
 .btn {
   border: none;
   border-radius: 12px;
@@ -2073,6 +2073,104 @@ body::after {
   align-items: baseline; /* sits naturally with text */
   line-height: 1.15;
   padding: 6px 10px;
+}
+
+
+/* =========================
+   PATCH: prevent CSS parsing break
+   IMPORTANT: replace any // comments in CSS with /* ... *\/
+   ========================= */
+
+/* =========================
+   PATCH: Quick-action pills should stay in one row
+   ========================= */
+.quick-actions {
+  flex-wrap: nowrap;           /* keep pills in a row */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quick-action {
+  flex: 0 0 auto;              /* do not shrink into stacking */
+}
+
+/* =========================
+   PATCH: Weekly Start date+time row (prevents iOS cut-off)
+   ========================= */
+/* Use this ONLY for the date/time pair row. You already use .times-item there. */
+.times-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 130px); /* date gets space, time is stable */
+  gap: 10px;
+  align-items: center;
+}
+
+.times-item .form-input {
+  width: 100%;
+  min-width: 0; /* critical for iOS clipping in flex/grid */
+}
+
+/* If you want it to stack on very small widths */
+@media (max-width: 380px) {
+  .times-item {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   PATCH: Completed badge rendering + layering (fix "choppy/cut off")
+   ========================= */
+
+/* Make sure card content sits above any glass ::before shine */
+.card {
+  position: relative;
+}
+
+.card::before {
+  z-index: 0;
+}
+
+/* Raise actual content above overlay */
+.card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Specifically ensure badge stack is never clipped or underlaid */
+.habit-badges {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
+
+/* Your completed badge */
+.card-badge.badge-completed {
+  display: inline-flex;
+  align-items: center;       /* keep icon+text vertically aligned */
+  gap: 6px;
+
+  white-space: nowrap;
+  line-height: 1;            /* avoids iOS baseline clipping */
+  padding: 6px 10px;
+  min-height: 24px;          /* ensures pill has enough height for icon */
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.16);   /* glassy, readable on dark */
+  border: 1px solid rgba(255, 255, 255, 0.22);
+
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* The icon */
+.card-badge.badge-completed .badge-icon {
+  width: 14px;
+  height: 14px;
+  display: block;            /* prevents baseline weirdness */
+  flex: 0 0 14px;
+  object-fit: contain;
 }
   </style>
 </head>
