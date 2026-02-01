@@ -1931,6 +1931,84 @@ img {
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
     0 2px 6px rgba(0, 0, 0, 0.12);
 }
+
+
+/* =========================================================
+   GLOBAL iOS BUTTON NORMALIZATION (ICON / HEADER / NAV)
+   ========================================================= */
+
+/* Any button that is NOT a primary action */
+button:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-log):not(.btn-edit):not(.btn-delete) {
+  -webkit-appearance: none;
+  appearance: none;
+
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: var(--text-primary) !important;
+
+  border-radius: 12px;
+  padding: 8px 10px;
+
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+}
+
+/* Hover / active (prevents whitening flash) */
+button:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-log):not(.btn-edit):not(.btn-delete):hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(91, 141, 239, 0.35) !important;
+}
+
+/* Icon-only buttons (header / calendar / habits nav) */
+.icon-btn,
+.calendar-nav-btn,
+.header button {
+  min-width: 36px;
+  min-height: 36px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Make sure icons don’t fade */
+.icon-btn img,
+.header img {
+  opacity: 0.9 !important;
+}
+
+/* =========================================================
+   COMPLETED BADGE -- PERFECT PILL (NO CLIP EVER)
+   ========================================================= */
+
+.card-badge.badge-completed {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 8px !important;
+  white-space: nowrap !important;
+
+  padding: 8px 14px !important;
+  min-height: 32px !important;
+
+  border-radius: 999px !important;
+  line-height: 1 !important;
+
+  background: rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+}
+
+/* Icon inside completed badge */
+.card-badge.badge-completed .badge-icon {
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 14px !important;
+  display: block !important;
+}
 </style>
 </head>
 
