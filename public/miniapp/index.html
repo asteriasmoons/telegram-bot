@@ -1943,6 +1943,47 @@ body::after {
   gap: 6px;
 }
 
+/* Make sure the header area and badge column can "paint" without being clipped */
+.card-header {
+  overflow: visible;
+}
+
+.habit-badges {
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* Completed badge: force clean layout + no baseline weirdness */
+.card-badge.badge-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  white-space: nowrap;
+  line-height: 1;
+  padding: 6px 10px; /* a little more breathing room so it doesn’t look chopped */
+
+  border-radius: 999px;
+
+  /* glassy + readable on dark */
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+
+  /* helps iOS WebView render it cleaner */
+  -webkit-font-smoothing: antialiased;
+}
+
+.card-badge.badge-completed .badge-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex: 0 0 14px;
+}
+
 /* Make badges behave like pills, not floaty ghosts */
 .card-badge {
   position: static !important;
