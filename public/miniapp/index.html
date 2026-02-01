@@ -2420,10 +2420,8 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
 
   const [status, setStatus] = useState(isEdit ? (initialHabit.status || "active") : "active");
   const [cadence, setCadence] = useState(isEdit ? (initialHabit.cadence || "daily") : "daily");
-  
-    const [cadence, setCadence] = useState(isEdit ? (initialHabit.cadence || "daily") : "daily");
 
-  // ✅ Weekly anchor inputs (only used when cadence === "weekly")
+  // ✅ Weekly anchor inputs (only used when cadence === "weekly" AND reminders are on)
   const [startDate, setStartDate] = useState(""); // "YYYY-MM-DD"
   const [startTime, setStartTime] = useState(""); // "HH:mm"
 
@@ -2493,24 +2491,27 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       return Array.from(s).sort((a, b) => a - b);
     });
   };
-  
-    // ✅ Prefill weekly anchor fields when editing
+
+  // ✅ Prefill weekly anchor fields when editing
   useEffect(() => {
     if (isEdit && initialHabit?.startAt) {
       const d = new Date(initialHabit.startAt);
+      if (!isNaN(d.getTime())) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const min = String(d.getMinutes()).padStart(2, "0");
 
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      const hh = String(d.getHours()).padStart(2, "0");
-      const min = String(d.getMinutes()).padStart(2, "0");
-
-      setStartDate(`${yyyy}-${mm}-${dd}`);
-      setStartTime(`${hh}:${min}`);
-    } else {
-      setStartDate("");
-      setStartTime("");
+        setStartDate(`${yyyy}-${mm}-${dd}`);
+        setStartTime(`${hh}:${min}`);
+        return;
+      }
     }
+
+    // default clear if not editing weekly or no startAt
+    setStartDate("");
+    setStartTime("");
   }, [isEdit, initialHabit]);
 
   const addTime = () => setTimesOfDay((prev) => [...(Array.isArray(prev) ? prev : []), "09:00"]);
@@ -2579,16 +2580,33 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
         return;
       }
     }
-    
-        // ✅ Weekly cadence must have an anchor datetime
-    if (cadence === "weekly") {
+
+    const remindersOn = reminderKind !== "off";
+
+    // ✅ Weekly cadence must have an anchor datetime when reminders are ON
+    if (cadence === "weekly" && remindersOn) {
       if (!startDate || !startTime) {
         tg?.showAlert?.("Weekly habits require a start date and start time.");
         return;
       }
     }
 
-        const payload = {
+    // ✅ Build ISO for startAt (weekly anchor)
+    let startAtISO = undefined;
+
+    if (cadence === "weekly" && remindersOn) {
+      const isoLocal = `${startDate}T${startTime}`; // local time from inputs
+      const d = new Date(isoLocal);
+
+      if (isNaN(d.getTime())) {
+        tg?.showAlert?.("Start date/time is invalid.");
+        return;
+      }
+
+      startAtISO = d.toISOString();
+    }
+
+    const payload = {
       name: String(name).trim(),
       description: description ? String(description).trim() : undefined,
       status: status === "paused" ? "paused" : "active",
@@ -2600,7 +2618,7 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
       reminderSchedule,
       nextReminderAt: nextReminderAt ? parseDateTimeLocalValue(nextReminderAt)?.toISOString() : undefined,
 
-      // ✅ add this
+      // ✅ weekly anchor (only sent when weekly + reminders on)
       startAt: startAtISO,
     };
 
@@ -2665,8 +2683,8 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
               <option value="weekly">weekly</option>
             </select>
           </div>
-          
-                    {cadence === "weekly" ? (
+
+          {cadence === "weekly" && reminderKind !== "off" ? (
             <div className="form-group">
               <label className="form-label">Weekly Start (required for weekly)</label>
 
@@ -2801,8 +2819,18 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">Window (optional)</label>
               <div className="times-item">
-                <input type="time" className="form-input" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
-                <input type="time" className="form-input" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
+                <input
+                  type="time"
+                  className="form-input"
+                  value={windowStart}
+                  onChange={(e) => setWindowStart(e.target.value)}
+                />
+                <input
+                  type="time"
+                  className="form-input"
+                  value={windowEnd}
+                  onChange={(e) => setWindowEnd(e.target.value)}
+                />
               </div>
             </div>
           ) : null}
