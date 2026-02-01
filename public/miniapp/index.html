@@ -1829,116 +1829,16 @@ img {
 }
 
 /* =========================================================
-   FIXES ONLY -- DO NOT STYLE (KEPT, DEDUPED)
-   ========================================================= */
-/* Transparent header (keep) */
-.header {
-  background: transparent !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-/* STOP badge overlap -- force proper stacking */
-.badge-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.habit-badges {
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-/* Completed badge: clean layout */
-.card-badge.badge-completed {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  line-height: 1.15;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(10px);
-  -webkit-font-smoothing: antialiased;
-}
-
-.card-badge.badge-completed .badge-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-  flex: 0 0 14px;
-}
-
-/* =========================================================
-   HABIT ACTION BUTTON LOCK
-   ========================================================= */
-.habit-actions button.btn {
-  background: none !important;
-}
-
-.habit-actions button.btn-log {
-  background: linear-gradient(135deg, #8000fe, #8000fe) !important;
-  color: #ffffff !important;
-  border: none !important;
-  box-shadow: 0 8px 22px rgba(123, 108, 255, 0.45) !important;
-}
-
-.habit-actions button.btn-edit {
-  background: linear-gradient(135deg, #00dbff, #00dbff) !important;
-  color: #062b2a !important;
-  border: none !important;
-  box-shadow: 0 8px 22px rgba(47, 212, 201, 0.45) !important;
-}
-
-.habit-actions button.btn-delete {
-  background: linear-gradient(135deg, #dc14ad, #dc14ad) !important;
-  color: #ffffff !important;
-  border: none !important;
-  box-shadow: 0 8px 22px rgba(255, 102, 179, 0.45) !important;
-}
-
-.habit-actions button.btn-view,
-.habit-actions button.btn-pause {
-  background: rgba(255, 255, 255, 0.12) !important;
-  color: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-}
-
-.habit-completed-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 6px;
-  padding: 3px 9px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: rgba(30, 30, 30, 0.85);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 2px 6px rgba(0, 0, 0, 0.12);
-}
-
-
-/* =========================================================
-   GLOBAL iOS BUTTON NORMALIZATION (ICON / HEADER / NAV)
+   PATCH: ONLY icon/utility buttons (no tag pills touched)
+   Paste at VERY END
    ========================================================= */
 
-/* Any button that is NOT a primary action */
-button:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-log):not(.btn-edit):not(.btn-delete) {
+/* iOS WebView: stop default white button rendering on icon buttons */
+.icon-btn,
+.calendar-nav-btn,
+.calendar-add-icon-btn,
+.calendar-event-delete,
+.header button {
   -webkit-appearance: none;
   appearance: none;
 
@@ -1946,41 +1846,39 @@ button:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-log):not(.b
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   color: var(--text-primary) !important;
 
-  border-radius: 12px;
-  padding: 8px 10px;
-
   -webkit-backdrop-filter: blur(14px) saturate(150%);
   backdrop-filter: blur(14px) saturate(150%);
 }
 
-/* Hover / active (prevents whitening flash) */
-button:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-log):not(.btn-edit):not(.btn-delete):hover {
+/* hover polish */
+.icon-btn:hover,
+.calendar-nav-btn:hover,
+.calendar-add-icon-btn:hover,
+.calendar-event-delete:hover,
+.header button:hover {
   background: rgba(255, 255, 255, 0.12) !important;
   border-color: rgba(91, 141, 239, 0.35) !important;
 }
 
-/* Icon-only buttons (header / calendar / habits nav) */
-.icon-btn,
-.calendar-nav-btn,
-.header button {
-  min-width: 36px;
-  min-height: 36px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Make sure icons don’t fade */
+/* Make sure icon images don’t get washed out */
 .icon-btn img,
-.header img {
+.header button img,
+.calendar-add-icon-btn img {
   opacity: 0.9 !important;
 }
 
-/* =========================================================
-   COMPLETED BADGE -- PERFECT PILL (NO CLIP EVER)
-   ========================================================= */
+/* Explicitly protect your colorful tags in case they are <button> */
+.tag-pill,
+.tag-chip {
+  background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%) !important;
+  color: #fff !important;
+  border: 1px solid rgba(91, 141, 239, 0.45) !important;
+  box-shadow: 0 4px 10px rgba(91, 141, 239, 0.18) !important;
+}
 
+/* =========================================================
+   COMPLETED BADGE -- PERFECT PILL (NO CLIP)
+   ========================================================= */
 .card-badge.badge-completed {
   display: inline-flex !important;
   align-items: center !important;
@@ -1994,15 +1892,8 @@ button:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-log):not(.b
 
   border-radius: 999px !important;
   line-height: 1 !important;
-
-  background: rgba(255, 255, 255, 0.16) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
-
-  -webkit-backdrop-filter: blur(10px) saturate(150%);
-  backdrop-filter: blur(10px) saturate(150%);
 }
 
-/* Icon inside completed badge */
 .card-badge.badge-completed .badge-icon {
   width: 14px !important;
   height: 14px !important;
