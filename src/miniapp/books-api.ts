@@ -294,7 +294,6 @@ router.put("/:id", async (req: any, res) => {
     const author = String(req.body?.author || "").trim();
     const shortSummary = clampShortSummary(req.body?.shortSummary);
     const status = normalizeStatus(req.body?.status);
-    const rating = clampRating(req.body?.rating);
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!status) return res.status(400).json({ error: "Invalid status" });
@@ -306,15 +305,22 @@ router.put("/:id", async (req: any, res) => {
     totalPages = prog.totalPages;
     currentPage = prog.currentPage;
 
+    // ✅ Only apply rating if it was actually provided
+    const hasRating = Object.prototype.hasOwnProperty.call(req.body, "rating");
+    const update: any = { title, author, shortSummary, status, totalPages, currentPage };
+
+    if (hasRating) {
+      update.rating = clampRating(req.body.rating) ?? 0;
+    }
+
     const updated = await Book.findOneAndUpdate(
       { _id: id, userId },
-      { title, author, shortSummary, status, totalPages, currentPage, rating },
-      { new: true }
+      update,
+      { new: true, runValidators: true }
     ).lean();
 
     if (!updated) return res.status(404).json({ error: "Book not found" });
 
-    // Add `id` for client consistency
     return res.json({ book: withId(updated) });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to update book" });
