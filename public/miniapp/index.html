@@ -2033,6 +2033,87 @@ img {
 .star-btn:active {
   transform: scale(0.92);
 }
+
+/* =========================================================
+   BOOK RECOMMENDATIONS (CHIP BUTTONS)
+   ========================================================= */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--accent);
+}
+
+.chip.is-on {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* Recommendations list */
+.recs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.rec-card {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+
+.rec-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.rec-author {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.rec-summary {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  opacity: 0.9;
+}
+
+.muted {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 14px;
+  margin-top: 10px;
+}
+
 </style>
 </head>
 
