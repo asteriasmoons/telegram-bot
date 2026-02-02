@@ -11,6 +11,8 @@ function normStatus(input: any): BookStatus | null {
   if (s === "tbr") return "tbr";
   if (s === "reading" || s === "active") return "reading";
   if (s === "finished" || s === "done") return "finished";
+  if (s === "paused") return "paused";
+  if (s === "dnf") return "dnf";
   return null;
 }
 
@@ -549,6 +551,8 @@ if (action === "progress" && parts[2] === "cancel") {
             [Markup.button.callback("TBR", `books:setstatus:${id}:tbr:${status}:${page}`)],
             [Markup.button.callback("Reading", `books:setstatus:${id}:reading:${status}:${page}`)],
             [Markup.button.callback("Finished", `books:setstatus:${id}:finished:${status}:${page}`)],
+            [Markup.button.callback("Paused", `books:setstatus:${id}:paused:${status}:${page}`)],
+            [Markup.button.callback("DNF", `books:setstatus:${id}:dnf:${status}:${page}`)],
             [Markup.button.callback("Back", `books:view:${id}:${status}:${page}`)],
           ])
         );
@@ -642,6 +646,8 @@ if (action === "progress" && parts[2] === "cancel") {
             [Markup.button.callback("TBR", "books:add:status:set:tbr")],
             [Markup.button.callback("Reading", "books:add:status:set:reading")],
             [Markup.button.callback("Finished", "books:add:status:set:finished")],
+            [Markup.button.callback("Paused", "books:add:status:set:paused")],
+            [Markup.button.callback("DNF", "books:add:status:set:dnf")],
             [Markup.button.callback("Back", "books:add:start")],
           ])
         );
