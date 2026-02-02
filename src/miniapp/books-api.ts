@@ -19,6 +19,8 @@ function normalizeStatus(input: any) {
   if (s === "tbr") return "tbr";
   if (s === "reading" || s === "active") return "reading";
   if (s === "finished" || s === "done") return "finished";
+  if (s === "paused") return "paused";
+  if (s === "dnf") return "dnf";
   return null;
 }
 
