@@ -9,6 +9,14 @@ const BookSchema = new Schema(
 
     // NEW: short card summary (1–2 sentences)
     shortSummary: { type: String, default: "", trim: true, maxlength: 800 },
+    
+    // Rating: 0–5 stars (0 = none)
+rating: {
+  type: Number,
+  default: 0,
+  min: 0,
+  max: 5,
+},
 
     // Only 3 statuses, exactly as requested
     status: {

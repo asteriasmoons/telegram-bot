@@ -30,6 +30,23 @@ function toIntOrNull(v: any) {
   return i >= 0 ? i : null;
 }
 
+function toIntOrUndefined(v: any) {
+  if (v === undefined || v === null || v === "") return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.floor(n);
+}
+
+function clampRating(v: any): number | undefined {
+  // allow undefined (no rating yet)
+  const n = toIntOrUndefined(v);
+  if (n === undefined) return undefined;
+  // enforce 0..5 (0 = clear)
+  if (n < 0) return 0;
+  if (n > 5) return 5;
+  return n;
+}
+
 function clampShortSummary(v: any) {
   // One to two short sentences is the UI goal, but enforce a safe max length.
   // If you want a different max, change 280 here.
@@ -228,6 +245,7 @@ router.post("/", async (req: any, res) => {
     const author = String(req.body?.author || "").trim();
     const shortSummary = clampShortSummary(req.body?.shortSummary);
     const status = normalizeStatus(req.body?.status);
+    const rating = clampRating(req.body?.rating);
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!status) return res.status(400).json({ error: "Invalid status" });
@@ -247,6 +265,7 @@ router.post("/", async (req: any, res) => {
       status,
       totalPages,
       currentPage,
+      rating,
     });
 
     // Ensure response has `id` even if client expects `book.id`
@@ -275,6 +294,7 @@ router.put("/:id", async (req: any, res) => {
     const author = String(req.body?.author || "").trim();
     const shortSummary = clampShortSummary(req.body?.shortSummary);
     const status = normalizeStatus(req.body?.status);
+    const rating = clampRating(req.body?.rating);
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!status) return res.status(400).json({ error: "Invalid status" });
@@ -288,7 +308,7 @@ router.put("/:id", async (req: any, res) => {
 
     const updated = await Book.findOneAndUpdate(
       { _id: id, userId },
-      { title, author, shortSummary, status, totalPages, currentPage },
+      { title, author, shortSummary, status, totalPages, currentPage, rating },
       { new: true }
     ).lean();
 
@@ -298,6 +318,38 @@ router.put("/:id", async (req: any, res) => {
     return res.json({ book: withId(updated) });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to update book" });
+  }
+});
+
+/**
+ * PATCH /api/miniapp/books/:id/rating
+ * body: { rating: 0..5 }
+ *
+ * Updates ONLY the rating. 0 clears.
+ */
+router.patch("/:id/rating", async (req: any, res) => {
+  try {
+    const userId = req.userId as number;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const id = String(req.params.id || "").trim();
+    if (!id || id === "undefined" || id === "null") {
+      return res.status(400).json({ error: "Missing id" });
+    }
+
+    const rating = clampRating(req.body?.rating);
+
+    const updated = await Book.findOneAndUpdate(
+      { _id: id, userId },
+      { $set: { rating } },
+      { new: true }
+    ).lean();
+
+    if (!updated) return res.status(404).json({ error: "Book not found" });
+
+    return res.json({ book: withId(updated) });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to update rating" });
   }
 });
 

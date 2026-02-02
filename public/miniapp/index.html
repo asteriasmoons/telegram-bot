@@ -1986,6 +1986,38 @@ img {
   -webkit-backdrop-filter: blur(14px) saturate(150%);
   backdrop-filter: blur(14px) saturate(150%);
 }
+
+.book-rating-row {
+  margin-top: 10px;
+}
+
+.star-rating {
+  display: flex;
+  gap: 6px;
+}
+
+.star-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.star-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.35;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.star-btn.is-on .star-icon {
+  opacity: 1;
+}
+
+.star-btn:hover .star-icon {
+  opacity: 0.75;
+  transform: scale(1.05);
+}
 </style>
 </head>
 
@@ -2178,6 +2210,28 @@ function statusLabelToValue(input) {
   if (s === "reading" || s === "active") return "reading";
   if (s === "finished" || s === "done") return "finished";
   return "tbr";
+}
+
+// --- Star Rating helpers (no JSX) ---
+
+export function clampRating(value, max = 5) {
+  const n = Number(value);
+  const v = Number.isFinite(n) ? Math.floor(n) : 0;
+  return Math.max(0, Math.min(max, v));
+}
+
+// Returns an array like: [true,true,true,false,false] for rating=3, max=5
+export function starFillMap(value, max = 5) {
+  const v = clampRating(value, max);
+  return Array.from({ length: max }, (_, i) => i + 1 <= v);
+}
+
+// If allowClear=true and they click the same rating, it clears to 0.
+export function nextRatingOnClick(currentValue, clickedValue, max = 5, allowClear = true) {
+  const cur = clampRating(currentValue, max);
+  const clicked = clampRating(clickedValue, max);
+  if (allowClear && clicked === cur) return 0;
+  return clicked;
 }
 
 
@@ -3402,8 +3456,8 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
 
 
 // Book Card Component
-function BookCard({ book, onEdit, onDelete }) {
-  const [expanded, setExpanded] = useState(false);
+function BookCard({ book, onEdit, onDelete, onRate }) {
+  const [expanded, setExpanded] = React.useState(false);
 
   const title = book.title?.trim() ? book.title.trim() : "(untitled)";
   const author = book.author?.trim() ? book.author.trim() : "";
@@ -3429,6 +3483,51 @@ function BookCard({ book, onEdit, onDelete }) {
 
   const pct = hasProgress ? Math.round((safeCurrent / totalPages) * 100) : null;
 
+  // ⭐ rating (0–5)
+  const rating = Math.max(0, Math.min(5, Number(book?.rating || 0)));
+
+  // ✅ API: update rating (PATCH)
+  // NOTE: uses your apiCall helper (same pattern as your screenshot)
+  async function patchRating(nextRating) {
+    const bookId = String(book?.id || book?._id || "").trim();
+    if (!bookId) return;
+
+    // clamp again just in case
+    const r = Math.max(0, Math.min(5, Number(nextRating || 0)));
+
+    // endpoint you said you’re using: /api/miniapp/books/:id/rating
+    // apiCall should throw on error (as you already do elsewhere)
+    const data = await apiCall(`/books/${id}/rating`, {
+      method: "PATCH",
+      body: { rating: r },
+    });
+
+    // expected shape: { book: ... }
+    return data?.book || null;
+  }
+
+  // ✅ "create" = create the new rating value and push it through the API
+  const setRating = async (n) => {
+    const next = n === rating ? 0 : n; // tap same star = clear
+
+    // optimistic callback (optional) so your parent can update local UI immediately
+    // if you don’t want optimistic updates, remove this line
+    onRate?.(book, next);
+
+    try {
+      const updatedBook = await patchRating(next);
+
+      // tell parent what the server accepted (recommended)
+      if (updatedBook) {
+        onRate?.(updatedBook, Math.max(0, Math.min(5, Number(updatedBook.rating || 0))));
+      }
+    } catch (err) {
+      console.error(err);
+      // if you want: revert optimistic UI by telling parent to re-sync from server
+      // (keeping it minimal here)
+    }
+  };
+
   return (
     <div className="card" onClick={() => setExpanded(!expanded)}>
       <div className="card-header">
@@ -3443,22 +3542,39 @@ function BookCard({ book, onEdit, onDelete }) {
               <span>{author}</span>
             </div>
           )}
-        </div>
-   
-        <span className="card-badge" style={{ background: badge.bg, color: badge.fg }}>
-  {String(book.status || "").toLowerCase() === "finished" && (
-    <img src="/icons/check.svg" alt="" className="badge-icon" />
-  )}
-  {badge.text}
-</span>
 
+          {/* ⭐ Rating */}
+          <div className="book-rating-row" onClick={(e) => e.stopPropagation()}>
+            <div className="star-rating">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`star-btn ${n <= rating ? "is-on" : ""}`}
+                  onClick={() => setRating(n)}
+                  title={`${n} star${n === 1 ? "" : "s"}`}
+                >
+                  <img
+                    src="/icons/star.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="star-icon"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <span className="card-badge" style={{ background: badge.bg, color: badge.fg }}>
+          {String(book.status || "").toLowerCase() === "finished" && (
+            <img src="/icons/check.svg" alt="" className="badge-icon" />
+          )}
+          {badge.text}
+        </span>
       </div>
-      
-      {book.shortSummary && (
-  <div className="book-summary">
-    {book.shortSummary}
-  </div>
-)}
+
+      {book.shortSummary && <div className="book-summary">{book.shortSummary}</div>}
 
       {hasProgress && (
         <div className="progress-wrap" onClick={(e) => e.stopPropagation()}>
