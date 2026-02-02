@@ -37,14 +37,13 @@ function toIntOrUndefined(v: any) {
   return Math.floor(n);
 }
 
-function clampRating(v: any): number | undefined {
-  // allow undefined (no rating yet)
-  const n = toIntOrUndefined(v);
-  if (n === undefined) return undefined;
-  // enforce 0..5 (0 = clear)
-  if (n < 0) return 0;
-  if (n > 5) return 5;
-  return n;
+function clampRating(v: any): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  const i = Math.floor(n);
+  if (i < 0) return 0;
+  if (i > 5) return 5;
+  return i;
 }
 
 function clampShortSummary(v: any) {
@@ -343,18 +342,17 @@ router.patch("/:id/rating", async (req: any, res) => {
       return res.status(400).json({ error: "Missing id" });
     }
 
-    // ✅ Require rating to be present in body (even if 0)
-    const hasRating = Object.prototype.hasOwnProperty.call(req.body, "rating");
-    if (!hasRating) {
+    // ✅ Require the rating field
+    if (req.body?.rating === undefined) {
       return res.status(400).json({ error: "Missing rating" });
     }
 
-    const rating = clampRating(req.body.rating) ?? 0;
+    const rating = clampRating(req.body.rating);
 
     const updated = await Book.findOneAndUpdate(
       { _id: id, userId },
       { $set: { rating } },
-      { new: true, runValidators: true }
+      { new: true }
     ).lean();
 
     if (!updated) return res.status(404).json({ error: "Book not found" });
