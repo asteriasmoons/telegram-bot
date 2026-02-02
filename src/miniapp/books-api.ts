@@ -343,12 +343,18 @@ router.patch("/:id/rating", async (req: any, res) => {
       return res.status(400).json({ error: "Missing id" });
     }
 
-    const rating = clampRating(req.body?.rating);
+    // ✅ Require rating to be present in body (even if 0)
+    const hasRating = Object.prototype.hasOwnProperty.call(req.body, "rating");
+    if (!hasRating) {
+      return res.status(400).json({ error: "Missing rating" });
+    }
+
+    const rating = clampRating(req.body.rating) ?? 0;
 
     const updated = await Book.findOneAndUpdate(
       { _id: id, userId },
       { $set: { rating } },
-      { new: true }
+      { new: true, runValidators: true }
     ).lean();
 
     if (!updated) return res.status(404).json({ error: "Book not found" });
