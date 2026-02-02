@@ -1987,10 +1987,6 @@ img {
   backdrop-filter: blur(14px) saturate(150%);
 }
 
-.book-rating-row {
-  margin-top: 10px;
-}
-
 .star-rating {
   display: flex;
   gap: 6px;
@@ -2006,12 +2002,14 @@ img {
 .star-icon {
   width: 16px;
   height: 16px;
-  opacity: 0.35;
+  opacity: 0.5;  /* Grey when unfilled */
   transition: opacity 0.15s ease, transform 0.15s ease;
+  filter: brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%);  /* Grey color */
 }
 
 .star-btn.is-on .star-icon {
-  opacity: 1;
+  opacity: 1;  /* White when filled */
+  filter: brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(100%) contrast(100%);  /* White color */
 }
 
 .star-btn:hover .star-icon {
@@ -3543,7 +3541,7 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
           )}
 
           {/* ⭐ Rating */}
-          <div className="book-rating-row" onClick={(e) => e.stopPropagation()} style={{ background: 'red', padding: '10px' }}>
+          <div className="book-rating-row" onClick={(e) => e.stopPropagation()}>
             <div className="star-rating">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
