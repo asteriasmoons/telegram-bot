@@ -3993,6 +3993,13 @@ function ReadingView({ activeView }) {
   const [summaryTitle, setSummaryTitle] = useState("");
   const [summaryAuthor, setSummaryAuthor] = useState("");
   
+    // ---- Recommendations (Recs) modal ----
+  const [recsOpen, setRecsOpen] = useState(false);
+  const [recsGenre, setRecsGenre] = useState("Fantasy");
+  const [recsLoading, setRecsLoading] = useState(false);
+  const [recsError, setRecsError] = useState("");
+  const [recs, setRecs] = useState([]);
+  
   const [streak, setStreak] = useState(null);
 const [streakLoading, setStreakLoading] = useState(false);
 
@@ -4010,6 +4017,12 @@ const [streakLoading, setStreakLoading] = useState(false);
     loadStreak();
   }
 }, [activeView, filter]);
+
+useEffect(() => {
+  if (recsOpen) {
+    loadRecs(recsGenre);
+  }
+}, [recsOpen, recsGenre]);
 
 const loadStreak = async () => {
   try {
@@ -4140,6 +4153,25 @@ const loadBooks = async () => {
       setSummaryLoading(false);
     }
   };
+  
+    const loadRecs = async (genre) => {
+    try {
+      setRecsLoading(true);
+      setRecsError("");
+      setRecs([]);
+
+      const data = await apiCall(`/books/recs`, {
+        method: "POST",
+        body: JSON.stringify({ genre }),
+      });
+
+      setRecs(Array.isArray(data?.recs) ? data.recs : []);
+    } catch (error) {
+      setRecsError(error?.message || "Failed to load recommendations.");
+    } finally {
+      setRecsLoading(false);
+    }
+  };
 
   return (
     <div>
@@ -4150,6 +4182,10 @@ const loadBooks = async () => {
           <button className="btn btn-prompt" type="button" onClick={promptSummarySearch}>
             Summary
           </button>
+         <button className="btn btn-secondary" type="button" onClick={() => setRecsOpen(true)}>
+  Recs
+</button>
+      </div>
         </div>
       </div>
       
@@ -4247,6 +4283,58 @@ const loadBooks = async () => {
           onSearchAgain={promptSummarySearch}
         />
       )}
+      
+      {recsOpen && (
+  <div className="modal-overlay" onClick={() => setRecsOpen(false)}>
+    <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h2>Recommendations</h2>
+        <button className="modal-close" type="button" onClick={() => setRecsOpen(false)}>
+          x
+        </button>
+      </div>
+
+      <div className="modal-body">
+        <div className="form-group">
+          <label className="form-label">Genre</label>
+
+          <div className="chip-row">
+            {["Fantasy", "Romance", "Thriller", "Mystery", "Horror", "Historical Fiction", "Sci-Fi", "YA"].map((g) => (
+              <button
+                key={g}
+                type="button"
+                className={`chip ${g === recsGenre ? "is-on" : ""}`}
+                onClick={() => {
+                  setRecsGenre(g);
+                  loadRecs(g);
+                }}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {recsLoading && <div className="muted">Loading…</div>}
+        {recsError && <div className="error-text">{recsError}</div>}
+
+        {!recsLoading && !recsError && recs.length === 0 && (
+          <div className="muted">No recommendations found.</div>
+        )}
+
+        <div className="recs-list">
+          {recs.map((r, idx) => (
+            <div key={idx} className="rec-card">
+              <div className="rec-title">{r.title}</div>
+              {r.author ? <div className="rec-author">{r.author}</div> : null}
+              <div className="rec-summary">{r.summary}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
