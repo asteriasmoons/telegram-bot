@@ -55,7 +55,7 @@ function clampShortSummary(v: any) {
 }
 
 function normalizeProgress(
-  status: "tbr" | "reading" | "finished",
+  status: "tbr" | "reading" | "finished" | "paused" | "dnf",
   totalPages: number | null,
   currentPage: number | null
 ) {

@@ -2211,26 +2211,70 @@ function formatShortDate(date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Book Status Badges
 function badgeForStatus(status) {
   const s = String(status || "").toLowerCase();
-  if (s === "tbr") return { text: "TBR", bg: "rgba(255,152,0,0.15)", fg: "#ff9800" };
-  if (s === "reading") return { text: "READING", bg: "rgba(76,175,80,0.15)", fg: "#4caf50" };
-  if (s === "finished") return { text: "FINISHED", bg: "rgba(91,141,239,0.15)", fg: "#5b8def" };
-  return { text: "BOOK", bg: "rgba(255,255,255,0.08)", fg: "#ffffff" };
+
+  if (s === "finished") {
+    return {
+      text: "FINISHED",
+      bg: "rgba(255,255,255,0.18)",
+      fg: "#ffffff",
+    };
+  }
+
+  if (s === "reading") {
+    return {
+      text: "READING",
+      bg: "rgba(255,235,59,0.22)",
+      fg: "#ffeb3b", // yellow
+    };
+  }
+
+  if (s === "tbr") {
+    return {
+      text: "TBR",
+      bg: "rgba(255,105,180,0.22)",
+      fg: "#ff69b4", // pink
+    };
+  }
+
+  if (s === "paused") {
+    return {
+      text: "PAUSED",
+      bg: "rgba(33,150,243,0.22)",
+      fg: "#2196f3", // blue
+    };
+  }
+
+  if (s === "dnf") {
+    return {
+      text: "DNF",
+      bg: "rgba(76,175,80,0.22)",
+      fg: "#4caf50", // green
+    };
+  }
+
+  return {
+    text: "BOOK",
+    bg: "rgba(255,255,255,0.08)",
+    fg: "#ffffff",
+  };
 }
 
+// STATUS NORMALIZER (not UI):
+// Ensures all book statuses resolve to a valid enum value.
 function statusLabelToValue(input) {
   const s = String(input || "").toLowerCase().trim();
   if (s === "tbr") return "tbr";
   if (s === "reading" || s === "active") return "reading";
   if (s === "finished" || s === "done") return "finished";
-  return "tbr";
+  if (s === "paused") return "paused";
+  if (s === "dnf") return "dnf";
+  return "tbr"; // fallback LAST
 }
 
 // --- Star Rating helpers (no JSX) ---
-
-// --- Star Rating helpers (no JSX) ---
-
 function clampRating(value, max = 5) {  // ✅ Removed 'export'
   const n = Number(value);
   const v = Number.isFinite(n) ? Math.floor(n) : 0;
@@ -3761,6 +3805,8 @@ function BookModal({ book, onClose, onSave, onDelete }) {
             >
               <option value="tbr">TBR</option>
               <option value="reading">Reading/Active</option>
+              <option value="paused">Paused</option>
+              <option value="dnf">DNF</option>
               <option value="finished">Finished</option>
             </select>
           </div>
@@ -4137,6 +4183,18 @@ const loadBooks = async () => {
           onClick={() => setFilter("finished")}
         >
           Finished
+        </div>
+        <div
+          className={`quick-action ${filter === "paused" ? "active" : ""}`}
+          onClick={() => setFilter("paused")}
+        >
+          Paused
+        </div>
+        <div
+          className={`quick-action ${filter === "dnf" ? "active" : ""}`}
+          onClick={() => setFilter("dnf")}
+        >
+          DNF
         </div>
       </div>
 

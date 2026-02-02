@@ -22,7 +22,7 @@ rating: {
     status: {
       type: String,
       required: true,
-      enum: ["tbr", "reading", "finished"],
+      enum: ["tbr", "reading", "finished", "paused", "dnf"],
       default: "tbr",
       index: true,
     },
