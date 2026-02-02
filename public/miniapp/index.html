@@ -3500,33 +3500,47 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
   // ⭐ rating (0–5)
 async function patchRating(nextRating) {
   const id = String(book?.id || book?._id || "").trim();
-  if (!id) return null;
+  if (!id) {
+    console.log("❌ patchRating: missing book id", { book });
+    return null;
+  }
 
   const rating = Math.max(0, Math.min(5, Number(nextRating || 0)));
 
   console.log("📡 PATCH rating payload", { id, rating });
 
+  // IMPORTANT: matches your existing pattern (JSON.stringify)
   const data = await apiCall(`/books/${id}/rating`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ rating }), // ✅ THIS is the fix
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rating }),
   });
+
+  console.log("✅ PATCH response", data);
 
   return data?.book || null;
 }
 
-  // ✅ user action → compute next rating and save
 const setRating = async (n) => {
-  const next = n === rating ? 0 : n;
-  console.log("⭐ setRating click", { n, rating, next }); // <-- add this
-
-  onRate?.(book, next);
+  const next = n === rating ? 0 : n; // tap same star = clear
+  console.log("⭐ setRating click", { n, current: rating, next });
 
   try {
     const updatedBook = await patchRating(next);
-    if (updatedBook) onRate?.(updatedBook, Number(updatedBook.rating || 0));
+
+    // If the request failed silently or returned nothing, don’t explode.
+    if (!updatedBook) {
+      console.log("⚠️ No updatedBook returned from patchRating");
+      return;
+    }
+
+    console.log("✅ Updated book rating (server)", {
+      id: updatedBook.id || updatedBook._id,
+      rating: updatedBook.rating,
+    });
+
+    // Call parent AFTER server confirms (prevents UI desync)
+    onRate?.(updatedBook, Number(updatedBook.rating || 0));
   } catch (err) {
     console.error("❌ setRating error", err);
   }

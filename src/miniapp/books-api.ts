@@ -341,6 +341,13 @@ router.patch("/:id/rating", async (req: any, res) => {
     if (!id || id === "undefined" || id === "null") {
       return res.status(400).json({ error: "Missing id" });
     }
+    
+        console.log("⭐ BOOK RATING PATCH HIT", {
+      paramsId: req.params.id,
+      parsedId: id,
+      body: req.body,
+      userId,
+    });
 
     // ✅ Require the rating field
     if (req.body?.rating === undefined) {
