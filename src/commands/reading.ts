@@ -2,7 +2,7 @@
 import { Telegraf, Markup } from "telegraf";
 import { Book } from "../models/Book";
 
-type BookStatus = "tbr" | "reading" | "finished";
+type BookStatus = "tbr" | "reading" | "finished" | "paused" | "dnf";
 
 const PAGE_SIZE = 6;
 
