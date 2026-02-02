@@ -3497,54 +3497,59 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
 
   const pct = hasProgress ? Math.round((safeCurrent / totalPages) * 100) : null;
 
-  // ⭐ rating (0–5)
-async function patchRating(nextRating) {
-  const id = String(book?.id || book?._id || "").trim();
-  if (!id) {
-    console.log("❌ patchRating: missing book id", { book });
-    return null;
-  }
+  // ⭐ rating (0–5) - DEFINE IT HERE AT COMPONENT LEVEL
+  const rating = Math.max(0, Math.min(5, Number(book?.rating || 0)));
 
-  const rating = Math.max(0, Math.min(5, Number(nextRating || 0)));
-
-  console.log("📡 PATCH rating payload", { id, rating });
-
-  // IMPORTANT: matches your existing pattern (JSON.stringify)
-  const data = await apiCall(`/books/${id}/rating`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rating }),
-  });
-
-  console.log("✅ PATCH response", data);
-
-  return data?.book || null;
-}
-
-const setRating = async (n) => {
-  const next = n === rating ? 0 : n; // tap same star = clear
-  console.log("⭐ setRating click", { n, current: rating, next });
-
-  try {
-    const updatedBook = await patchRating(next);
-
-    // If the request failed silently or returned nothing, don’t explode.
-    if (!updatedBook) {
-      console.log("⚠️ No updatedBook returned from patchRating");
-      return;
+  async function patchRating(nextRating) {
+    const id = String(book?.id || book?._id || "").trim();
+    if (!id) {
+      console.log("❌ patchRating: missing book id", { book });
+      return null;
     }
 
-    console.log("✅ Updated book rating (server)", {
-      id: updatedBook.id || updatedBook._id,
-      rating: updatedBook.rating,
+    const r = Math.max(0, Math.min(5, Number(nextRating || 0))); // renamed to 'r' to avoid conflict
+
+    console.log("📡 PATCH rating payload", { id, rating: r });
+
+    const data = await apiCall(`/books/${id}/rating`, {
+      method: "PATCH",
+      body: JSON.stringify({ rating: r }),
     });
 
-    // Call parent AFTER server confirms (prevents UI desync)
-    onRate?.(updatedBook, Number(updatedBook.rating || 0));
-  } catch (err) {
-    console.error("❌ setRating error", err);
+    console.log("✅ PATCH response", data);
+
+    return data?.book || null;
   }
-};
+
+  const setRating = async (n) => {
+    const next = n === rating ? 0 : n;
+    console.log("⭐ setRating click", { n, current: rating, next });
+
+    try {
+      const updatedBook = await patchRating(next);
+
+      if (!updatedBook) {
+        console.log("⚠️ No updatedBook returned from patchRating");
+        return;
+      }
+
+      console.log("✅ Updated book rating (server)", {
+        id: updatedBook.id || updatedBook._id,
+        rating: updatedBook.rating,
+      });
+
+      // Call parent AFTER server confirms
+      if (onRate) {
+        onRate(updatedBook, Number(updatedBook.rating || 0));
+      }
+    } catch (err) {
+      console.error("❌ setRating error", err);
+      // Show user-friendly error
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram.WebApp.showAlert("Failed to update rating: " + (err.message || "Unknown error"));
+      }
+    }
+  };
 
   return (
     <div className="card" onClick={() => setExpanded(!expanded)}>
@@ -3624,6 +3629,7 @@ const setRating = async (n) => {
     </div>
   );
 }
+
 
 // Book Create & Edit Modal
 function BookModal({ book, onClose, onSave, onDelete }) {
@@ -3989,17 +3995,28 @@ const handleCheckIn = async (e) => {
   }
 };
 
-  const loadBooks = async () => {
-    try {
-      setLoading(true);
-      const data = await apiCall(`/books?status=${encodeURIComponent(filter)}`);
-      setBooks(Array.isArray(data.books) ? data.books : []);
-    } catch (error) {
-      tg.showAlert("Failed to load books: " + error.message);
-    } finally {
-      setLoading(false);
+const loadBooks = async () => {
+  try {
+    setLoading(true);
+    const data = await apiCall(`/books?status=${encodeURIComponent(filter)}`);
+    
+    // ✅ ADD THIS DEBUG
+    console.log("📚 Loaded books:", data.books);
+    if (data.books && data.books.length > 0) {
+      console.log("📚 First book structure:", {
+        id: data.books[0].id,
+        _id: data.books[0]._id,
+        rating: data.books[0].rating,
+      });
     }
-  };
+    
+    setBooks(Array.isArray(data.books) ? data.books : []);
+  } catch (error) {
+    tg.showAlert("Failed to load books: " + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCreate = () => {
     setEditingBook(null);
