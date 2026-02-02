@@ -3490,7 +3490,7 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
   // NOTE: uses your apiCall helper (same pattern as your screenshot)
   async function patchRating(nextRating) {
     const bookId = String(book?.id || book?._id || "").trim();
-    if (!bookId) return;
+    if (!id) return;
 
     // clamp again just in case
     const r = Math.max(0, Math.min(5, Number(nextRating || 0)));
@@ -3625,6 +3625,7 @@ function BookModal({ book, onClose, onSave, onDelete }) {
   );
 
   const isReading = String(status || "").toLowerCase() === "reading";
+  
 
   useEffect(() => {
     document.body.classList.add("modal-open");
@@ -3925,6 +3926,14 @@ function ReadingView({ activeView }) {
   const [streak, setStreak] = useState(null);
 const [streakLoading, setStreakLoading] = useState(false);
 
+   // ✅ ADD THIS HANDLER
+  const handleRating = (book, newRating) => {
+    // Update local state optimistically
+    setBooks(prev => prev.map(b => 
+      b._id === book._id ? { ...b, rating: newRating } : b
+    ));
+  };
+
   useEffect(() => {
   if (activeView === "reading") {
     loadBooks();
@@ -4113,7 +4122,7 @@ const handleCheckIn = async (e) => {
         </div>
       ) : (
         books.map((book) => (
-          <BookCard key={book._id} book={book} onEdit={handleEdit} onDelete={handleDelete} />
+          <BookCard key={book._id} book={book} onEdit={handleEdit} onDelete={handleDelete} onRate={handleRating} />
         ))
       )}
 
