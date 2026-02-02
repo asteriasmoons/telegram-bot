@@ -4190,11 +4190,11 @@ const loadRecs = async (genre) => {
   }
 }, [activeView, filter]);
 
-  useEffect(() => {
+  /* useEffect(() => {
   if (recsOpen) {
     loadRecs(recsGenre);
   }
-}, [recsOpen, recsGenre]);
+}, [recsOpen, recsGenre]); */ 
 
 const loadStreak = async () => {
   try {
@@ -4437,7 +4437,7 @@ const loadBooks = async () => {
         />
       )}
       
-      {recsOpen && (
+      /* {recsOpen && (
   <RecsModal
     genre={recsGenre}
     recs={recs}
@@ -4449,7 +4449,7 @@ const loadBooks = async () => {
       loadRecs(g);
     }}
   />
-)}
+)} */
     </div>
   );
 }
