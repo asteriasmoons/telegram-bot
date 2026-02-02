@@ -3543,7 +3543,7 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
           )}
 
           {/* ⭐ Rating */}
-          <div className="book-rating-row" onClick={(e) => e.stopPropagation()}>
+          <div className="book-rating-row" onClick={(e) => e.stopPropagation()} style={{ background: 'red', padding: '10px' }}>
             <div className="star-rating">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
