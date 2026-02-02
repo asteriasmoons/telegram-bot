@@ -1987,34 +1987,51 @@ img {
   backdrop-filter: blur(14px) saturate(150%);
 }
 
+/* =========================
+   STAR RATING (Reading Card)
+   ========================= */
+
+.book-rating-row {
+  margin-top: 8px;
+}
+
 .star-rating {
-  display: flex;
-  gap: 6px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .star-btn {
-  padding: 0;
-  background: none;
+  background: transparent;
   border: none;
+  padding: 0;
+  margin: 0;
   cursor: pointer;
+
+  /* iOS tap + baseline fixes */
+  line-height: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .star-icon {
-  width: 16px;
-  height: 16px;
-  opacity: 0.5;  /* Grey when unfilled */
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  filter: brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%);  /* Grey color */
+  /* FORCE a real box so SVGs can't collapse */
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;
+
+  /* default "off" look */
+  opacity: 0.35;
+  filter: grayscale(1);
 }
 
 .star-btn.is-on .star-icon {
-  opacity: 1;  /* White when filled */
-  filter: brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(100%) contrast(100%);  /* White color */
+  opacity: 1;
+  filter: none;
 }
 
-.star-btn:hover .star-icon {
-  opacity: 0.75;
-  transform: scale(1.05);
+/* Optional: small press feedback */
+.star-btn:active {
+  transform: scale(0.92);
 }
 </style>
 </head>
