@@ -3498,28 +3498,21 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
   const pct = hasProgress ? Math.round((safeCurrent / totalPages) * 100) : null;
 
   // ⭐ rating (0–5)
-  const rating = Math.max(0, Math.min(5, Number(book?.rating || 0)));
-
-  // ✅ API: update rating (PATCH)
 async function patchRating(nextRating) {
   const id = String(book?.id || book?._id || "").trim();
-
-  console.log("⭐ patchRating()", { id, nextRating, book }); // <-- put it here
-
-  if (!id) {
-    console.error("❌ Missing book id for rating patch", book);
-    return null;
-  }
+  if (!id) return null;
 
   const rating = Math.max(0, Math.min(5, Number(nextRating || 0)));
 
-  // IMPORTANT: use your pattern (you said: maybe "/books" but nothing more)
+  console.log("📡 PATCH rating payload", { id, rating });
+
   const data = await apiCall(`/books/${id}/rating`, {
     method: "PATCH",
-    body: { rating },
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ rating }), // ✅ THIS is the fix
   });
-
-  console.log("✅ patchRating response", data); // <-- and here
 
   return data?.book || null;
 }
