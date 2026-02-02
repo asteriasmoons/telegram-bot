@@ -3501,44 +3501,40 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
   const rating = Math.max(0, Math.min(5, Number(book?.rating || 0)));
 
   // ✅ API: update rating (PATCH)
-  // NOTE: uses your apiCall helper (same pattern as your screenshot)
   async function patchRating(nextRating) {
-    const bookId = String(book?.id || book?._id || "").trim();
-    if (!id) return;
+    // Use ONE variable consistently
+    const id = String(book?.id || book?._id || "").trim();
+    if (!id) throw new Error("Missing book id");
 
-    // clamp again just in case
     const r = Math.max(0, Math.min(5, Number(nextRating || 0)));
 
-    // endpoint you said you’re using: /api/miniapp/books/:id/rating
-    // apiCall should throw on error (as you already do elsewhere)
+    // IMPORTANT: use `id` here (not bookId/not undefined)
     const data = await apiCall(`/books/${id}/rating`, {
       method: "PATCH",
       body: { rating: r },
     });
 
-    // expected shape: { book: ... }
     return data?.book || null;
   }
 
-  // ✅ "create" = create the new rating value and push it through the API
+  // ✅ user action → compute next rating and save
   const setRating = async (n) => {
     const next = n === rating ? 0 : n; // tap same star = clear
 
-    // optimistic callback (optional) so your parent can update local UI immediately
-    // if you don’t want optimistic updates, remove this line
+    // optional optimistic UI
     onRate?.(book, next);
 
     try {
       const updatedBook = await patchRating(next);
 
-      // tell parent what the server accepted (recommended)
       if (updatedBook) {
-        onRate?.(updatedBook, Math.max(0, Math.min(5, Number(updatedBook.rating || 0))));
+        // recommended: pass the whole updated book back up
+        onRate?.(updatedBook, Number(updatedBook.rating || 0));
       }
     } catch (err) {
-      console.error(err);
-      // if you want: revert optimistic UI by telling parent to re-sync from server
-      // (keeping it minimal here)
+      console.error("Failed to save rating:", err);
+      // if you want to hard-revert optimistic UI, you can:
+      // onRate?.(book, rating);
     }
   };
 
