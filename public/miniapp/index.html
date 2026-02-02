@@ -4190,7 +4190,7 @@ const loadRecs = async (genre) => {
   }
 }, [activeView, filter]);
 
-useEffect(() => {
+  useEffect(() => {
   if (recsOpen) {
     loadRecs(recsGenre);
   }
@@ -4438,37 +4438,6 @@ const loadBooks = async () => {
       )}
       
       {recsOpen && (
-  <div className="modal-overlay" onClick={() => setRecsOpen(false)}>
-    <div className="modal" onClick={(e) => e.stopPropagation()}>
-      <div className="modal-header">
-        <h2>Recommendations</h2>
-        <button className="modal-close" type="button" onClick={() => setRecsOpen(false)}>
-          x
-        </button>
-      </div>
-
-      <div className="modal-body">
-        <div className="form-group">
-          <label className="form-label">Genre</label>
-
-          <div className="chip-row">
-            {["Fantasy", "Romance", "Thriller", "Mystery", "Horror", "Historical Fiction", "Sci-Fi", "YA"].map((g) => (
-              <button
-                key={g}
-                type="button"
-                className={`chip ${g === recsGenre ? "is-on" : ""}`}
-                onClick={() => {
-                  setRecsGenre(g);
-                  loadRecs(g);
-                }}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {recsOpen && (
   <RecsModal
     genre={recsGenre}
     recs={recs}
