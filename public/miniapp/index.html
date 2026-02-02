@@ -4056,6 +4056,78 @@ function ReadingStreakCard({ streak, loading, onCheckIn }) {
   );
 }
 
+// Recommendations Modal
+function RecsModal({ genre, recs, loading, error, onClose, onSelectGenre }) {
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
+  const genres = ["Fantasy", "Romance", "Thriller", "Mystery", "Horror", "Historical Fiction", "Sci-Fi", "YA"];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Recommendations</h2>
+          <button className="modal-close" onClick={onClose} type="button">×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Genre</label>
+            
+            <div className="card-actions" style={{ marginBottom: 12 }}>
+              {genres.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  className={`btn ${g === genre ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => onSelectGenre(g)}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading && (
+            <div className="loading">
+              <div className="spinner" />
+              <div>Loading recommendations…</div>
+            </div>
+          )}
+
+          {!loading && error && <div className="error-text">{error}</div>}
+
+          {!loading && !error && recs.length === 0 && (
+            <div className="empty-state-text">No recommendations found.</div>
+          )}
+
+          {!loading && !error && recs.length > 0 && (
+            <div className="recs-list">
+              {recs.map((r, idx) => (
+                <div key={idx} className="rec-card">
+                  <div className="rec-title">{r.title}</div>
+                  {r.author && <div className="rec-author">{r.author}</div>}
+                  <div className="rec-summary">{r.summary}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose} type="button">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // Reading View
 function ReadingView({ activeView }) {
   const [books, setBooks] = useState([]);
@@ -4083,6 +4155,25 @@ function ReadingView({ activeView }) {
   
   const [streak, setStreak] = useState(null);
 const [streakLoading, setStreakLoading] = useState(false);
+
+const loadRecs = async (genre) => {
+  try {
+    setRecsLoading(true);
+    setRecsError("");
+    setRecs([]);
+
+    const data = await apiCall(`/books/recs`, {
+      method: "POST",
+      body: JSON.stringify({ genre }),
+    });
+
+    setRecs(Array.isArray(data?.recs) ? data.recs : []);
+  } catch (error) {
+    setRecsError(error?.message || "Failed to load recommendations.");
+  } finally {
+    setRecsLoading(false);
+  }
+};
 
    // ✅ ADD THIS HANDLER
   const handleRating = (book, newRating) => {
@@ -4234,25 +4325,6 @@ const loadBooks = async () => {
       setSummaryLoading(false);
     }
   };
-  
-    const loadRecs = async (genre) => {
-    try {
-      setRecsLoading(true);
-      setRecsError("");
-      setRecs([]);
-
-      const data = await apiCall(`/books/recs`, {
-        method: "POST",
-        body: JSON.stringify({ genre }),
-      });
-
-      setRecs(Array.isArray(data?.recs) ? data.recs : []);
-    } catch (error) {
-      setRecsError(error?.message || "Failed to load recommendations.");
-    } finally {
-      setRecsLoading(false);
-    }
-  };
 
   return (
     <div>
@@ -4396,25 +4468,18 @@ const loadBooks = async () => {
           </div>
         </div>
 
-        {recsLoading && <div className="muted">Loading…</div>}
-        {recsError && <div className="error-text">{recsError}</div>}
-
-        {!recsLoading && !recsError && recs.length === 0 && (
-          <div className="muted">No recommendations found.</div>
-        )}
-
-        <div className="recs-list">
-          {recs.map((r, idx) => (
-            <div key={idx} className="rec-card">
-              <div className="rec-title">{r.title}</div>
-              {r.author ? <div className="rec-author">{r.author}</div> : null}
-              <div className="rec-summary">{r.summary}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  </div>
+        {recsOpen && (
+  <RecsModal
+    genre={recsGenre}
+    recs={recs}
+    loading={recsLoading}
+    error={recsError}
+    onClose={() => setRecsOpen(false)}
+    onSelectGenre={(g) => {
+      setRecsGenre(g);
+      loadRecs(g);
+    }}
+  />
 )}
     </div>
   );
