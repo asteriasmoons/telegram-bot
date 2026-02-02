@@ -2214,26 +2214,25 @@ function statusLabelToValue(input) {
 
 // --- Star Rating helpers (no JSX) ---
 
-export function clampRating(value, max = 5) {
+// --- Star Rating helpers (no JSX) ---
+
+function clampRating(value, max = 5) {  // ✅ Removed 'export'
   const n = Number(value);
   const v = Number.isFinite(n) ? Math.floor(n) : 0;
   return Math.max(0, Math.min(max, v));
 }
 
-// Returns an array like: [true,true,true,false,false] for rating=3, max=5
-export function starFillMap(value, max = 5) {
+function starFillMap(value, max = 5) {  // ✅ Removed 'export'
   const v = clampRating(value, max);
   return Array.from({ length: max }, (_, i) => i + 1 <= v);
 }
 
-// If allowClear=true and they click the same rating, it clears to 0.
-export function nextRatingOnClick(currentValue, clickedValue, max = 5, allowClear = true) {
+function nextRatingOnClick(currentValue, clickedValue, max = 5, allowClear = true) {  // ✅ Removed 'export'
   const cur = clampRating(currentValue, max);
   const clicked = clampRating(clickedValue, max);
   if (allowClear && clicked === cur) return 0;
   return clicked;
 }
-
 
 // =========================
 // HABITS UI (matches your Habit.ts / HabitLog.ts / habits.ts API)
