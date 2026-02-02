@@ -4156,7 +4156,7 @@ function ReadingView({ activeView }) {
   const [streak, setStreak] = useState(null);
 const [streakLoading, setStreakLoading] = useState(false);
 
-const loadRecs = async (genre) => {
+const loadRecs = React.useCallback(async (genre) => {
   try {
     setRecsLoading(true);
     setRecsError("");
@@ -4173,7 +4173,8 @@ const loadRecs = async (genre) => {
   } finally {
     setRecsLoading(false);
   }
-};
+}, []); // empty deps because it only uses parameters and setters
+
 
    // ✅ ADD THIS HANDLER
   const handleRating = (book, newRating) => {
@@ -4190,11 +4191,12 @@ const loadRecs = async (genre) => {
   }
 }, [activeView, filter]);
 
-  /* useEffect(() => {
+useEffect(() => {
   if (recsOpen) {
     loadRecs(recsGenre);
   }
-}, [recsOpen, recsGenre]); */ 
+}, [recsOpen, recsGenre, loadRecs]);
+
 
 const loadStreak = async () => {
   try {
@@ -4437,7 +4439,7 @@ const loadBooks = async () => {
         />
       )}
       
-      /* {recsOpen && (
+      {recsOpen && (
   <RecsModal
     genre={recsGenre}
     recs={recs}
@@ -4449,7 +4451,7 @@ const loadBooks = async () => {
       loadRecs(g);
     }}
   />
-)} */
+)}
     </div>
   );
 }
