@@ -2572,7 +2572,7 @@ function parseDateTimeLocalValue(str) {
 
 // Checklist Card
 function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = React.useState(false);
 
   const handleToggle = (e) => {
     e.stopPropagation();
@@ -2612,9 +2612,9 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
 
 // Checklist Modal
 function ChecklistModal({ item, onClose, onSave }) {
-  const [text, setText] = useState(item?.text || '');
+  const [text, setText] = React.useState(item?.text || '');
 
-  useEffect(() => {
+  React.useEffect(() => {
     document.body.classList.add('modal-open');
     return () => document.body.classList.remove('modal-open');
   }, []);
@@ -2664,13 +2664,13 @@ function ChecklistModal({ item, onClose, onSave }) {
 
 // Checklist View
 function ChecklistView({ activeView, userDisplayName, onBack }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
-  const [filter, setFilter] = useState('all'); // all | active | done
+  const [items, setItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [showModal, setShowModal] = React.useState(false);
+  const [editingItem, setEditingItem] = React.useState(null);
+  const [filter, setFilter] = React.useState('all');
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (activeView === 'checklist') {
       loadItems();
     }
