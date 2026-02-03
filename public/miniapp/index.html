@@ -6019,6 +6019,7 @@ const [shareLoading, setShareLoading] = useState(false);
   const [repeatEndKind, setRepeatEndKind] = useState('never'); // never | until | count
   const [repeatUntilDate, setRepeatUntilDate] = useState(''); // YYYY-MM-DD
   const [repeatCount, setRepeatCount] = useState(10); // occurrences
+  const [weekdaysTouched, setWeekdaysTouched] = useState(false);
   
       const createShareCode = async () => {
   if (!event?._id) return;
@@ -6180,6 +6181,20 @@ setRepeatInterval(intervalStr);
       }
     }
   }, [event, selectedDate]);
+  
+  useEffect(() => {
+  if (
+    !repeatEnabled ||
+    String(repeatFreq || 'weekly') !== 'weekly' ||
+    weekdaysTouched ||
+    !date
+  ) {
+    return;
+  }
+
+  const wd = new Date(date + 'T00:00:00').getDay();
+  setRepeatWeekdays([wd]);
+}, [date, repeatEnabled, repeatFreq]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -6334,14 +6349,15 @@ endDate: endISO || undefined,
   // =============================
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const toggleWeekday = (idx) => {
-    setRepeatWeekdays((prev) => {
-      const set = new Set(Array.isArray(prev) ? prev : []);
-      if (set.has(idx)) set.delete(idx);
-      else set.add(idx);
-      return Array.from(set).sort((a, b) => a - b);
-    });
-  };
+const toggleWeekday = (idx) => {
+  setWeekdaysTouched(true);
+  setRepeatWeekdays((prev) => {
+    const set = new Set(Array.isArray(prev) ? prev : []);
+    if (set.has(idx)) set.delete(idx);
+    else set.add(idx);
+    return Array.from(set).sort((a, b) => a - b);
+  });
+};
 
   const WeekdayButton = ({ idx }) => {
     const active = Array.isArray(repeatWeekdays) && repeatWeekdays.includes(idx);
@@ -6411,11 +6427,10 @@ endDate: endISO || undefined,
           <div className="form-group">
             <label className="form-label">Date</label>
             <input
-              type="date"
-              className="form-input"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-            />
+  type="date"
+  value={date}
+  onChange={(e) => setDate(e.target.value)}
+/>
           </div>
 
           <div className="form-group">
