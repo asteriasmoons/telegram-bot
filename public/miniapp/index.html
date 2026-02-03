@@ -2229,36 +2229,52 @@ img {
   display: block;
 }
 
-/* Calendar event delete button -- match day "+" style */
+/* Make trash button match the day "+": outer plate + inner tile */
 .calendar-event-delete {
   width: 44px;
   height: 44px;
   padding: 0;
 
-  /* rounded square like day + */
-  border-radius: 12px;
+  /* FORCE rounded-square (overrides any global "circle" styles) */
+  border-radius: 14px !important;
 
-  /* glass background */
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-
+  /* outer plate */
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 
-  /* center icon */
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 
-  /* remove default button junk */
-  box-shadow: none;
-  transform: none;
+  position: relative;
+  overflow: hidden;
+
+  box-shadow: none !important;
   outline: none;
+  transform: none;
 }
 
-/* icon sizing to match + */
+/* inner tile (this is what your day "+" has) */
+.calendar-event-delete::before {
+  content: "";
+  position: absolute;
+  inset: 9px;                 /* controls inner tile size */
+  border-radius: 11px;
+
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  /* subtle inset to look "pressed" like the + */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+/* keep the trash icon above the inner tile */
 .calendar-event-delete img,
 .calendar-event-delete svg {
+  position: relative;
+  z-index: 1;
   width: 18px;
   height: 18px;
   display: block;
