@@ -305,9 +305,8 @@ console.log("🎯 /recs route HIT", {
     // Google Books "subject:" is the easiest genre-ish recommender
     const q = `subject:${genre}`;
 
-    const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-      q
-    )}&maxResults=12&printType=books&langRestrict=en`;
+const apiKey = process.env.GOOGLE_BOOKS_API_KEY || "";
+const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12&printType=books&langRestrict=en&key=${apiKey}`;
     
     console.log("📡 Fetching from:", gbUrl);
 
