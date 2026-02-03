@@ -2186,6 +2186,14 @@ img {
   <div id="root"></div>
 
   <script type="text/babel">
+  window.onerror = function (message, source, lineno, colno, error) {
+  alert(
+    "ERROR:\n" +
+    message + "\n" +
+    "Line: " + lineno + "\n" +
+    "Col: " + colno
+  );
+};
     const { useState, useEffect, useRef } = React;
     const { DateTime } = luxon;
 
@@ -3678,8 +3686,7 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
         <button
           className={`checklist-checkbox ${item.done ? 'done' : ''}`}
           onClick={handleToggle}
-          type="button"
-        />
+          type="button">
           <img src="/icons/check.svg" alt="" />
         </button>
 
