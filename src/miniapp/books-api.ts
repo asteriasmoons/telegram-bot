@@ -285,6 +285,11 @@ router.post("/", async (req: any, res) => {
  * Uses Google Books search by subject + optional keyword boost.
  */
 router.post("/recs", async (req: any, res) => {
+console.log("🎯 /recs route HIT", {
+    userId: req.userId,
+    genre: req.body?.genre,
+    headers: req.headers,
+  });
   try {
     const userId = req.userId as number;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
