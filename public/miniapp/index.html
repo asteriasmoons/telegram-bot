@@ -3667,7 +3667,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
 
 // Checklist Card
 function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const handleToggle = (e) => {
     e.stopPropagation();
@@ -3727,9 +3727,9 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
 
 // Checklist Modal
 function ChecklistModal({ item, onClose, onSave }) {
-const [text, setText] = React.useState(item && item.text ? item.text : '');
+const [text, setText] = useState(item && item.text ? item.text : '');
 
-  React.useEffect(() => {
+  useEffect(() => {
     document.body.classList.add('modal-open');
     return () => document.body.classList.remove('modal-open');
   }, []);
@@ -3779,13 +3779,13 @@ const [text, setText] = React.useState(item && item.text ? item.text : '');
 
 // Checklist View
 function ChecklistView({ activeView, userDisplayName, onBack }) {
-  const [items, setItems] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [showModal, setShowModal] = React.useState(false);
-  const [editingItem, setEditingItem] = React.useState(null);
-  const [filter, setFilter] = React.useState('all');
+const [items, setItems] = useState([]);
+const [loading, setLoading] = useState(true);
+const [showModal, setShowModal] = useState(false);
+const [editingItem, setEditingItem] = useState(null);
+const [filter, setFilter] = useState('all');
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (activeView === 'checklist') {
       loadItems();
     }
@@ -3855,11 +3855,17 @@ setItems(list);
   };
 
 const handleDelete = async (item) => {
-  const id = item?._id;
-  if (!id) return tg.showAlert("Missing item id");
-  await apiCall(`/checklist/${id}`, { method: "DELETE" 
-  });
-  loadItems();
+  try {
+    const id = typeof item === "string" ? item : item?._id;
+    if (!id) return;
+
+    await apiCall(`/checklist/${id}`, { method: "DELETE" });
+
+    tg.showPopup({ message: "Item deleted" });
+    loadItems();
+  } catch (error) {
+    tg.showAlert("Failed to delete: " + (error?.message || String(error)));
+  }
 };
 
   const safeItems = Array.isArray(items) ? items : [];
