@@ -315,22 +315,21 @@ console.log("🎯 /recs route HIT", {
     const gb = await gbResp.json();
     const items = Array.isArray(gb?.items) ? gb.items : [];
 
-    const recs = items
-      .map((item: any) => {
-        const info = item?.volumeInfo || {};
-        const title = String(info?.title || "").trim();
-        const author = Array.isArray(info?.authors) ? info.authors.join(", ") : "";
-        const desc = typeof info?.description === "string" ? info.description.trim() : "";
+const recs = items
+  .map((item: any) => {
+    const info = item?.volumeInfo || {};
+    const title = String(info?.title || "").trim();
+    const author = Array.isArray(info?.authors) ? info.authors.join(", ") : "";
+    const desc = typeof info?.description === "string" ? info.description.trim() : "";
 
-        if (!title || !desc) return null;
+    if (!title) return null;
 
-        // keep it from being huge
-        const summary = desc.length > 700 ? desc.slice(0, 700).trim() + "…" : desc;
+    const summary = desc.length > 700 ? desc.slice(0, 700).trim() + "…" : (desc || "No description available.");
 
-        return { title, author, summary };
-      })
-      .filter(Boolean)
-      .slice(0, 10);
+    return { title, author, summary };
+  })
+  .filter(Boolean)
+  .slice(0, 10);
 
     return res.json({ recs });
   } catch (err: any) {
