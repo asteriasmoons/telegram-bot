@@ -1846,7 +1846,6 @@ img {
 .icon-btn,
 .calendar-nav-btn,
 .calendar-add-icon-btn,
-.calendar-event-delete,
 .header button {
   -webkit-appearance: none;
   appearance: none;
@@ -1863,7 +1862,6 @@ img {
 .icon-btn:hover,
 .calendar-nav-btn:hover,
 .calendar-add-icon-btn:hover,
-.calendar-event-delete:hover,
 .header button:hover {
   background: rgba(255, 255, 255, 0.12) !important;
   border-color: rgba(91, 141, 239, 0.35) !important;
@@ -1874,20 +1872,6 @@ img {
 .header button img,
 .calendar-add-icon-btn img {
   opacity: 0.9 !important;
-}
-
-.calendar-event-delete {
-  background: rgba(91, 141, 239, 0.15);
-  border: none;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
-  color: #5b8def;
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* Explicitly protect your colorful tags in case they are <button> */
@@ -1947,26 +1931,6 @@ img {
   background: linear-gradient(135deg, #8b7def 0%, #5b8def 100%) !important;
   color: #ffffff !important;
   border: 1px solid rgba(91, 141, 239, 0.45) !important;
-}
-
-/* ---------- CALENDAR: trash can should NOT be in a square ---------- */
-.calendar-event-delete {
-  -webkit-appearance: none;
-  appearance: none;
-
-  background: transparent !important;
-  border: none !important;
-
-  padding: 6px !important;
-  border-radius: 999px !important;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.calendar-event-delete:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* ---------- HABITS: force your intended button colors ---------- */
@@ -2231,12 +2195,12 @@ img {
 
 /* Make trash button match the day "+": outer plate + inner tile */
 .calendar-event-delete {
-  width: 44px;
-  height: 44px;
+  width: 18px;
+  height: 18px;
   padding: 0;
 
   /* FORCE rounded-square (overrides any global "circle" styles) */
-  border-radius: 14px !important;
+  border-radius: 12px !important;
 
   /* outer plate */
   background: rgba(255, 255, 255, 0.06) !important;
