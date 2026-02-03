@@ -2160,6 +2160,49 @@ img {
   transform: none;
 }
 
+/* Checklist "more/expand" icon button -- kill white overlay and match your glass style */
+.checklist-expand {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+
+  border-radius: 12px !important;
+
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: none !important;
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+/* If any inherited "inner tile" overlay exists, remove it */
+.checklist-expand::before,
+.checklist-expand::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Make sure the icon renders above everything */
+.checklist-expand img,
+.checklist-expand svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  opacity: 0.9;
+
+  position: relative;
+  z-index: 1;
+}
+
 /* REMINDERS VIEW ICON BUTTONS */
 /* Header right-side actions: stop icon buttons from clashing */
 .header-actions {
