@@ -312,8 +312,18 @@ console.log("🎯 /recs route HIT", {
       return res.status(500).json({ error: "Failed to fetch recommendations" });
     }
 
+
     const gb = await gbResp.json();
     const items = Array.isArray(gb?.items) ? gb.items : [];
+    
+    console.log("📚 Google Books raw response:", {
+  totalItems: gb?.totalItems,
+  itemsCount: items.length,
+  firstItem: items[0] ? {
+    title: items[0]?.volumeInfo?.title,
+    hasDesc: !!items[0]?.volumeInfo?.description,
+  } : "no items",
+});
 
 const recs = items
   .map((item: any) => {
@@ -330,6 +340,14 @@ const recs = items
   })
   .filter(Boolean)
   .slice(0, 10);
+  
+  console.log("✅ Final recs array:", {
+  count: recs.length,
+  first: recs[0],
+});
+
+return res.json({ recs });
+
 
     return res.json({ recs });
   } catch (err: any) {
