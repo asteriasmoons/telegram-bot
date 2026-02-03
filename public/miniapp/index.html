@@ -1669,8 +1669,7 @@ img {
 .nav-item-icon img,
 .empty-state-icon img,
 .calendar-add-icon-btn img,
-.calendar-event-location img,
-.calendar-event-delete img {
+.calendar-event-location img {
   display: inline-block;
   width: 1em;
   height: 1em;
@@ -1723,11 +1722,6 @@ img {
   width: 14px;
   height: 14px;
   opacity: 0.85;
-}
-
-.calendar-event-delete img {
-  width: 18px;
-  height: 18px;
 }
 
 /* =========================================================
@@ -2195,12 +2189,12 @@ img {
 
 /* Make trash button match the day "+": outer plate + inner tile */
 .calendar-event-delete {
-  width: 18px;
-  height: 18px;
+  width: 32px;
+  height: 32px;
   padding: 0;
 
   /* FORCE rounded-square (overrides any global "circle" styles) */
-  border-radius: 12px !important;
+  border-radius: 8px !important;
 
   /* outer plate */
   background: rgba(255, 255, 255, 0.06) !important;
@@ -2239,10 +2233,15 @@ img {
 .calendar-event-delete svg {
   position: relative;
   z-index: 1;
-  width: 18px;
-  height: 18px;
-  display: block;
   opacity: 0.9;
+  width: 32px;
+  height: 32px;
+  color: #5b8def;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
 </head>
