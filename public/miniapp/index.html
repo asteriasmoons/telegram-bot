@@ -3889,7 +3889,7 @@ const filteredItems = safeItems
           })()}
         </div>
 
-        <button className="btn btn-secondary" onClick={onBack}>
+        <button className="btn btn-secondary"  type="button" onClick={onBack}>
           Back
         </button>
       </div>
@@ -6877,7 +6877,7 @@ const data = await apiCall(
     }
 
     // Reminders View
-function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits }) {
+function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits, goTo }) {
       const [reminders, setReminders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showHistory, setShowHistory] = useState(false);
@@ -7846,7 +7846,9 @@ return (
   userTimezone={userTimezone}
   userDisplayName={userDisplayName}
   onOpenHabits={openHabitsFromReminders}
+  goTo={goTo}
 />
+
       </div>
       
       <div
