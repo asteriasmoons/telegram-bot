@@ -3773,8 +3773,16 @@ function ChecklistView({ activeView, userDisplayName, onBack }) {
   const loadItems = async () => {
     try {
       setLoading(true);
-      const data = await apiCall('/checklist');
-      setItems(data.items || []);
+      const data = await apiCall("/checklist");
+
+// Accept a few possible shapes safely:
+const list =
+  Array.isArray(data?.items) ? data.items :
+  Array.isArray(data?.checklist) ? data.checklist :
+  Array.isArray(data?.data?.items) ? data.data.items :
+  [];
+
+setItems(list);
     } catch (error) {
       tg.showAlert('Failed to load checklist: ' + error.message);
     } finally {
@@ -3837,9 +3845,13 @@ function ChecklistView({ activeView, userDisplayName, onBack }) {
     }
   };
 
-  const filteredItems = items.filter(item => {
-    if (filter === 'active') return !item.done;
-    if (filter === 'done') return item.done;
+  const safeItems = Array.isArray(items) ? items : [];
+
+const filteredItems = safeItems
+  .filter(Boolean) // removes null/undefined elements if backend ever sends them
+  .filter((item) => {
+    if (filter === "active") return !item.done;
+    if (filter === "done") return !!item.done;
     return true;
   });
 
@@ -3891,10 +3903,15 @@ function ChecklistView({ activeView, userDisplayName, onBack }) {
             <img src="/icons/check.svg" alt="" />
           </div>
           <div className="empty-state-text">
-            {filter === 'all'
-              ? 'No items yet.\nTap + to create one!'
-              : `No ${filter} items.`}
-          </div>
+  {filter === 'all' ? (
+    <>
+      <div>No items yet.</div>
+      <div>Tap + to create one!</div>
+    </>
+  ) : (
+    `No ${filter} items.`
+  )}
+</div>
         </div>
       ) : (
         filteredItems.map(item => (
