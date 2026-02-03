@@ -299,6 +299,8 @@ console.log("🎯 /recs route HIT", {
 
     // Keep it simple & safe
     const genre = genreRaw.slice(0, 60);
+    
+    console.log("✅ Genre validated:", genre);
 
     // Google Books "subject:" is the easiest genre-ish recommender
     const q = `subject:${genre}`;
@@ -306,8 +308,11 @@ console.log("🎯 /recs route HIT", {
     const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
       q
     )}&maxResults=12&printType=books&langRestrict=en`;
+    
+    console.log("📡 Fetching from:", gbUrl);
 
     const gbResp = await fetch(gbUrl);
+    console.log("📥 Fetch response:", gbResp.status, gbResp.ok);
     if (!gbResp.ok) {
       return res.status(500).json({ error: "Failed to fetch recommendations" });
     }
@@ -351,8 +356,9 @@ return res.json({ recs });
 
     return res.json({ recs });
   } catch (err: any) {
-    return res.status(500).json({ error: "Failed to fetch recommendations" });
-  }
+  console.error("💥 ERROR in /recs:", err);
+  return res.status(500).json({ error: "Failed to fetch recommendations" });
+}
 });
 
 /**
