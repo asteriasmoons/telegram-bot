@@ -2228,6 +2228,42 @@ img {
   height: 18px;
   display: block;
 }
+
+/* Calendar event delete button -- match day "+" style */
+.calendar-event-delete {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+
+  /* rounded square like day + */
+  border-radius: 12px;
+
+  /* glass background */
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  /* center icon */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* remove default button junk */
+  box-shadow: none;
+  transform: none;
+  outline: none;
+}
+
+/* icon sizing to match + */
+.calendar-event-delete img,
+.calendar-event-delete svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  opacity: 0.9;
+}
 </style>
 </head>
 
