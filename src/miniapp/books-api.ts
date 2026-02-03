@@ -278,6 +278,62 @@ router.post("/", async (req: any, res) => {
 });
 
 /**
+ * POST /api/miniapp/books/recs
+ * body: { genre: string }
+ *
+ * Returns: { recs: [{ title, author, summary }] }
+ * Uses Google Books search by subject + optional keyword boost.
+ */
+router.post("/recs", async (req: any, res) => {
+  try {
+    const userId = req.userId as number;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const genreRaw = String(req.body?.genre || "").trim();
+    if (!genreRaw) return res.status(400).json({ error: "Genre is required" });
+
+    // Keep it simple & safe
+    const genre = genreRaw.slice(0, 60);
+
+    // Google Books "subject:" is the easiest genre-ish recommender
+    const q = `subject:${genre}`;
+
+    const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+      q
+    )}&maxResults=12&printType=books&langRestrict=en`;
+
+    const gbResp = await fetch(gbUrl);
+    if (!gbResp.ok) {
+      return res.status(500).json({ error: "Failed to fetch recommendations" });
+    }
+
+    const gb = await gbResp.json();
+    const items = Array.isArray(gb?.items) ? gb.items : [];
+
+    const recs = items
+      .map((item: any) => {
+        const info = item?.volumeInfo || {};
+        const title = String(info?.title || "").trim();
+        const author = Array.isArray(info?.authors) ? info.authors.join(", ") : "";
+        const desc = typeof info?.description === "string" ? info.description.trim() : "";
+
+        if (!title || !desc) return null;
+
+        // keep it from being huge
+        const summary = desc.length > 700 ? desc.slice(0, 700).trim() + "…" : desc;
+
+        return { title, author, summary };
+      })
+      .filter(Boolean)
+      .slice(0, 10);
+
+    return res.json({ recs });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to fetch recommendations" });
+  }
+});
+
+/**
  * PUT /api/miniapp/books/:id
  * body: { title, author?, status, shortSummary?, totalPages?, currentPage? }
  */
@@ -369,63 +425,6 @@ router.patch("/:id/rating", async (req: any, res) => {
     return res.json({ book: withId(updated) });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to update rating" });
-  }
-});
-
-
-/**
- * POST /api/miniapp/books/recs
- * body: { genre: string }
- *
- * Returns: { recs: [{ title, author, summary }] }
- * Uses Google Books search by subject + optional keyword boost.
- */
-router.post("/recs", async (req: any, res) => {
-  try {
-    const userId = req.userId as number;
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-    const genreRaw = String(req.body?.genre || "").trim();
-    if (!genreRaw) return res.status(400).json({ error: "Genre is required" });
-
-    // Keep it simple & safe
-    const genre = genreRaw.slice(0, 60);
-
-    // Google Books "subject:" is the easiest genre-ish recommender
-    const q = `subject:${genre}`;
-
-    const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-      q
-    )}&maxResults=12&printType=books&langRestrict=en`;
-
-    const gbResp = await fetch(gbUrl);
-    if (!gbResp.ok) {
-      return res.status(500).json({ error: "Failed to fetch recommendations" });
-    }
-
-    const gb = await gbResp.json();
-    const items = Array.isArray(gb?.items) ? gb.items : [];
-
-    const recs = items
-      .map((item: any) => {
-        const info = item?.volumeInfo || {};
-        const title = String(info?.title || "").trim();
-        const author = Array.isArray(info?.authors) ? info.authors.join(", ") : "";
-        const desc = typeof info?.description === "string" ? info.description.trim() : "";
-
-        if (!title || !desc) return null;
-
-        // keep it from being huge
-        const summary = desc.length > 700 ? desc.slice(0, 700).trim() + "…" : desc;
-
-        return { title, author, summary };
-      })
-      .filter(Boolean)
-      .slice(0, 10);
-
-    return res.json({ recs });
-  } catch (err: any) {
-    return res.status(500).json({ error: "Failed to fetch recommendations" });
   }
 });
 

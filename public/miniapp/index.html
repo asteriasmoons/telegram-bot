@@ -4118,10 +4118,19 @@ function RecsModal({ genre, recs, loading, error, onClose, onSelectGenre }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose} type="button">
-            Close
-          </button>
-        </div>
+  <button className="btn btn-secondary" onClick={onClose} type="button">
+    Close
+  </button>
+  
+  <button 
+    className="btn btn-primary" 
+    onClick={() => onSelectGenre(genre)} 
+    disabled={loading}
+    type="button"
+  >
+    {loading ? "Loading..." : "Get Recommendations"}
+  </button>
+</div>
       </div>
     </div>
   );
@@ -4331,10 +4340,7 @@ const loadBooks = async () => {
           <button className="btn btn-prompt" type="button" onClick={promptSummarySearch}>
             Summary
           </button>
-         <button className="btn btn-secondary" type="button" onClick={() => {
-  setRecsOpen(true);
-  loadRecs(recsGenre);
-}}>
+         <button className="btn btn-secondary" type="button" onClick={() => setRecsOpen(true)}>
   Recs
 </button>
       </div>
