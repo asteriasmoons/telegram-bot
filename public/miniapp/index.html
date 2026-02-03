@@ -2114,6 +2114,71 @@ img {
   margin-top: 10px;
 }
 
+/* =========================================================
+   CHECKLIST SPECIFIC STYLES
+   ========================================================= */
+.checklist-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.checklist-checkbox {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.checklist-checkbox:hover {
+  border-color: var(--accent);
+}
+
+.checklist-checkbox.done {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.checklist-checkbox img {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.checklist-checkbox.done img {
+  opacity: 1;
+}
+
+.checklist-text {
+  flex: 1;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.checklist-text.done {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.card.checklist-item {
+  cursor: default;
+}
+
+.card.checklist-item:hover {
+  transform: none;
+}
+
 </style>
 </head>
 
@@ -2500,6 +2565,272 @@ function parseDateTimeLocalValue(str) {
 
   return d;
 }
+
+// =========================
+// CHECKLIST COMPONENTS
+// =========================
+
+// Checklist Card
+function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const handleToggle = (e) => {
+    e.stopPropagation();
+    onToggle(item);
+  };
+
+  return (
+    <div className="card checklist-item" onClick={() => setExpanded(!expanded)}>
+      <div className="checklist-item-row">
+        <button
+          className={`checklist-checkbox ${item.done ? 'done' : ''}`}
+          onClick={handleToggle}
+          type="button"
+        >
+          <img src="/icons/check.svg" alt="" />
+        </button>
+
+        <div className={`checklist-text ${item.done ? 'done' : ''}`}>
+          {item.text || '(empty)'}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="card-actions" onClick={e => e.stopPropagation()} style={{ marginTop: 12 }}>
+          <button className="btn btn-primary" onClick={() => onEdit(item)}>
+            <img src="/icons/pencil.svg" alt="" />
+            Edit
+          </button>
+          <button className="btn btn-danger" onClick={() => onDelete(item._id)}>
+            <img src="/icons/trash.svg" alt="" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Checklist Modal
+function ChecklistModal({ item, onClose, onSave }) {
+  const [text, setText] = useState(item?.text || '');
+
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
+  const handleSave = async () => {
+    if (!text.trim()) {
+      tg.showAlert('Please enter some text');
+      return;
+    }
+
+    await onSave({ text: text.trim() });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{item ? 'Edit Item' : 'New Item'}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Text</label>
+            <textarea
+              className="form-textarea form-textarea--sm"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="What do you need to do?"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            {item ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Checklist View
+function ChecklistView({ activeView, userDisplayName, onBack }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [filter, setFilter] = useState('all'); // all | active | done
+
+  useEffect(() => {
+    if (activeView === 'checklist') {
+      loadItems();
+    }
+  }, [activeView]);
+
+  const loadItems = async () => {
+    try {
+      setLoading(true);
+      const data = await apiCall('/checklist');
+      setItems(data.items || []);
+    } catch (error) {
+      tg.showAlert('Failed to load checklist: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingItem(null);
+    setShowModal(true);
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setShowModal(true);
+  };
+
+  const handleSave = async (data) => {
+    try {
+      if (editingItem) {
+        await apiCall(`/checklist/${editingItem._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+        tg.showPopup({ message: 'Item updated' });
+      } else {
+        await apiCall('/checklist', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        tg.showPopup({ message: 'Item created' });
+      }
+      setShowModal(false);
+      loadItems();
+    } catch (error) {
+      tg.showAlert('Failed to save: ' + error.message);
+    }
+  };
+
+  const handleToggle = async (item) => {
+    try {
+      await apiCall(`/checklist/${item._id}/toggle`, {
+        method: 'POST',
+      });
+      loadItems();
+    } catch (error) {
+      tg.showAlert('Failed to toggle: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await apiCall(`/checklist/${id}`, {
+        method: 'DELETE',
+      });
+      tg.showPopup({ message: 'Item deleted' });
+      loadItems();
+    } catch (error) {
+      tg.showAlert('Failed to delete: ' + error.message);
+    }
+  };
+
+  const filteredItems = items.filter(item => {
+    if (filter === 'active') return !item.done;
+    if (filter === 'done') return item.done;
+    return true;
+  });
+
+  return (
+    <div>
+      <div className="header">
+        <div>
+          <h1>Checklist</h1>
+          {(() => {
+            const name = (userDisplayName || '').trim();
+            return name ? <div className="reminders-greeting">Hello {name}</div> : null;
+          })()}
+        </div>
+
+        <button className="btn btn-secondary" onClick={onBack}>
+          Back
+        </button>
+      </div>
+
+      <div className="quick-actions">
+        <div
+          className={`quick-action ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          All
+        </div>
+        <div
+          className={`quick-action ${filter === 'active' ? 'active' : ''}`}
+          onClick={() => setFilter('active')}
+        >
+          Active
+        </div>
+        <div
+          className={`quick-action ${filter === 'done' ? 'active' : ''}`}
+          onClick={() => setFilter('done')}
+        >
+          Done
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading checklist...</div>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <img src="/icons/check.svg" alt="" />
+          </div>
+          <div className="empty-state-text">
+            {filter === 'all'
+              ? 'No items yet.\nTap + to create one!'
+              : `No ${filter} items.`}
+          </div>
+        </div>
+      ) : (
+        filteredItems.map(item => (
+          <ChecklistCard
+            key={item._id}
+            item={item}
+            onToggle={handleToggle}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ))
+      )}
+
+      <button
+        className="is-hidden"
+        data-create-checklist="1"
+        onClick={handleCreate}
+      />
+
+      {showModal && (
+        <ChecklistModal
+          item={editingItem}
+          onClose={() => setShowModal(false)}
+          onSave={handleSave}
+        />
+      )}
+    </div>
+  );
+}
+
 
 // Habit Card
 function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLogs }) {
@@ -6611,7 +6942,6 @@ useEffect(() => {
           <div className="header">
   <div>
     <h1>Reminders</h1>
-
     {(() => {
       const name = (userDisplayName || "").trim();
       return name ? <div className="reminders-greeting">Hello {name}</div> : null;
@@ -6619,14 +6949,25 @@ useEffect(() => {
   </div>
 
   <div className="header-actions">
+    {/* CHECKLIST ICON BUTTON */}
+    <button
+      type="button"
+      className="icon-btn"
+      aria-label="Checklist"
+      title="Checklist"
+      onClick={() => goTo('checklist')}
+    >
+      <img src="/icons/check.svg" alt="" />
+    </button>
+
     {/* HABITS ICON BUTTON */}
     <button
-  type="button"
-  className="icon-btn"
-  aria-label="Habits"
-  title="Habits"
-  onClick={onOpenHabits}
->
+      type="button"
+      className="icon-btn"
+      aria-label="Habits"
+      title="Habits"
+      onClick={onOpenHabits}
+    >
       <img src="/icons/plus.svg" alt="" />
     </button>
 
@@ -6637,6 +6978,7 @@ useEffect(() => {
     </div>
   </div>
 </div>
+
 
           <div className="quick-actions">
             <div
@@ -6925,6 +7267,7 @@ return (
 );
 }
 
+// Event Share View
 function EventShareView({ onBack }) {
   const [token, setToken] = useState("");
   const [event, setEvent] = useState(null);
@@ -7430,6 +7773,11 @@ document.querySelector('[data-create-habit="1"]');
   if (btn) btn.click();
 } 
 
+else if (activeView === 'checklist') {
+    const btn = document.querySelector('[data-create-checklist="1"]');
+    if (btn) btn.click();
+}
+
 else if (activeView === 'calendar') {
   const btn = document.querySelector('[data-create-event="1"]');
   if (btn) btn.click();
@@ -7467,6 +7815,17 @@ return (
   <HabitsView
     activeView={activeView}
     userTimezone={userTimezone}
+    userDisplayName={userDisplayName}
+    onBack={goBack}
+  />
+</div>
+
+<div
+  className={`view-container ${activeView === 'checklist' ? 'active' : ''}`}
+  data-view="checklist"
+>
+  <ChecklistView
+    activeView={activeView}
     userDisplayName={userDisplayName}
     onBack={goBack}
   />
