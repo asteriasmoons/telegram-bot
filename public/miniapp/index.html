@@ -3678,34 +3678,45 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
     <div className="card checklist-item">
       <div className="checklist-item-row">
         <button
-          className={`checklist-checkbox ${item.done ? 'done' : ''}`}
+          className={`checklist-checkbox ${item.done ? "done" : ""}`}
           onClick={handleToggle}
-          type="button">
+          type="button"
+        >
           <img src="/icons/check.svg" alt="" />
         </button>
 
-        <div className={`checklist-text ${item.done ? 'done' : ''}`}>
-          {item.text || '(empty)'}
+        <div className={`checklist-text ${item.done ? "done" : ""}`}>
+          {item.text || "(empty)"}
         </div>
+
         <button
-  className="checklist-expand"
-  type="button"
-  onClick={(e) => {
-    e.stopPropagation();
-    setExpanded(v => !v);
-  }}
->
-<img src="/icons/more.svg" alt="" />
-</button>
+          className="checklist-expand"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+        >
+          <img src="/icons/more.svg" alt="" />
+        </button>
       </div>
 
       {expanded && (
         <div className="card-actions" style={{ marginTop: 12 }}>
-          <button className="btn btn-primary" onClick={() => onEdit(item)}>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => onEdit(item)}
+          >
             <img src="/icons/pencil.svg" alt="" />
             Edit
           </button>
-          <button className="btn btn-danger" onClick={() => onDelete(item)}>
+
+          <button
+            className="btn btn-danger"
+            type="button"
+            onClick={() => onDelete(item)}
+          >
             <img src="/icons/trash.svg" alt="" />
           </button>
         </div>
