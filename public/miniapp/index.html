@@ -3854,15 +3854,12 @@ setItems(list);
     }
   };
 
-  const handleDelete = async (item) => {
-  await apiCall(`/checklist/${item._id}`, { method: 'DELETE' });
+const handleDelete = async (item) => {
+  const id = item?._id;
+  if (!id) return tg.showAlert("Missing item id");
+  await apiCall(`/checklist/${id}`, { method: "DELETE" });
+  loadItems();
 };
-      tg.showPopup({ message: 'Item deleted' });
-      loadItems();
-    } catch (error) {
-      tg.showAlert('Failed to delete: ' + error.message);
-    }
-  };
 
   const safeItems = Array.isArray(items) ? items : [];
 
