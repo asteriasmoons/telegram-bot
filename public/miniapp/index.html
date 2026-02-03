@@ -2179,6 +2179,32 @@ img {
   transform: none;
 }
 
+/* REMINDERS VIEW ICON BUTTONS */
+/* Header right-side actions: stop icon buttons from clashing */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;              /* space between the two icon buttons + toggle */
+}
+
+/* Give icon buttons a real box so they can’t overlap */
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  flex: 0 0 auto;         /* don’t shrink */
+}
+
+/* Keep the icon graphic consistent */
+.icon-btn img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
 </style>
 </head>
 
