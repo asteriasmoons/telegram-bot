@@ -2566,271 +2566,6 @@ function parseDateTimeLocalValue(str) {
   return d;
 }
 
-// =========================
-// CHECKLIST COMPONENTS
-// =========================
-
-// Checklist Card
-function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
-  const [expanded, setExpanded] = React.useState(false);
-
-  const handleToggle = (e) => {
-    e.stopPropagation();
-    onToggle(item);
-  };
-
-  return (
-    <div className="card checklist-item" onClick={() => setExpanded(!expanded)}>
-      <div className="checklist-item-row">
-        <button
-          className={`checklist-checkbox ${item.done ? 'done' : ''}`}
-          onClick={handleToggle}
-          type="button"
-        >
-          <img src="/icons/check.svg" alt="" />
-        </button>
-
-        <div className={`checklist-text ${item.done ? 'done' : ''}`}>
-          {item.text || '(empty)'}
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="card-actions" onClick={e => e.stopPropagation()} style={{ marginTop: 12 }}>
-          <button className="btn btn-primary" onClick={() => onEdit(item)}>
-            <img src="/icons/pencil.svg" alt="" />
-            Edit
-          </button>
-          <button className="btn btn-danger" onClick={() => onDelete(item._id)}>
-            <img src="/icons/trash.svg" alt="" />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Checklist Modal
-function ChecklistModal({ item, onClose, onSave }) {
-  const [text, setText] = React.useState(item?.text || '');
-
-  React.useEffect(() => {
-    document.body.classList.add('modal-open');
-    return () => document.body.classList.remove('modal-open');
-  }, []);
-
-  const handleSave = async () => {
-    if (!text.trim()) {
-      tg.showAlert('Please enter some text');
-      return;
-    }
-
-    await onSave({ text: text.trim() });
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{item ? 'Edit Item' : 'New Item'}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-
-        <div className="modal-body">
-          <div className="form-group">
-            <label className="form-label">Text</label>
-            <textarea
-              className="form-textarea form-textarea--sm"
-              value={text}
-              onChange={e => setText(e.target.value)}
-              placeholder="What do you need to do?"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {item ? 'Update' : 'Create'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Checklist View
-function ChecklistView({ activeView, userDisplayName, onBack }) {
-  const [items, setItems] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [showModal, setShowModal] = React.useState(false);
-  const [editingItem, setEditingItem] = React.useState(null);
-  const [filter, setFilter] = React.useState('all');
-
-  React.useEffect(() => {
-    if (activeView === 'checklist') {
-      loadItems();
-    }
-  }, [activeView]);
-
-  const loadItems = async () => {
-    try {
-      setLoading(true);
-      const data = await apiCall('/checklist');
-      setItems(data.items || []);
-    } catch (error) {
-      tg.showAlert('Failed to load checklist: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreate = () => {
-    setEditingItem(null);
-    setShowModal(true);
-  };
-
-  const handleEdit = (item) => {
-    setEditingItem(item);
-    setShowModal(true);
-  };
-
-  const handleSave = async (data) => {
-    try {
-      if (editingItem) {
-        await apiCall(`/checklist/${editingItem._id}`, {
-          method: 'PUT',
-          body: JSON.stringify(data),
-        });
-        tg.showPopup({ message: 'Item updated' });
-      } else {
-        await apiCall('/checklist', {
-          method: 'POST',
-          body: JSON.stringify(data),
-        });
-        tg.showPopup({ message: 'Item created' });
-      }
-      setShowModal(false);
-      loadItems();
-    } catch (error) {
-      tg.showAlert('Failed to save: ' + error.message);
-    }
-  };
-
-  const handleToggle = async (item) => {
-    try {
-      await apiCall(`/checklist/${item._id}/toggle`, {
-        method: 'POST',
-      });
-      loadItems();
-    } catch (error) {
-      tg.showAlert('Failed to toggle: ' + error.message);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await apiCall(`/checklist/${id}`, {
-        method: 'DELETE',
-      });
-      tg.showPopup({ message: 'Item deleted' });
-      loadItems();
-    } catch (error) {
-      tg.showAlert('Failed to delete: ' + error.message);
-    }
-  };
-
-  const filteredItems = items.filter(item => {
-    if (filter === 'active') return !item.done;
-    if (filter === 'done') return item.done;
-    return true;
-  });
-
-  return (
-    <div>
-      <div className="header">
-        <div>
-          <h1>Checklist</h1>
-          {(() => {
-            const name = (userDisplayName || '').trim();
-            return name ? <div className="reminders-greeting">Hello {name}</div> : null;
-          })()}
-        </div>
-
-        <button className="btn btn-secondary" onClick={onBack}>
-          Back
-        </button>
-      </div>
-
-      <div className="quick-actions">
-        <div
-          className={`quick-action ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          All
-        </div>
-        <div
-          className={`quick-action ${filter === 'active' ? 'active' : ''}`}
-          onClick={() => setFilter('active')}
-        >
-          Active
-        </div>
-        <div
-          className={`quick-action ${filter === 'done' ? 'active' : ''}`}
-          onClick={() => setFilter('done')}
-        >
-          Done
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="loading">
-          <div className="spinner" />
-          <div>Loading checklist...</div>
-        </div>
-      ) : filteredItems.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">
-            <img src="/icons/check.svg" alt="" />
-          </div>
-          <div className="empty-state-text">
-            {filter === 'all'
-              ? 'No items yet.\nTap + to create one!'
-              : `No ${filter} items.`}
-          </div>
-        </div>
-      ) : (
-        filteredItems.map(item => (
-          <ChecklistCard
-            key={item._id}
-            item={item}
-            onToggle={handleToggle}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ))
-      )}
-
-      <button
-        className="is-hidden"
-        data-create-checklist="1"
-        onClick={handleCreate}
-      />
-
-      {showModal && (
-        <ChecklistModal
-          item={editingItem}
-          onClose={() => setShowModal(false)}
-          onSave={handleSave}
-        />
-      )}
-    </div>
-  );
-}
-
 
 // Habit Card
 function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLogs }) {
@@ -3920,6 +3655,271 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
       {showLogsModal && logsHabit ? (
         <HabitLogsModal habit={logsHabit} onClose={() => setShowLogsModal(false)} />
       ) : null}
+    </div>
+  );
+}
+
+// =========================
+// CHECKLIST COMPONENTS
+// =========================
+
+// Checklist Card
+function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
+  const [expanded, setExpanded] = React.useState(false);
+
+  const handleToggle = (e) => {
+    e.stopPropagation();
+    onToggle(item);
+  };
+
+  return (
+    <div className="card checklist-item" onClick={() => setExpanded(!expanded)}>
+      <div className="checklist-item-row">
+        <button
+          className={`checklist-checkbox ${item.done ? 'done' : ''}`}
+          onClick={handleToggle}
+          type="button"
+        >
+          <img src="/icons/check.svg" alt="" />
+        </button>
+
+        <div className={`checklist-text ${item.done ? 'done' : ''}`}>
+          {item.text || '(empty)'}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="card-actions" onClick={e => e.stopPropagation()} style={{ marginTop: 12 }}>
+          <button className="btn btn-primary" onClick={() => onEdit(item)}>
+            <img src="/icons/pencil.svg" alt="" />
+            Edit
+          </button>
+          <button className="btn btn-danger" onClick={() => onDelete(item._id)}>
+            <img src="/icons/trash.svg" alt="" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Checklist Modal
+function ChecklistModal({ item, onClose, onSave }) {
+  const [text, setText] = React.useState(item?.text || '');
+
+  React.useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
+  const handleSave = async () => {
+    if (!text.trim()) {
+      tg.showAlert('Please enter some text');
+      return;
+    }
+
+    await onSave({ text: text.trim() });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{item ? 'Edit Item' : 'New Item'}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Text</label>
+            <textarea
+              className="form-textarea form-textarea--sm"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="What do you need to do?"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            {item ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Checklist View
+function ChecklistView({ activeView, userDisplayName, onBack }) {
+  const [items, setItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [showModal, setShowModal] = React.useState(false);
+  const [editingItem, setEditingItem] = React.useState(null);
+  const [filter, setFilter] = React.useState('all');
+
+  React.useEffect(() => {
+    if (activeView === 'checklist') {
+      loadItems();
+    }
+  }, [activeView]);
+
+  const loadItems = async () => {
+    try {
+      setLoading(true);
+      const data = await apiCall('/checklist');
+      setItems(data.items || []);
+    } catch (error) {
+      tg.showAlert('Failed to load checklist: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingItem(null);
+    setShowModal(true);
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setShowModal(true);
+  };
+
+  const handleSave = async (data) => {
+    try {
+      if (editingItem) {
+        await apiCall(`/checklist/${editingItem._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+        tg.showPopup({ message: 'Item updated' });
+      } else {
+        await apiCall('/checklist', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        tg.showPopup({ message: 'Item created' });
+      }
+      setShowModal(false);
+      loadItems();
+    } catch (error) {
+      tg.showAlert('Failed to save: ' + error.message);
+    }
+  };
+
+  const handleToggle = async (item) => {
+    try {
+      await apiCall(`/checklist/${item._id}/toggle`, {
+        method: 'POST',
+      });
+      loadItems();
+    } catch (error) {
+      tg.showAlert('Failed to toggle: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await apiCall(`/checklist/${id}`, {
+        method: 'DELETE',
+      });
+      tg.showPopup({ message: 'Item deleted' });
+      loadItems();
+    } catch (error) {
+      tg.showAlert('Failed to delete: ' + error.message);
+    }
+  };
+
+  const filteredItems = items.filter(item => {
+    if (filter === 'active') return !item.done;
+    if (filter === 'done') return item.done;
+    return true;
+  });
+
+  return (
+    <div>
+      <div className="header">
+        <div>
+          <h1>Checklist</h1>
+          {(() => {
+            const name = (userDisplayName || '').trim();
+            return name ? <div className="reminders-greeting">Hello {name}</div> : null;
+          })()}
+        </div>
+
+        <button className="btn btn-secondary" onClick={onBack}>
+          Back
+        </button>
+      </div>
+
+      <div className="quick-actions">
+        <div
+          className={`quick-action ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          All
+        </div>
+        <div
+          className={`quick-action ${filter === 'active' ? 'active' : ''}`}
+          onClick={() => setFilter('active')}
+        >
+          Active
+        </div>
+        <div
+          className={`quick-action ${filter === 'done' ? 'active' : ''}`}
+          onClick={() => setFilter('done')}
+        >
+          Done
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading checklist...</div>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <img src="/icons/check.svg" alt="" />
+          </div>
+          <div className="empty-state-text">
+            {filter === 'all'
+              ? 'No items yet.\nTap + to create one!'
+              : `No ${filter} items.`}
+          </div>
+        </div>
+      ) : (
+        filteredItems.map(item => (
+          <ChecklistCard
+            key={item._id}
+            item={item}
+            onToggle={handleToggle}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ))
+      )}
+
+      <button
+        className="is-hidden"
+        data-create-checklist="1"
+        onClick={handleCreate}
+      />
+
+      {showModal && (
+        <ChecklistModal
+          item={editingItem}
+          onClose={() => setShowModal(false)}
+          onSave={handleSave}
+        />
+      )}
     </div>
   );
 }
