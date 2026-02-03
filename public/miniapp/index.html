@@ -4331,7 +4331,10 @@ const loadBooks = async () => {
           <button className="btn btn-prompt" type="button" onClick={promptSummarySearch}>
             Summary
           </button>
-         <button className="btn btn-secondary" type="button" onClick={() => setRecsOpen(true)}>
+         <button className="btn btn-secondary" type="button" onClick={() => {
+  setRecsOpen(true);
+  loadRecs(recsGenre);
+}}>
   Recs
 </button>
       </div>
