@@ -3857,7 +3857,8 @@ setItems(list);
 const handleDelete = async (item) => {
   const id = item?._id;
   if (!id) return tg.showAlert("Missing item id");
-  await apiCall(`/checklist/${id}`, { method: "DELETE" });
+  await apiCall(`/checklist/${id}`, { method: "DELETE" 
+  });
   loadItems();
 };
 
