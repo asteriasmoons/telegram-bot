@@ -6,9 +6,9 @@
   <title>Lystaria</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/luxon@3/build/global/luxon.min.js"></script>
 
   <style>
@@ -2227,40 +2227,34 @@ if (!isTelegram) {
 tg.ready();
 tg.expand();
 
-// ===== CRASH OVERLAY (PASTE AT TOP OF SCRIPT) =====
-(function () {
+// ---- GLOBAL ERROR SURFACE (put at VERY TOP of your main script) ----
+(function attachGlobalErrorOverlay() {
   function show(msg) {
     try {
-      let el = document.getElementById("__crash_overlay__");
-      if (!el) {
-        el = document.createElement("pre");
-        el.id = "__crash_overlay__";
-        el.style.position = "fixed";
-        el.style.left = "0";
-        el.style.right = "0";
-        el.style.top = "0";
-        el.style.bottom = "0";
-        el.style.padding = "12px";
-        el.style.margin = "0";
-        el.style.background = "#0b0b0f";
-        el.style.color = "#ffb3c7";
-        el.style.fontSize = "12px";
-        el.style.whiteSpace = "pre-wrap";
-        el.style.zIndex = "999999";
-        el.style.overflow = "auto";
-        document.body.appendChild(el);
-      }
-      el.textContent = String(msg);
+      if (window.Telegram?.WebApp?.showAlert) window.Telegram.WebApp.showAlert(msg);
     } catch {}
+    console.error(msg);
   }
 
   window.addEventListener("error", (e) => {
-    show("JS ERROR:\n" + (e?.error?.stack || e?.message || String(e)));
+    const message = e?.message || "Unknown error";
+    const file = e?.filename || "(no file)";
+    const line = e?.lineno ?? "?";
+    const col = e?.colno ?? "?";
+    const stack = e?.error?.stack ? `\n\n${e.error.stack}` : "";
+    show(`JS ERROR:\n${message}\n${file}:${line}:${col}${stack}`);
   });
 
   window.addEventListener("unhandledrejection", (e) => {
-    const r = e?.reason;
-    show("UNHANDLED PROMISE REJECTION:\n" + (r?.stack || r?.message || String(r)));
+    const reason = e?.reason;
+    const msg =
+      typeof reason === "string"
+        ? reason
+        : reason?.message
+        ? reason.message
+        : JSON.stringify(reason);
+    const stack = reason?.stack ? `\n\n${reason.stack}` : "";
+    show(`PROMISE REJECTION:\n${msg}${stack}`);
   });
 })();
 
@@ -3733,7 +3727,7 @@ const [text, setText] = React.useState(item && item.text ? item.text : '');
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{item ? 'Edit Item' : 'New Item'}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" type="button" onClick={onClose}>×</button>
         </div>
 
         <div className="modal-body">
@@ -3750,12 +3744,12 @@ const [text, setText] = React.useState(item && item.text ? item.text : '');
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {item ? 'Update' : 'Create'}
-          </button>
+          <button className="btn btn-secondary" type="button" onClick={onClose}>
+  Cancel
+</button>
+<button className="btn btn-primary" type="button" onClick={handleSave}>
+  {item ? 'Update' : 'Create'}
+</button>
         </div>
       </div>
     </div>
