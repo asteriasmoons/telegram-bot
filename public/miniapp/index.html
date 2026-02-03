@@ -3675,7 +3675,7 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
   };
 
   return (
-    <div className="card checklist-item" onClick={() => setExpanded(!expanded)}>
+    <div className="card checklist-item">
       <div className="checklist-item-row">
         <button
           className={`checklist-checkbox ${item.done ? 'done' : ''}`}
@@ -3687,6 +3687,16 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
         <div className={`checklist-text ${item.done ? 'done' : ''}`}>
           {item.text || '(empty)'}
         </div>
+        <button
+  className="checklist-expand"
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    setExpanded(v => !v);
+  }}
+>
+  ⋯
+</button>
       </div>
 
       {expanded && (
@@ -3695,7 +3705,7 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
             <img src="/icons/pencil.svg" alt="" />
             Edit
           </button>
-          <button className="btn btn-danger" onClick={() => onDelete(item._id)}>
+          <button className="btn btn-danger" onClick={() => onDelete(item)}>
             <img src="/icons/trash.svg" alt="" />
           </button>
         </div>
@@ -3833,11 +3843,9 @@ setItems(list);
     }
   };
 
-  const handleDelete = async (id) => {
-    try {
-      await apiCall(`/checklist/${id}`, {
-        method: 'DELETE',
-      });
+  const handleDelete = async (item) => {
+  await apiCall(`/checklist/${item._id}`, { method: 'DELETE' });
+};
       tg.showPopup({ message: 'Item deleted' });
       loadItems();
     } catch (error) {
