@@ -4191,12 +4191,6 @@ const loadRecs = React.useCallback(async (genre) => {
   }
 }, [activeView, filter]);
 
-useEffect(() => {
-  if (recsOpen) {
-    loadRecs(recsGenre);
-  }
-}, [recsOpen, recsGenre, loadRecs]);
-
 
 const loadStreak = async () => {
   try {
