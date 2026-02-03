@@ -14,7 +14,7 @@ import eventShareApiRouter from "./miniapp/eventShare-api";
 
 import habitsRouter from "./miniapp/habits";
 
-import checklistRouter from "./checklist-api";
+import checklistRouter from "./miniapp/checklist-api";
 
 
 type StartServerOpts = {
