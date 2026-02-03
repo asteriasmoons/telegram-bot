@@ -3712,7 +3712,7 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
 
 // Checklist Modal
 function ChecklistModal({ item, onClose, onSave }) {
-  const [text, setText] = React.useState(item?.text || '');
+const [text, setText] = React.useState(item && item.text ? item.text : '');
 
   React.useEffect(() => {
     document.body.classList.add('modal-open');
