@@ -3695,12 +3695,12 @@ function ChecklistCard({ item, onToggle, onEdit, onDelete }) {
     setExpanded(v => !v);
   }}
 >
-  ⋯
+<img src="/icons/more.svg" alt="" />
 </button>
       </div>
 
       {expanded && (
-        <div className="card-actions" onClick={e => e.stopPropagation()} style={{ marginTop: 12 }}>
+        <div className="card-actions" style={{ marginTop: 12 }}>
           <button className="btn btn-primary" onClick={() => onEdit(item)}>
             <img src="/icons/pencil.svg" alt="" />
             Edit
