@@ -31,6 +31,8 @@ import { registerReadingStreakHandlers } from "./commands/readingStreaks";
 
 import { installHabitFlows } from "./habitScheduler";
 
+import { setupRules } from "./main/rules";
+
 
 import { UserSettings } from "./models/UserSettings";
 import { Reminder } from "./models/Reminder";
@@ -187,6 +189,9 @@ registerTimezoneCommand(bot);
 // READING COMMANDS
 registerReading(bot);
 registerReadingStreakHandlers(bot);
+
+// Rules & Welcome Listener
+setupRules(bot);
 
 
   bot.catch((err) => {
