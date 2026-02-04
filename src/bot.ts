@@ -31,7 +31,7 @@ import { registerReadingStreakHandlers } from "./commands/readingStreaks";
 
 import { installHabitFlows } from "./habitScheduler";
 
-import { setupRules } from "./main/rules";
+import { setupRules } from "./listeners/rules";
 import { registerInfoCommand } from "./commands/info";
 
 

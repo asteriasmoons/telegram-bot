@@ -24,8 +24,8 @@ export function registerInfoCommand(bot: Telegraf<Context>) {
           Markup.button.url("Join Group", GROUP_URL),
         ],
       ]),
-      disable_web_page_preview: true,
-    });
+   link_preview_options: { is_disabled: true },          
+          });
 
 // IMPORTANT: allow other middleware / flows to continue
     return next();

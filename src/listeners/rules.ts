@@ -34,7 +34,7 @@ export function setupRules(bot: Telegraf<Context>) {
         ...Markup.inlineKeyboard([
           Markup.button.callback("Agree to Rules", `agree_rules:${user.id}`),
         ]),
-        disable_web_page_preview: true,
+        link_preview_options: { is_disabled: true },
       });
     }
   });
@@ -51,12 +51,15 @@ export function setupRules(bot: Telegraf<Context>) {
     await ctx.answerCbQuery("Thanks -- noted.");
 
     // user is not in scope here; use ctx.from
-const agreedBy = `<a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>`;
+    const agreedBy = `<a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>`;
 
     try {
       await ctx.editMessageText(
         `${agreedBy} agreed to the rules.\n\nPlease enjoy your stay!`,
-        { disable_web_page_preview: true }
+        {
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: true },
+        }
       );
     } catch {
       await ctx.reply("Agreed. Welcome!");
