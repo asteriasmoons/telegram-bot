@@ -1,7 +1,20 @@
 import { Router } from 'express';
+import { DateTime } from "luxon";
+import { UserSettings } from "../models/UserSettings";
 import Intention from '../models/Intention';
 
 const router = Router();
+
+// HELPERS HELPERS HELPERS 
+async function getUserTz(userId: number) {
+  const s = await UserSettings.findOne({ userId }).lean();
+  return String(s?.timezone || "America/Chicago");
+}
+
+function startOfTodayInTz(tz: string) {
+  // Start of the user's local day, expressed as a real JS Date (UTC instant)
+  return DateTime.now().setZone(tz).startOf("day").toUTC().toJSDate();
+}
 
 /**
  * GET /api/miniapp/intention
@@ -15,18 +28,8 @@ router.get('/intention', async (req, res) => {
     }
 
     // Get start of today in UTC
-    const now = new Date();
-    const startOfDay = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-    );
+     const tz = await getUserTz(userId);
+     const startOfDay = startOfTodayInTz(tz);
 
     // Find intention set today
     const intention = await Intention.findOne({
@@ -73,35 +76,17 @@ router.post('/intention', async (req, res) => {
         .json({ ok: false, error: 'Intention too long (max 2000 characters)' });
     }
 
-    // Get start of today in UTC
-    const now = new Date();
-    const startOfDay = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-    );
+    const tz = await getUserTz(userId);
+    const startOfDay = startOfTodayInTz(tz);
 
-    // Delete any existing intention for today
-    await Intention.deleteMany({
-      userId: String(userId),
-      setAt: { $gte: startOfDay },
-    });
+    // Create new intention (keep history)
+     const newIntention = new Intention({
+     userId: String(userId),
+     text,
+     setAt: new Date(), // keep as the instant it was set
+});
 
-    // Create new intention
-    const newIntention = new Intention({
-      userId: String(userId),
-      text,
-      setAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    await newIntention.save();
+      await newIntention.save();
 
     res.json({
       ok: true,
@@ -125,19 +110,8 @@ router.delete('/intention', async (req, res) => {
       return res.status(401).json({ ok: false, error: "Unauthorized - invalid userId" });
     }
 
-    // Get start of today in UTC
-    const now = new Date();
-    const startOfDay = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-    );
+    const tz = await getUserTz(userId);
+    const startOfDay = startOfTodayInTz(tz);
 
     // Delete today's intention
     await Intention.deleteMany({
