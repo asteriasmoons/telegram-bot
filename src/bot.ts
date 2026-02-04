@@ -32,6 +32,7 @@ import { registerReadingStreakHandlers } from "./commands/readingStreaks";
 import { installHabitFlows } from "./habitScheduler";
 
 import { setupRules } from "./main/rules";
+import { registerInfoCommand } from "./commands/info";
 
 
 import { UserSettings } from "./models/UserSettings";
@@ -192,6 +193,9 @@ registerReadingStreakHandlers(bot);
 
 // Rules & Welcome Listener
 setupRules(bot);
+
+// INFORMATION COMMAND
+registerInfoCommand(bot);
 
 
   bot.catch((err) => {
