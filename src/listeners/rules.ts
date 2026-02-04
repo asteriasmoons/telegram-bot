@@ -54,15 +54,27 @@ export function setupRules(bot: Telegraf<Context>) {
     const agreedBy = `<a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>`;
 
     try {
-      await ctx.editMessageText(
-        `${agreedBy} agreed to the rules.\n\nPlease enjoy your stay!`,
-        {
-          parse_mode: "HTML",
-          link_preview_options: { is_disabled: true },
-        }
-      );
-    } catch {
-      await ctx.reply("Agreed. Welcome!");
+  // Edit the original rules message (the one with the button)
+  await ctx.editMessageText(
+    `${agreedBy} agreed to the rules.\n\nPlease enjoy your stay!`,
+    {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
     }
+  );
+
+  // Delete the message after 15 seconds
+  const msg = ctx.callbackQuery?.message;
+  if (msg && "message_id" in msg) {
+    const chatId = msg.chat.id;
+    const messageId = msg.message_id;
+
+    setTimeout(() => {
+      ctx.telegram.deleteMessage(chatId, messageId).catch(() => {});
+    }, 30_000);
+  }
+} catch {
+  await ctx.reply("Agreed. Welcome!");
+}
   });
 }
