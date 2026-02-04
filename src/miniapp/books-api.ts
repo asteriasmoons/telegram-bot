@@ -53,7 +53,7 @@ function clampShortSummary(v: any) {
   // If you want a different max, change 280 here.
   const s = String(v || "").trim();
   if (!s) return "";
-  return s.slice(0, 800);
+  return s.slice(0, 1500);
 }
 
 function normalizeProgress(
@@ -338,7 +338,7 @@ const recs = items
 
     if (!title) return null;
 
-    const summary = desc.length > 700 ? desc.slice(0, 700).trim() + "…" : (desc || "No description available.");
+    const summary = desc.length > 1500 ? desc.slice(0, 1500).trim() + "…" : (desc || "No description available.");
 
     return { title, author, summary };
   })
