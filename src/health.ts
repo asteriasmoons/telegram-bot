@@ -16,7 +16,7 @@ import habitsRouter from "./miniapp/habits";
 
 import checklistRouter from "./miniapp/checklist-api";
 
-import intentionsApi from "./miniapp/intentions-api";
+import intentionsRouter from "./miniapp/intentions-api";
 
 
 
