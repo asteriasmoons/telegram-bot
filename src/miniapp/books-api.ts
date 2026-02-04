@@ -552,9 +552,12 @@ router.post("/summary", async (req: any, res) => {
       let q = rawTitle;
       if (rawAuthor) q = `${rawTitle} ${rawAuthor}`;
 
-      const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-        q
-      )}&maxResults=20&printType=books&langRestrict=en`;
+const apiKey = process.env.GOOGLE_BOOKS_API_KEY || "";
+
+const gbUrl =
+  `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}` +
+  `&maxResults=20&printType=books&langRestrict=en` +
+  (apiKey ? `&key=${apiKey}` : "");
 
       console.log("🔍 Google Books URL:", gbUrl);
 
