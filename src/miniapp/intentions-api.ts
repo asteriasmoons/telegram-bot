@@ -48,7 +48,7 @@ router.get('/intention', async (req, res) => {
 });
 
 /**
- * POST /api/miniapp/journal/intention
+ * POST /api/miniapp/intention
  * Set today's intention (replaces existing if present)
  */
 router.post('/intention', async (req, res) => {
@@ -115,7 +115,7 @@ router.post('/intention', async (req, res) => {
 });
 
 /**
- * DELETE /api/miniapp/journal/intention
+ * DELETE /api/miniapp/intention
  * Clear today's intention
  */
 router.delete('/intention', async (req, res) => {

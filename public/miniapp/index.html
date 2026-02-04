@@ -5380,7 +5380,7 @@ useEffect(() => {
   const loadIntention = async () => {
     try {
       setLoading(true);
-      const data = await apiCall("/intention");
+      const data = await apiCall("/intentions/intention");
       
       if (data?.intention) {
         setIntention(data.intention);
@@ -5403,7 +5403,7 @@ useEffect(() => {
 
     try {
       setSaving(true);
-      await apiCall("/intention", {
+      await apiCall("/intentions/intention", {
         method: "POST",
         body: JSON.stringify({ intention: text }),
       });
@@ -5424,7 +5424,7 @@ useEffect(() => {
   const clearIntention = async () => {
     try {
       setSaving(true);
-      await apiCall("/intention", {
+      await apiCall("/intentions/intention", {
         method: "DELETE",
       });
 
