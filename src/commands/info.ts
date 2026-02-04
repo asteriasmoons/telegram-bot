@@ -13,7 +13,7 @@ export function registerInfoCommand(bot: Telegraf<Context>) {
       `<b>Where to go</b>\n` +
       `• The channel is for announcements, updates, and releases.\n` +
       `• The group is for discussion, support, and community.\n\n` +
-       `<blockquote>` +
+       `</blockquote>` +
       `<i>Use the buttons below to open the right space.</i>`;
 
     await ctx.reply(text, {
