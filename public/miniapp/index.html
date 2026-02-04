@@ -1657,6 +1657,169 @@ input[type="date"].form-input::-webkit-datetime-edit {
 }
 
 /* =========================================================
+   DAILY INTENTION CARD
+   ========================================================= */
+.intention-card {
+  margin: 0 16px 20px;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  box-shadow: 0 14px 40px var(--glass-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.intention-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.18),
+    rgba(255,255,255,0.06) 35%,
+    rgba(255,255,255,0.00) 60%
+  );
+  opacity: 0.55;
+  mix-blend-mode: screen;
+}
+
+.intention-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.intention-header img {
+  width: 20px;
+  height: 20px;
+  opacity: 0.9;
+}
+
+.intention-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.intention-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.intention-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  transition: all 0.2s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+.intention-textarea:focus {
+  outline: none;
+  border-color: rgba(91, 141, 239, 0.60) !important;
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.09) !important;
+}
+
+.intention-textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.intention-display {
+  position: relative;
+  z-index: 1;
+}
+
+.intention-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-line;
+  word-break: break-word;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: rgba(139, 125, 239, 0.08);
+  border-left: 3px solid #8b7def;
+  border-radius: 8px;
+}
+
+.intention-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.intention-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.intention-date img {
+  width: 14px;
+  height: 14px;
+  opacity: 0.8;
+}
+
+.intention-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.intention-edit-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.intention-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(91, 141, 239, 0.35);
+}
+
+.intention-clear-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(244, 67, 54, 0.12);
+  border: 1px solid rgba(244, 67, 54, 0.25);
+  color: #f44336;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.intention-clear-btn:hover {
+  background: rgba(244, 67, 54, 0.18);
+  border-color: rgba(244, 67, 54, 0.40);
+}
+
+
+/* =========================================================
    ICON SYSTEM (SVG icons replacing emojis)
    ========================================================= */
 img {
@@ -5199,6 +5362,182 @@ function JournalTagsView({ onBack, onPickTag }) {
   );
 }
 
+// =========================
+// DAILY INTENTION CARD COMPONENT
+// =========================
+
+function DailyIntentionCard({ activeView }) {
+  const [intention, setIntention] = useState("");
+  const [input, setInput] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+useEffect(() => {
+  loadIntention();
+}, []);
+
+  const loadIntention = async () => {
+    try {
+      setLoading(true);
+      const data = await apiCall("/intention");
+      
+      if (data?.intention) {
+        setIntention(data.intention);
+      } else {
+        setIntention("");
+      }
+    } catch (e) {
+      setIntention("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveIntention = async () => {
+    const text = input.trim();
+    if (!text) {
+      tg?.showAlert?.("Please enter an intention");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await apiCall("/intention", {
+        method: "POST",
+        body: JSON.stringify({ intention: text }),
+      });
+
+      setIntention(text);
+      setInput("");
+      setEditing(false);
+      tg?.showPopup?.({ message: "Intention set" });
+    } catch (e) {
+      tg?.showAlert?.("Failed to save: " + (e?.message || "Unknown error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearIntention = async () => {
+    try {
+      setSaving(true);
+      await apiCall("/intention", {
+        method: "DELETE",
+      });
+
+      setIntention("");
+      setInput("");
+      setEditing(false);
+      tg?.showPopup?.({ message: "Intention cleared" });
+    } catch (e) {
+      tg?.showAlert?.("Failed to clear: " + (e?.message || "Unknown error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEdit = () => {
+    setInput(intention);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setInput("");
+    setEditing(false);
+  };
+
+  return (
+    <div className="intention-card">
+      {loading ? (
+        <div className="loading" style={{ padding: "12px 0" }}>
+          <div className="spinner" />
+          <div>Loading intention...</div>
+        </div>
+      ) : !intention || editing ? (
+        <div>
+          <div className="intention-header">
+            <img src="/icons/star.svg" alt="" />
+            <div className="intention-title">Daily Intention</div>
+          </div>
+
+          <div className="intention-input-group">
+            <textarea
+              className="intention-textarea"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="What's your intention for today?"
+              disabled={saving}
+              autoFocus
+            />
+
+            <div className="card-actions">
+              <button
+                className="btn btn-primary"
+                onClick={saveIntention}
+                disabled={saving || !input.trim()}
+                type="button"
+              >
+                {saving ? "Saving..." : "Set Intention"}
+              </button>
+
+              {editing && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={cancelEdit}
+                  disabled={saving}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="intention-header">
+            <img src="/icons/star.svg" alt="" />
+            <div className="intention-title">Today's Intention</div>
+          </div>
+
+          <div className="intention-display">
+            <div className="intention-text">{intention}</div>
+
+            <div className="intention-meta">
+              <div className="intention-date">
+                <img src="/icons/cal.svg" alt="" />
+                <span>Set today</span>
+              </div>
+
+              <div className="intention-actions">
+                <button
+                  className="intention-edit-btn"
+                  onClick={startEdit}
+                  type="button"
+                >
+                  Edit
+                </button>
+
+                <button
+                  className="intention-clear-btn"
+                  onClick={clearIntention}
+                  disabled={saving}
+                  type="button"
+                >
+                  {saving ? "Clearing..." : "Clear"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 
 // Journals View
 function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect }) {
@@ -5390,6 +5729,8 @@ const handleGeneratePrompt = async () => {
     <button className="journal-filter-clear" type="button" onClick={onClearTag}>
       Clear
     </button>
+    
+    <DailyIntentionCard />
   </div>
 ) : null}
 
