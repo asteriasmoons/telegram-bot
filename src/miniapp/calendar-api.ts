@@ -390,12 +390,8 @@ const safeNextRunAt =
   return { reminderId: created._id };
 }
 
-function startOfDayKey(d: Date) {
-  // "YYYY-MM-DD" in local time of the Date object
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+function startOfDayKey(d: Date, tz: string) {
+  return DateTime.fromJSDate(d, { zone: tz }).toFormat("yyyy-LL-dd");
 }
 
 function clampDayOfMonth(year: number, month0: number, desiredDay: number) {
@@ -464,7 +460,7 @@ function isRecurrenceActiveOnDate(rule: any, occurrenceIndex: number, occurrence
   return true;
 }
 
-function expandRecurringEventIntoRange(event: any, rangeStart: Date, rangeEnd: Date) {
+function expandRecurringEventIntoRange(event: any, rangeStart: Date, rangeEnd: Date, tz: string) {
   const rule = event.recurrence;
   if (!rule) return [];
 
@@ -534,22 +530,18 @@ function expandRecurringEventIntoRange(event: any, rangeStart: Date, rangeEnd: D
 
     // Weekly weekday filter: only include certain weekdays
     if (freq === "weekly" && byWeekday) {
-      const dow = current.getDay(); // 0..6
-      if (!byWeekday.has(dow)) {
-        // move one day forward within the week until we hit a valid weekday,
-        // but still advance overall in a controlled manner:
-        // simplest: walk day-by-day, but guard it.
-        const nextDay = addDays(current, 1);
-        current = nextDay;
-        continue;
-      }
-    }
+  const dow = DateTime.fromJSDate(current, { zone: tz }).weekday % 7; // 0..6
+  if (!byWeekday.has(dow)) {
+    current = addDays(current, 1);
+    continue;
+  }
+}
 
     const occStart = new Date(current);
     const occEnd = baseEnd ? new Date(occStart.getTime() + durationMs) : null;
 
     // Exceptions are stored by day key (keeps it simple for all-day + timed)
-    const key = startOfDayKey(occStart);
+   const key = startOfDayKey(occStart, tz);
     if (!exceptions.has(key)) {
       // Only include occurrences that overlap the range
       // For timed events, check start within range; for multi-day, check overlap
@@ -651,8 +643,8 @@ const recurringParents = await Event.find({
 
     // Expand occurrences
     const occurrences = recurringParents.flatMap((ev) =>
-      expandRecurringEventIntoRange(ev, rangeStart, rangeEnd)
-    );
+  expandRecurringEventIntoRange(ev, rangeStart, rangeEnd, tz)
+);
 
     // Merge and sort
     const combined = [...oneTime, ...occurrences].sort((a, b) => {

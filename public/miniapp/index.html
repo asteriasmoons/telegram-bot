@@ -2615,12 +2615,30 @@ function debugHabitsApi(endpoint, options) {
   });
 }
 
-// =========================
-// HABITS UI (FIXED for iOS WebView strict input formats)
-// Assumes you already have: apiCall, tg, safeNum, isSessionsUnit,
-// habitBadgeForCadence, habitBadgeForStatus,
-// fmtDateTimeLocalValue, parseDateTimeLocalValue
-// =========================
+
+function dateInputValue(d, timeZone) {
+  // YYYY-MM-DD in the desired timezone
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timeZone || undefined,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function timeInputValue(d, timeZone) {
+  // HH:MM in the desired timezone
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timeZone || undefined,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+
+  const hh = parts.find(p => p.type === "hour")?.value || "09";
+  const mm = parts.find(p => p.type === "minute")?.value || "00";
+  return `${hh}:${mm}`;
+}
 
 // --- helpers (local) ---
 function pad2(n) {
@@ -2675,6 +2693,13 @@ function parseDateTimeLocalValue(str) {
 
   return d;
 }
+
+// =========================
+// HABITS UI (FIXED for iOS WebView strict input formats)
+// Assumes you already have: apiCall, tg, safeNum, isSessionsUnit,
+// habitBadgeForCadence, habitBadgeForStatus,
+// fmtDateTimeLocalValue, parseDateTimeLocalValue
+// =========================
 
 
 // Habit Card
@@ -5684,8 +5709,8 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
   React.useEffect(() => {
     if (reminder) {
       const d = new Date(reminder.nextRunAt);
-      setDate(d.toISOString().split("T")[0]);
-      setTime(d.toTimeString().slice(0, 5));
+setDate(dateInputValue(d, userTimezone));
+setTime(timeInputValue(d, userTimezone));
 
       const k = reminder?.schedule?.kind || "once";
       setScheduleKind(k);
@@ -5783,7 +5808,7 @@ const handleSave = async () => {
     schedule = { kind: "daily", timeOfDay: time };
 
   } else if (scheduleKind === "weekly") {
-    const chosenWeekday = new Date(`${date}T00:00:00`).getDay(); // 0..6
+const chosenWeekday = DateTime.fromISO(date, { zone }).weekday % 7; // 0..6 (Sun=0)
     const days = Array.isArray(weeklyDays)
       ? weeklyDays
           .map((n) => Number(n))
@@ -5798,7 +5823,7 @@ const handleSave = async () => {
 
   } else if (scheduleKind === "monthly") {
     // If user leaves it blank or invalid, default to day-of-month from chosen date.
-    const fallbackDom = new Date(`${date}T00:00:00`).getDate();
+const fallbackDom = DateTime.fromISO(date, { zone }).day;
     const dom = Number(monthlyDay);
 
     const normalizedDom =
@@ -6106,8 +6131,8 @@ const [shareLoading, setShareLoading] = useState(false);
     // -----------------------------
     if (event) {
       const d = new Date(event.startDate);
-      setDate(d.toISOString().split('T')[0]);
-      setTime(d.toTimeString().slice(0, 5));
+setDate(dateInputValue(d, userTimezone));
+setTime(timeInputValue(d, userTimezone));
       setAllDay(!!event.allDay);
       setLocation(event.location || '');
       setDescription(event.description || '');
@@ -6120,7 +6145,7 @@ const [shareLoading, setShareLoading] = useState(false);
         setEndTime('');
       }
     } else if (selectedDate) {
-      setDate(selectedDate.toISOString().split('T')[0]);
+setDate(dateInputValue(selectedDate, userTimezone));
       setTime('09:00');
       setEndTime('10:00');
       setAllDay(false);
@@ -6309,7 +6334,7 @@ const interval = Number.isFinite(rawInterval) && rawInterval >= 1 ? Math.trunc(r
           ? repeatWeekdays.map(n => Number(n)).filter(n => n >= 0 && n <= 6)
           : [];
 
-const startWeekday = new Date(date + "T00:00:00").getDay(); // 0..6
+const startWeekday = DateTime.fromISO(date, { zone }).weekday % 7; // 0..6
 
 if (list.length === 0) {
   byWeekday = [startWeekday];
