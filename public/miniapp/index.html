@@ -5407,11 +5407,13 @@ useEffect(() => {
         method: "POST",
         body: JSON.stringify({ intention: text }),
       });
+      
+      tg?.showAlert?.("API finished");
 
       setIntention(text);
       setInput("");
-      setEditing(false);
-      tg?.showPopup?.({ message: "Intention set" });
+      setEditing(false); 
+      tg?.showAlert?.("Intention set");
     } catch (e) {
       tg?.showAlert?.("Failed to save: " + (e?.message || "Unknown error"));
     } finally {
@@ -5429,7 +5431,7 @@ useEffect(() => {
       setIntention("");
       setInput("");
       setEditing(false);
-      tg?.showPopup?.({ message: "Intention cleared" });
+      tg?.showAlert?.("Intention cleared");
     } catch (e) {
       tg?.showAlert?.("Failed to clear: " + (e?.message || "Unknown error"));
     } finally {

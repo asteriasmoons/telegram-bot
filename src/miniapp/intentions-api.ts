@@ -4,7 +4,7 @@ import Intention from '../models/Intention';
 const router = Router();
 
 /**
- * GET /api/miniapp/journal/intention
+ * GET /api/miniapp/intention
  * Get today's intention
  */
 router.get('/intention', async (req, res) => {
