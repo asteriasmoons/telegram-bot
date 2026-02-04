@@ -71,7 +71,7 @@ export function setupRules(bot: Telegraf<Context>) {
 
     setTimeout(() => {
       ctx.telegram.deleteMessage(chatId, messageId).catch(() => {});
-    }, 30_000);
+    }, 10_000);
   }
 } catch {
   await ctx.reply("Agreed. Welcome!");
