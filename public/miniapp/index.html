@@ -6041,7 +6041,7 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
 
   const [scheduleKind, setScheduleKind] = React.useState(reminder?.schedule?.kind || "once");
   // NEW: daily interval (every N days)
-const [dailyInterval, setDailyInterval] = React.useState(1);
+const [dailyIntervalStr, setDailyIntervalStr] = React.useState("");
   const [intervalMinutes, setIntervalMinutes] = React.useState(
     reminder?.schedule?.intervalMinutes || 30
   );
@@ -6072,10 +6072,12 @@ setTime(timeInputValue(d, userTimezone));
       
       // Daily interval
 if (k === "daily") {
-  const iv = Number(reminder?.schedule?.interval);
-  setDailyInterval(Number.isFinite(iv) && iv >= 1 ? iv : 1);
+  const iv = reminder?.schedule?.interval;
+  setDailyIntervalStr(
+    iv === undefined || iv === null ? "" : String(iv)
+  );
 } else {
-  setDailyInterval(1);
+  setDailyIntervalStr("");
 }
 
       // Interval
@@ -6221,7 +6223,9 @@ const handleSave = async () => {
     schedule = { kind: "once" };
 
 } else if (scheduleKind === "daily") {
-  const iv = Number(dailyInterval);
+  const raw = String(dailyInterval || "").trim();
+  const iv = raw === "" ? 1 : Number(raw);
+
   if (!Number.isFinite(iv) || iv < 1) {
     tg.showAlert("Daily interval must be at least 1 day.");
     return;
@@ -6367,17 +6371,13 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
 
     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
       <input
-        type="number"
-        className="form-input"
-        min="1"
-        max="365"
-        value={dailyInterval}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          setDailyInterval(Number.isFinite(v) && v >= 1 ? Math.min(v, 365) : 1);
-        }}
-        style={{ width: 90 }}
-      />
+  type="number"
+  className="form-input"
+  min="1"
+  placeholder="e.g. 28"
+  value={dailyIntervalStr}
+  onChange={(e) => setDailyIntervalStr(e.target.value)}
+/>
       <span style={{ color: "var(--text-secondary)" }}>days</span>
     </div>
 
