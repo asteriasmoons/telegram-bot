@@ -105,9 +105,6 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   const tz = String(rem.timezone || "America/Chicago");
   const nowZ = DateTime.now().setZone(tz);
   
-    const baseZ = rem.nextRunAt
-    ? DateTime.fromJSDate(new Date(rem.nextRunAt), { zone: tz })
-    : nowZ;
 
   // -------------------------
   // interval: now + X minutes
@@ -131,20 +128,18 @@ const timeFromNext = rem.nextRunAt ? DateTime.fromJSDate(new Date(rem.nextRunAt)
   // -------------------------
   // daily
   // -------------------------
-  if (sched.kind === "daily") {
-    const step = Math.max(1, Number(sched.interval || 1));
+if (sched.kind === "daily") {
+  const step = Math.max(1, Number(sched.interval || 1));
 
-    // anchor to the last scheduled occurrence time
-    let candidate = baseZ.set({ hour, minute, second: 0, millisecond: 0 });
+  let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
 
-    // move forward by the configured interval first
+  // If it's already passed (or equal), move forward by N days until it's future
+  while (candidate <= nowZ) {
     candidate = candidate.plus({ days: step });
-
-    // ensure it's in the future (in case we're behind)
-    while (candidate <= nowZ) candidate = candidate.plus({ days: step });
-
-    return candidate.toJSDate();
   }
+
+  return candidate.toJSDate();
+}
 
   // -------------------------
   // weekly
@@ -199,7 +194,7 @@ const anchorDay = Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromN
       return dt.set({ day: safeDay });
     };
 
-    let candidate = clampDay(baseZ.set({ hour, minute, second: 0, millisecond: 0 }), anchorDay);
+let candidate = clampDay(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), anchorDay);
 
     while (candidate <= nowZ) {
       candidate = clampDay(candidate.plus({ months: step }), anchorDay);
@@ -226,7 +221,7 @@ const anchorDay = Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromN
       return dt.set({ day: safeDay });
     };
 
-    let candidate = baseZ.set({
+   let candidate = nowZ.set({
       month: Math.min(Math.max(1, anchorMonth), 12),
       hour,
       minute,
