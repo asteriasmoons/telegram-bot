@@ -6135,57 +6135,61 @@ if (k === "daily") {
   };
   
   const handleKindChange = (k) => {
-  setScheduleKind(k);
+  try {
+    setScheduleKind(k);
 
-  // Preserve typed values. Only "fill in" if empty/invalid.
-  const zone = userTimezone || "America/Chicago";
+    const zone = userTimezone || "America/Chicago";
+    const safeDate = date || DateTime.now().setZone(zone).toISODate(); // "YYYY-MM-DD"
 
-if (k === "daily") {
-  setDailyIntervalStr((prev) => {
-    const raw = String(prev ?? "").trim();
-    if (raw === "") return "";              // keep blank
-    const n = Number(raw);
-    return Number.isFinite(n) && n >= 1 ? String(Math.trunc(n)) : "";
-  });
-  return;
-}
+    if (k === "daily") {
+      setDailyIntervalStr((prev) => {
+        const raw = String(prev ?? "").trim();
+        if (raw === "") return "";
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 1 ? String(Math.trunc(n)) : "";
+      });
+      return;
+    }
 
-  if (k === "weekly") {
-    const chosenWeekday = DateTime.fromISO(date, { zone }).weekday % 7; // 0..6
-    setWeeklyDays((prev) => {
-      const arr = Array.isArray(prev)
-        ? prev.map(Number).filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
-        : [];
-      return arr.length ? arr : [chosenWeekday];
-    });
-    return;
+    if (k === "weekly") {
+      const chosenWeekday = DateTime.fromISO(safeDate, { zone }).weekday % 7;
+      setWeeklyDays((prev) => {
+        const arr = Array.isArray(prev)
+          ? prev.map(Number).filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
+          : [];
+        return arr.length ? arr : [chosenWeekday];
+      });
+      return;
+    }
+
+    if (k === "monthly") {
+      const fallbackDom = DateTime.fromISO(safeDate, { zone }).day;
+      setMonthlyDay((prev) => {
+        const n = Number(prev);
+        return Number.isFinite(n) && n >= 1 && n <= 31 ? Math.trunc(n) : fallbackDom;
+      });
+      return;
+    }
+
+    if (k === "yearly") {
+      const dt = DateTime.fromISO(safeDate, { zone });
+      setYearlyMonth((prev) => {
+        const n = Number(prev);
+        return Number.isFinite(n) && n >= 1 && n <= 12 ? Math.trunc(n) : dt.month;
+      });
+      setYearlyDay((prev) => {
+        const n = Number(prev);
+        return Number.isFinite(n) && n >= 1 && n <= 31 ? Math.trunc(n) : dt.day;
+      });
+      return;
+    }
+  } catch (err) {
+    tg.showAlert(
+      "KIND CHANGE CRASH:\n" +
+      (err?.message || String(err)) +
+      (err?.stack ? "\n\n" + err.stack : "")
+    );
   }
-
-  if (k === "monthly") {
-    const fallbackDom = DateTime.fromISO(date, { zone }).day;
-    setMonthlyDay((prev) => {
-      const n = Number(prev);
-      return Number.isFinite(n) && n >= 1 && n <= 31 ? Math.trunc(n) : fallbackDom;
-    });
-    return;
-  }
-
-  if (k === "yearly") {
-    const dt = DateTime.fromISO(date, { zone });
-
-    setYearlyMonth((prev) => {
-      const n = Number(prev);
-      return Number.isFinite(n) && n >= 1 && n <= 12 ? Math.trunc(n) : dt.month;
-    });
-
-    setYearlyDay((prev) => {
-      const n = Number(prev);
-      return Number.isFinite(n) && n >= 1 && n <= 31 ? Math.trunc(n) : dt.day;
-    });
-    return;
-  }
-
-  // interval/once don't need extra normalization here
 };
 
 const handleSave = async () => {
