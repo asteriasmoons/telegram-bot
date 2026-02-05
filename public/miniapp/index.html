@@ -6133,7 +6133,7 @@ if (k === "daily") {
       setDate(now.toISOString().split("T")[0]);
       setTime("09:00");
       setScheduleKind("once");
-      setDailyInterval(1);
+      setDailyIntervalStr("");
       setIntervalMinutes(30);
       setWeeklyDays([now.getDay()]);
       setMonthlyDay(now.getDate());
@@ -6159,13 +6159,15 @@ if (k === "daily") {
   // Preserve typed values. Only "fill in" if empty/invalid.
   const zone = userTimezone || "America/Chicago";
 
-  if (k === "daily") {
-    setDailyInterval((prev) => {
-      const n = Number(prev);
-      return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : 1;
-    });
-    return;
-  }
+if (k === "daily") {
+  setDailyIntervalStr((prev) => {
+    const raw = String(prev ?? "").trim();
+    if (raw === "") return "";              // keep blank
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 1 ? String(Math.trunc(n)) : "";
+  });
+  return;
+}
 
   if (k === "weekly") {
     const chosenWeekday = DateTime.fromISO(date, { zone }).weekday % 7; // 0..6
@@ -6223,7 +6225,7 @@ const handleSave = async () => {
     schedule = { kind: "once" };
 
 } else if (scheduleKind === "daily") {
-  const raw = String(dailyInterval || "").trim();
+  const raw = String(dailyIntervalStr || "").trim();
   const iv = raw === "" ? 1 : Number(raw);
 
   if (!Number.isFinite(iv) || iv < 1) {
