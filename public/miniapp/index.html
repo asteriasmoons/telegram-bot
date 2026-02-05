@@ -5979,6 +5979,18 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
         const kind = reminder.schedule?.kind || 'once';
         return `card-badge badge-${kind}`;
       };
+      
+      const getBadgeLabel = () => {
+  const s = reminder.schedule;
+  if (!s || !s.kind) return "once";
+
+  if (s.kind === "daily") {
+    const iv = Number(s.interval || 1);
+    return iv === 1 ? "daily" : "custom";
+  }
+
+  return s.kind;
+};
 
       return (
         <div className="card" onClick={() => setExpanded(!expanded)}>
@@ -5988,7 +6000,7 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
   <span>{formatDateTime(reminder.nextRunAt)}</span>
 </div>
             <span className={getBadgeClass()}>
-              {reminder.schedule?.kind || 'once'}
+              {getBadgeLabel()}
             </span>
           </div>
 
@@ -6028,6 +6040,8 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
   const [time, setTime] = React.useState("");
 
   const [scheduleKind, setScheduleKind] = React.useState(reminder?.schedule?.kind || "once");
+  // NEW: daily interval (every N days)
+const [dailyInterval, setDailyInterval] = React.useState(1);
   const [intervalMinutes, setIntervalMinutes] = React.useState(
     reminder?.schedule?.intervalMinutes || 30
   );
@@ -6055,6 +6069,14 @@ setTime(timeInputValue(d, userTimezone));
 
       const k = reminder?.schedule?.kind || "once";
       setScheduleKind(k);
+      
+      // Daily interval
+if (k === "daily") {
+  const iv = Number(reminder?.schedule?.interval);
+  setDailyInterval(Number.isFinite(iv) && iv >= 1 ? iv : 1);
+} else {
+  setDailyInterval(1);
+}
 
       // Interval
       if (k === "interval") {
@@ -6109,6 +6131,7 @@ setTime(timeInputValue(d, userTimezone));
       setDate(now.toISOString().split("T")[0]);
       setTime("09:00");
       setScheduleKind("once");
+      setDailyInterval(1);
       setIntervalMinutes(30);
       setWeeklyDays([now.getDay()]);
       setMonthlyDay(now.getDate());
@@ -6127,6 +6150,58 @@ setTime(timeInputValue(d, userTimezone));
       return Array.from(set).sort((a, b) => a - b);
     });
   };
+  
+  const handleKindChange = (k) => {
+  setScheduleKind(k);
+
+  // Preserve typed values. Only "fill in" if empty/invalid.
+  const zone = userTimezone || "America/Chicago";
+
+  if (k === "daily") {
+    setDailyInterval((prev) => {
+      const n = Number(prev);
+      return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : 1;
+    });
+    return;
+  }
+
+  if (k === "weekly") {
+    const chosenWeekday = DateTime.fromISO(date, { zone }).weekday % 7; // 0..6
+    setWeeklyDays((prev) => {
+      const arr = Array.isArray(prev)
+        ? prev.map(Number).filter((n) => Number.isFinite(n) && n >= 0 && n <= 6)
+        : [];
+      return arr.length ? arr : [chosenWeekday];
+    });
+    return;
+  }
+
+  if (k === "monthly") {
+    const fallbackDom = DateTime.fromISO(date, { zone }).day;
+    setMonthlyDay((prev) => {
+      const n = Number(prev);
+      return Number.isFinite(n) && n >= 1 && n <= 31 ? Math.trunc(n) : fallbackDom;
+    });
+    return;
+  }
+
+  if (k === "yearly") {
+    const dt = DateTime.fromISO(date, { zone });
+
+    setYearlyMonth((prev) => {
+      const n = Number(prev);
+      return Number.isFinite(n) && n >= 1 && n <= 12 ? Math.trunc(n) : dt.month;
+    });
+
+    setYearlyDay((prev) => {
+      const n = Number(prev);
+      return Number.isFinite(n) && n >= 1 && n <= 31 ? Math.trunc(n) : dt.day;
+    });
+    return;
+  }
+
+  // interval/once don't need extra normalization here
+};
 
 const handleSave = async () => {
   if (!text.trim()) {
@@ -6145,8 +6220,18 @@ const handleSave = async () => {
   if (scheduleKind === "once") {
     schedule = { kind: "once" };
 
-  } else if (scheduleKind === "daily") {
-    schedule = { kind: "daily", timeOfDay: time };
+} else if (scheduleKind === "daily") {
+  const iv = Number(dailyInterval);
+  if (!Number.isFinite(iv) || iv < 1) {
+    tg.showAlert("Daily interval must be at least 1 day.");
+    return;
+  }
+
+  schedule = {
+    kind: "daily",
+    timeOfDay: time,
+    interval: Math.trunc(iv),
+  };
 
   } else if (scheduleKind === "weekly") {
 const chosenWeekday = DateTime.fromISO(date, { zone }).weekday % 7; // 0..6 (Sun=0)
@@ -6265,7 +6350,7 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
             <select
               className="form-select"
               value={scheduleKind}
-              onChange={(e) => setScheduleKind(e.target.value)}
+              onChange={(e) => handleKindChange(e.target.value)}
             >
               <option value="once">Once</option>
               <option value="daily">Daily</option>
@@ -6275,6 +6360,32 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
               <option value="interval">Custom Interval</option>
             </select>
           </div>
+          
+          {scheduleKind === "daily" && (
+  <div className="form-group">
+    <label className="form-label">Repeat every</label>
+
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <input
+        type="number"
+        className="form-input"
+        min="1"
+        max="365"
+        value={dailyInterval}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          setDailyInterval(Number.isFinite(v) && v >= 1 ? Math.min(v, 365) : 1);
+        }}
+        style={{ width: 90 }}
+      />
+      <span style={{ color: "var(--text-secondary)" }}>days</span>
+    </div>
+
+    <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
+      Set to 1 for daily, or higher for custom spacing (e.g. every 28 days).
+    </div>
+  </div>
+)}
 
           {scheduleKind === "weekly" && (
             <div className="form-group">

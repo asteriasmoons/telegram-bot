@@ -104,6 +104,10 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
 
   const tz = String(rem.timezone || "America/Chicago");
   const nowZ = DateTime.now().setZone(tz);
+  
+    const baseZ = rem.nextRunAt
+    ? DateTime.fromJSDate(new Date(rem.nextRunAt), { zone: tz })
+    : nowZ;
 
   // -------------------------
   // interval: now + X minutes
@@ -119,7 +123,7 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   // -----------------------------------------
   const timeFromSchedule = parseTimeOfDay(sched.timeOfDay);
 
-  const timeFromNext = rem.nextRunAt ? DateTime.fromJSDate(rem.nextRunAt, { zone: tz }) : null;
+const timeFromNext = rem.nextRunAt ? DateTime.fromJSDate(new Date(rem.nextRunAt), { zone: tz }) : null;
 
   const hour = timeFromSchedule?.hour ?? (timeFromNext?.isValid ? timeFromNext.hour : 9);
   const minute = timeFromSchedule?.minute ?? (timeFromNext?.isValid ? timeFromNext.minute : 0);
@@ -129,8 +133,16 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   // -------------------------
   if (sched.kind === "daily") {
     const step = Math.max(1, Number(sched.interval || 1));
-    let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
+
+    // anchor to the last scheduled occurrence time
+    let candidate = baseZ.set({ hour, minute, second: 0, millisecond: 0 });
+
+    // move forward by the configured interval first
+    candidate = candidate.plus({ days: step });
+
+    // ensure it's in the future (in case we're behind)
     while (candidate <= nowZ) candidate = candidate.plus({ days: step });
+
     return candidate.toJSDate();
   }
 
@@ -155,7 +167,10 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
     }
 
     // Search next 7 days for next valid day at HH:mm
-    for (let i = 0; i <= 7; i++) {
+const stepWeeks = Math.max(1, Number(sched.interval || 1));
+const maxDays = 7 * stepWeeks;
+
+     for (let i = 0; i <= maxDays; i++) {  
       const day = nowZ.plus({ days: i });
       if (!targetLuxonWeekdays.has(day.weekday)) continue;
 
@@ -184,7 +199,7 @@ const anchorDay = Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromN
       return dt.set({ day: safeDay });
     };
 
-    let candidate = clampDay(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), anchorDay);
+    let candidate = clampDay(baseZ.set({ hour, minute, second: 0, millisecond: 0 }), anchorDay);
 
     while (candidate <= nowZ) {
       candidate = clampDay(candidate.plus({ months: step }), anchorDay);
@@ -211,7 +226,7 @@ const anchorDay = Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromN
       return dt.set({ day: safeDay });
     };
 
-    let candidate = nowZ.set({
+    let candidate = baseZ.set({
       month: Math.min(Math.max(1, anchorMonth), 12),
       hour,
       minute,
@@ -255,8 +270,15 @@ function computeNextForRepeat(rem: ReminderDoc | any): Date | null {
   const base = DateTime.fromJSDate(rem.nextRunAt, { zone: tz });
   if (!base.isValid) return null;
 
-  if (sched.kind === "daily") return base.plus({ days: 1 }).toJSDate();
-  if (sched.kind === "weekly") return base.plus({ weeks: 1 }).toJSDate();
+  if (sched.kind === "daily") {
+    const step = Math.max(1, Number(sched.interval || 1));
+    return base.plus({ days: step }).toJSDate();
+  }
+
+  if (sched.kind === "weekly") {
+    const step = Math.max(1, Number(sched.interval || 1));
+    return base.plus({ weeks: step }).toJSDate();
+  }
 
   // For monthly/yearly, Luxon version above should handle it; keep null here as a true fallback.
   return null;

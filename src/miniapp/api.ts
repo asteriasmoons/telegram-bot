@@ -226,6 +226,22 @@ if (!text || !nextRunAt) {
     // Use timezone from request if provided, otherwise fall back to saved user settings
 const tz = String(timezone || settings.timezone || "America/Chicago").trim();
 
+// ✅ validate schedule.interval for daily on create too
+if (schedule?.kind === "daily") {
+  if (!schedule.timeOfDay || !String(schedule.timeOfDay).includes(":")) {
+    return res.status(400).json({ error: "Missing schedule.timeOfDay for daily reminders" });
+  }
+
+  const ivRaw = schedule.interval;
+  const iv = ivRaw === undefined ? 1 : Number(ivRaw);
+
+  if (!Number.isFinite(iv) || iv < 1 || iv > 365) {
+    return res.status(400).json({ error: "Missing/invalid schedule.interval for daily reminders" });
+  }
+
+  schedule.interval = Math.trunc(iv);
+}
+
     const reminder = await Reminder.create({
       userId: req.userId,
       chatId: settings.dmChatId,
@@ -262,13 +278,28 @@ if (schedule !== undefined) {
   const kind = schedule?.kind || "once";
 
   // Validate timeOfDay for recurring kinds that use it
-  if (kind === "daily" || kind === "weekly" || kind === "monthly") {
-    if (!schedule.timeOfDay || !String(schedule.timeOfDay).includes(":")) {
-      return res
-        .status(400)
-        .json({ error: "Missing schedule.timeOfDay for recurring reminders" });
-    }
+// Validate timeOfDay for recurring kinds that use it
+if (kind === "daily" || kind === "weekly" || kind === "monthly") {
+  if (!schedule.timeOfDay || !String(schedule.timeOfDay).includes(":")) {
+    return res
+      .status(400)
+      .json({ error: "Missing schedule.timeOfDay for recurring reminders" });
   }
+}
+
+// ✅ daily interval support (every N days)
+if (kind === "daily") {
+  const ivRaw = schedule.interval;
+  const iv = ivRaw === undefined ? 1 : Number(ivRaw);
+
+  if (!Number.isFinite(iv) || iv < 1 || iv > 365) {
+    return res.status(400).json({
+      error: "Missing/invalid schedule.interval for daily reminders",
+    });
+  }
+
+  schedule.interval = Math.trunc(iv);
+}
 
   if (kind === "weekly") {
     if (!Array.isArray(schedule.daysOfWeek) || schedule.daysOfWeek.length === 0) {
@@ -376,11 +407,19 @@ const minute = Number(mRaw);
 
 if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
 
-  if (schedule.kind === "daily") {
-    let candidate = from.set({ hour, minute, second: 0, millisecond: 0 });
-    if (candidate <= from) candidate = candidate.plus({ days: 1 });
-    return candidate.toJSDate();
+if (schedule.kind === "daily") {
+const raw = Number(schedule.interval);
+const step = Number.isFinite(raw) && raw >= 1 ? Math.trunc(raw) : 1;
+
+  let candidate = from.set({ hour, minute, second: 0, millisecond: 0 });
+
+  // advance by N days until it's in the future
+  while (candidate <= from) {
+    candidate = candidate.plus({ days: step });
   }
+
+  return candidate.toJSDate();
+}
 
   if (schedule.kind === "weekly") {
     const days: number[] = Array.isArray(schedule.daysOfWeek) ? schedule.daysOfWeek : [];
@@ -433,7 +472,7 @@ if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
     return null;
 }
 
-// POST /api/miniapp/reminders/:id/done - Mark as done
+
 // POST /api/miniapp/reminders/:id/done - Mark as done (and reschedule recurring)
 router.post("/reminders/:id/done", async (req, res) => {
   try {
