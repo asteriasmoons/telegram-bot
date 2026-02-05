@@ -2499,36 +2499,17 @@ if (!isTelegram) {
 tg.ready();
 tg.expand();
 
-// ---- GLOBAL ERROR SURFACE (put at VERY TOP of your main script) ----
-(function attachGlobalErrorOverlay() {
-  function show(msg) {
-    try {
-      if (window.Telegram?.WebApp?.showAlert) window.Telegram.WebApp.showAlert(msg);
-    } catch {}
-    console.error(msg);
-  }
+window.addEventListener("error", (e) => {
+  try {
+    tg?.showAlert?.(`JS Error: ${e.message}`);
+  } catch {}
+});
 
-  window.addEventListener("error", (e) => {
-    const message = e?.message || "Unknown error";
-    const file = e?.filename || "(no file)";
-    const line = e?.lineno ?? "?";
-    const col = e?.colno ?? "?";
-    const stack = e?.error?.stack ? `\n\n${e.error.stack}` : "";
-    show(`JS ERROR:\n${message}\n${file}:${line}:${col}${stack}`);
-  });
-
-  window.addEventListener("unhandledrejection", (e) => {
-    const reason = e?.reason;
-    const msg =
-      typeof reason === "string"
-        ? reason
-        : reason?.message
-        ? reason.message
-        : JSON.stringify(reason);
-    const stack = reason?.stack ? `\n\n${reason.stack}` : "";
-    show(`PROMISE REJECTION:\n${msg}${stack}`);
-  });
-})();
+window.addEventListener("unhandledrejection", (e) => {
+  try {
+    tg?.showAlert?.(`Promise Error: ${String(e.reason?.message || e.reason)}`);
+  } catch {}
+});
 
 // --- Telegram real viewport height fix (standalone fullscreen vs chat sheet) ---
 function syncTelegramViewportHeight() {
@@ -6225,7 +6206,9 @@ const handleSave = async () => {
     schedule = { kind: "once" };
 
 } else if (scheduleKind === "daily") {
-  const raw = String(dailyIntervalStr || "").trim();
+  const raw = String(dailyIntervalStr ?? "").trim();
+
+  // allow blank in UI; treat blank as 1 when saving
   const iv = raw === "" ? 1 : Number(raw);
 
   if (!Number.isFinite(iv) || iv < 1) {
