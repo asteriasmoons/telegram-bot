@@ -2478,24 +2478,32 @@ img {
 }
 
 /* === Reminder card time alignment override === */
-.card-header .card-time {
-  display: flex !important;
+/* === Fix reminder clock icon alignment === */
+
+/* The row that contains the icon + "Tomorrow at ..." text */
+.card-time {
+  display: inline-flex !important;
   align-items: center !important;
-  gap: 10px !important;
-  line-height: 1 !important;
+  gap: 10px !important;      /* spacing between icon and text */
+  line-height: 1.2 !important;
 }
 
-/* Clock icon fix */
-.card-header .card-time img,
-.card-header .card-time svg {
-  width: 16px !important;
-  height: 16px !important;
-  display: block !important;
-  flex-shrink: 0 !important;
+/* If the clock is an <img src="/icons/alarm.svg"> */
+.card-time img {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;     /* kills baseline weirdness */
+  flex: 0 0 auto !important;
   margin: 0 !important;
+}
 
-  /* optical alignment tweak */
-  transform: translateY(1px);
+/* If the clock is an inline <svg> */
+.card-time svg {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;     /* kills baseline weirdness */
+  flex: 0 0 auto !important;
+  margin: 0 !important;
 }
 </style>
 </head>
