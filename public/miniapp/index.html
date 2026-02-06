@@ -2722,6 +2722,30 @@ img {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+
+/* --- Reading card: author line --- */
+.card-author {
+  display: flex;
+  align-items: center;        /* baseline-safe */
+  gap: 6px;
+
+  font-size: 0.9rem;
+  line-height: 1.3;           /* enough for descenders */
+  color: var(--text-secondary);
+
+  overflow: visible;          /* prevent clipping */
+}
+
+.card-author img {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.card-author span {
+  line-height: 1.3;
+}
 </style>
 </head>
 
@@ -4619,7 +4643,7 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
           </div>
 
           {author && (
-            <div className="card-time">
+            <div className="card-author">
               <img src="/icons/user.svg" alt="" />
               <span>{author}</span>
             </div>
