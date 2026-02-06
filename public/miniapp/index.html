@@ -2564,6 +2564,103 @@ img {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* --- Fine-tune card time alignment --- */
+
+/* Icon should align with the text line, not the whole block */
+.card-time-icon{
+  grid-row: 1;              /* ONLY first row now */
+  align-self: center;       /* center on the Tomorrow line */
+}
+
+/* Slightly reduce "Today / Tomorrow" text size */
+.card-time-text{
+  font-size: 14.5px;        /* was 15px -- subtle but noticeable */
+  line-height: 1.15;
+}
+
+/* Optional: tiny nudge if you want the icon optically perfect */
+.card-time-icon img{
+  position: relative;
+  top: 1px;                 /* optical alignment tweak */
+}
+
+/* --- Reading card: author should NOT wrap to two lines --- */
+
+/* If your reading card uses a meta row, force it to behave */
+.reading-card .book-meta,
+.reading-card .book-author-row,
+.reading-card .book-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+/* Make sure the text area can shrink (needed for ellipsis in flex) */
+.reading-card .book-author,
+.reading-card .book-author-text {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Prevent wrapping + use ellipsis */
+.reading-card .book-author-text,
+.reading-card .book-author span,
+.reading-card .book-author {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ================================
+   Journal cards: stop date wrapping
+   ================================ */
+
+/* Target the date row + common variations */
+.journal-card .card-date-row,
+.journal-card .entry-date-row,
+.journal-card .card-date,
+.journal-card .entry-date,
+.card .card-date-row,
+.card .entry-date-row,
+.card .card-date,
+.card .entry-date {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;     /* IMPORTANT: never wrap onto 2 lines */
+  min-width: 0;          /* IMPORTANT: allows ellipsis inside flex */
+}
+
+/* Date text itself */
+.journal-card .card-date span,
+.journal-card .entry-date span,
+.card .card-date span,
+.card .entry-date span {
+  white-space: nowrap;   /* keep "Jan 31, 2026" on one line */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* If your date is just text without a span */
+.journal-card .card-date,
+.journal-card .entry-date,
+.card .card-date,
+.card .entry-date {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* If there’s a little calendar icon next to the date, keep it from stretching */
+.journal-card .card-date-row img,
+.journal-card .entry-date-row img,
+.card .card-date-row img,
+.card .entry-date-row img {
+  flex: 0 0 auto;
+}
 </style>
 </head>
 
