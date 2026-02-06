@@ -95,9 +95,6 @@ const ReminderScheduleSchema = new Schema<ReminderSchedule>(
     
     timesOfDay: { type: [String], required: false, default: [] },
     
-    runDayKey: { type: String, required: false },
-    sentTimesOfDay: { type: [String], required: false, default: [] },
-    
     interval: { type: Number, required: false, min: 1, default: 1 },
 
     // weekly only
@@ -143,6 +140,9 @@ status: {
 },
 
 nextRunAt: { type: Date, required: true, index: true },
+
+runDayKey: { type: String, required: false },
+sentTimesOfDay: { type: [String], required: false, default: [] },
 
 schedule: { type: ReminderScheduleSchema, required: false },
 

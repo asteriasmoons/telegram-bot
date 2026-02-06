@@ -93,16 +93,16 @@ function parseTimeOfDay(timeOfDay?: string): { hour: number; minute: number } | 
 }
 
 function normalizeTimesOfDay(schedule: any): string[] {
-  const raw =
+  const raw: unknown[] =
     Array.isArray(schedule?.timesOfDay) && schedule.timesOfDay.length
       ? schedule.timesOfDay
-      : schedule?.timeOfDay
+      : typeof schedule?.timeOfDay === "string"
         ? [schedule.timeOfDay]
         : [];
 
   const times = raw
-    .map((t: any) => String(t || "").trim())
-    .filter((t: string) => /^\d{2}:\d{2}$/.test(t));
+    .map((t) => String(t ?? "").trim())
+    .filter((t) => /^\d{2}:\d{2}$/.test(t));
 
   const uniq = Array.from(new Set(times));
   uniq.sort((a, b) => a.localeCompare(b));
