@@ -462,12 +462,10 @@ body::after {
 
 /* keep your existing card-time, but make it wrap cleanly if you have multiple pills */
 .card-time {
-  font-size: 13px;
-  color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;       /* ✅ lets time chips sit nicely */
+  gap: 8px;               /* 👈 this is the key fix */
+  line-height: 1;
 }
 
 .card-times-inline {
