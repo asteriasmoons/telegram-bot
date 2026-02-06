@@ -2713,10 +2713,8 @@ img {
 }
 
 .card-time-text {
-  font-size: 13px;       /* "down by a hair" */
+  font-size: 13px;
   line-height: 1.2;
-  white-space: nowrap;
-  min-width: 0;
 }
 
 /* Drop the times under the Tomorrow text and align them with the text start */
@@ -2725,8 +2723,6 @@ img {
   display: flex;
   gap: 8px;
   margin-top: 6px;
-
-  /* indent to start under the text (icon width + gap) */
   margin-left: 24px;
 }
 
@@ -2735,14 +2731,11 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   padding: 4px 10px;
   border-radius: 999px;
-
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
-
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: var(--text-secondary);
