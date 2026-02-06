@@ -6182,7 +6182,6 @@ if (k === "daily") {
       }
       
             // Prefill yearly anchors (fallback to nextRunAt month/day)
-      const sched = reminder?.schedule;
       if (sched?.kind === "yearly") {
         const m = Number(sched.anchorMonth);
         const day = Number(sched.anchorDay);
