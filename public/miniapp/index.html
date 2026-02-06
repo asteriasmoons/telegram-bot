@@ -2477,53 +2477,92 @@ img {
   justify-content: center;
 }
 
-/* --- Reminder card time row alignment (override) --- */
-.card .card-time-row {
+/* ============================
+   Reminder card time row overrides
+   (PUT AT BOTTOM OF CSS)
+   ============================ */
+
+.card-header{
   display: flex;
-  align-items: center;            /* vertically align icon + text + chips */
-  gap: 10px;                      /* space between icon and "Tomorrow..." */
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-/* icon wrapper makes SVG predictable */
-.card .card-time-row .card-time-icon {
+/* Turn the left side into a 2-row grid:
+   row 1 = icon + "Tomorrow at ..."
+   row 2 = time chips under the text
+*/
+.card-time-row{
+  display: grid;
+  grid-template-columns: 18px 1fr;  /* icon col + text col */
+  grid-template-rows: auto auto;    /* text row + chips row */
+  column-gap: 10px;
+  row-gap: 6px;                     /* space between Tomorrow line and chips */
+  align-items: center;
+  min-width: 0;                     /* prevent overflow weirdness */
+}
+
+/* Icon sits on the left and spans both rows */
+.card-time-icon{
+  grid-column: 1;
+  grid-row: 1 / 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
+  width: 18px;
+  height: 18px;
 }
 
-/* make the svg behave */
-.card .card-time-row .card-time-icon img {
-  width: 100%;
-  height: 100%;
-  display: block;                 /* kills baseline weirdness */
+.card-time-icon img{
+  width: 16px;     /* keep it slightly smaller than its box */
+  height: 16px;
+  display: block;
   opacity: 0.9;
 }
 
-/* time text */
-.card .card-time-row .card-time-text {
-  line-height: 1.2;
+/* "Tomorrow at 11:40 AM" smaller + nicer alignment */
+.card-time-text{
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 15px;     /* shrink this (adjust to taste: 14–15) */
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  margin: 0;
+  padding: 0;
 }
 
-/* keep the chips inline and nicely aligned with the row */
-.card .card-time-row .card-times-inline {
-  display: inline-flex;
+/* Chips UNDER the Tomorrow line */
+.card-times-inline{
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
-  gap: 6px;
-  margin-left: 6px;               /* small breathing room after "Tomorrow..." */
+  margin: 0;
+  padding: 0;
 }
 
-/* make time chips feel like pills again */
-.card .card-time-row .time-chip {
+/* Transparent "ghost pill" like the badge vibe */
+.time-chip{
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   padding: 4px 10px;
   border-radius: 999px;
+
+  font-size: 13px;
   line-height: 1;
-  font-size: 12px;
-  white-space: nowrap;
+  font-weight: 600;
+
+  color: rgba(255, 255, 255, 0.78);
+
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 </style>
 </head>
