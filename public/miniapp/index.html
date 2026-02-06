@@ -6277,6 +6277,21 @@ const getAllTimes = () => {
   ).sort();
 };
 
+function formatTime12h(hhmm) {
+  if (!hhmm || !hhmm.includes(":")) return hhmm;
+
+  const [hRaw, mRaw] = hhmm.split(":");
+  let h = Number(hRaw);
+  const m = mRaw;
+
+  if (!Number.isFinite(h)) return hhmm;
+
+  const suffix = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+
+  return `${h}:${m} ${suffix}`;
+}
+
       return (
         <div className="card" onClick={() => setExpanded(!expanded)}>
 <div className="card-header">
@@ -6290,8 +6305,10 @@ const getAllTimes = () => {
     {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
       <div className="card-times-inline">
         {getAllTimes().map((t) => (
-          <span key={t} className="time-chip">{t}</span>
-        ))}
+  <span key={t} className="time-chip">
+    {formatTime12h(t)}
+  </span>
+))}
       </div>
     )}
   </div>
