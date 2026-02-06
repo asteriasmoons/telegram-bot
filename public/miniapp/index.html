@@ -6027,22 +6027,23 @@ const getAllTimes = () => {
       return (
         <div className="card" onClick={() => setExpanded(!expanded)}>
           <div className="card-header">
-            <div className="card-time">
-  <img src="/icons/alarm.svg" alt="" />
-  <span>{formatDateTime(reminder.nextRunAt)}</span>
-</div>
+  <div className="card-time-row">
+    <img src="/icons/alarm.svg" alt="" />
+    <span>{formatDateTime(reminder.nextRunAt)}</span>
 
-{["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
-  <div className="card-times">
-    {getAllTimes().map((t) => (
-      <span key={t} className="time-chip">{t}</span>
-    ))}
+    {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
+      <div className="card-times-inline">
+        {getAllTimes().map((t) => (
+          <span key={t} className="time-chip">{t}</span>
+        ))}
+      </div>
+    )}
   </div>
-)}
-            <span className={getBadgeClass()}>
-              {getBadgeLabel()}
-            </span>
-          </div>
+
+  <span className={getBadgeClass()}>
+    {getBadgeLabel()}
+  </span>
+</div>
 
           <div className="card-text">{reminder.text}</div>
 
