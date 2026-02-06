@@ -454,18 +454,45 @@ body::after {
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;   /* ✅ this is the fix */
   gap: 12px;
   margin-bottom: 12px;
   overflow: visible;
 }
 
+/* keep your existing card-time, but make it wrap cleanly if you have multiple pills */
 .card-time {
   font-size: 13px;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;       /* ✅ lets time chips sit nicely */
+}
+
+.card-times-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-time-pill {
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.card-time img {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;           /* kills baseline weirdness */
+  opacity: 0.9;             /* optional: makes it match your muted text */
+  transform: translateY(1px); /* optical alignment (tweak 0–2px) */
 }
 
 .card-badge {
