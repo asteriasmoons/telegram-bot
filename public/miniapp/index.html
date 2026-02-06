@@ -2451,6 +2451,23 @@ img {
   align-items: center;
   justify-content: center;
 }
+
+.card-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.time-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text-secondary);
+}
 </style>
 </head>
 
@@ -5986,6 +6003,27 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
   return s.kind;
 };
 
+const getAllTimes = () => {
+  const s = reminder.schedule;
+  if (!s) return [];
+
+  const raw =
+    Array.isArray(s.timesOfDay) && s.timesOfDay.length
+      ? s.timesOfDay
+      : s.timeOfDay
+        ? [s.timeOfDay]
+        : [];
+
+  // keep only valid "HH:mm", unique, sorted
+  return Array.from(
+    new Set(
+      raw
+        .map((t) => String(t || "").trim())
+        .filter((t) => /^\d{2}:\d{2}$/.test(t))
+    )
+  ).sort();
+};
+
       return (
         <div className="card" onClick={() => setExpanded(!expanded)}>
           <div className="card-header">
@@ -5993,6 +6031,19 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
   <img src="/icons/alarm.svg" alt="" />
   <span>{formatDateTime(reminder.nextRunAt)}</span>
 </div>
+
+<div className="card-time">
+  <img src="/icons/alarm.svg" alt="" />
+  <span>{formatDateTime(reminder.nextRunAt)}</span>
+</div>
+
+{["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
+  <div className="card-times">
+    {getAllTimes().map((t) => (
+      <span key={t} className="time-chip">{t}</span>
+    ))}
+  </div>
+)}
             <span className={getBadgeClass()}>
               {getBadgeLabel()}
             </span>
