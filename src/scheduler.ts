@@ -92,6 +92,131 @@ function parseTimeOfDay(timeOfDay?: string): { hour: number; minute: number } | 
   return { hour: hh, minute: mm };
 }
 
+function normalizeTimesOfDay(schedule: any): string[] {
+  const raw =
+    Array.isArray(schedule?.timesOfDay) && schedule.timesOfDay.length
+      ? schedule.timesOfDay
+      : schedule?.timeOfDay
+        ? [schedule.timeOfDay]
+        : [];
+
+  const times = raw
+    .map((t: any) => String(t || "").trim())
+    .filter((t: string) => /^\d{2}:\d{2}$/.test(t));
+
+  const uniq = Array.from(new Set(times));
+  uniq.sort((a, b) => a.localeCompare(b));
+  return uniq;
+}
+
+function dateTimeForDayAndTime(dayStart: DateTime, hhmm: string): DateTime | null {
+  const parsed = parseTimeOfDay(hhmm);
+  if (!parsed) return null;
+  return dayStart.set({ hour: parsed.hour, minute: parsed.minute, second: 0, millisecond: 0 });
+}
+
+function nextOccurrenceDay(rem: any, tz: string, fromDayStart: DateTime): DateTime | null {
+  const sched = rem?.schedule;
+  if (!sched || sched.kind === "once" || sched.kind === "interval") return null;
+
+  const kind = sched.kind;
+  const from = fromDayStart.setZone(tz).startOf("day");
+
+  if (kind === "daily") {
+    const step = Math.max(1, Number(sched.interval || 1));
+    return from.plus({ days: step });
+  }
+
+  if (kind === "weekly") {
+    const days: number[] = Array.isArray(sched.daysOfWeek) ? sched.daysOfWeek : [];
+    const target = new Set(
+      days
+        .map(Number)
+        .filter((d) => Number.isFinite(d) && d >= 0 && d <= 6)
+        .map((d) => (d === 0 ? 7 : d)) // Sun(0)->7
+    );
+    if (target.size === 0) target.add(from.weekday);
+
+    // look forward 1..14 days (covers gaps)
+    for (let i = 1; i <= 14; i++) {
+      const d = from.plus({ days: i });
+      if (target.has(d.weekday)) return d;
+    }
+    return from.plus({ days: 7 });
+  }
+
+  if (kind === "monthly") {
+    const step = Math.max(1, Number(sched.interval || 1));
+
+    const desiredDom = Number(sched.dayOfMonth) || from.day;
+
+    const clampDay = (dt: DateTime, dayNum: number) => {
+      const dim = dt.daysInMonth ?? 31;
+      const safeDay = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safeDay });
+    };
+
+    // next month interval from "from"
+    const base = from.plus({ months: step }).startOf("month");
+    return clampDay(base, desiredDom);
+  }
+
+  if (kind === "yearly") {
+    const step = Math.max(1, Number(sched.interval || 1));
+
+    const anchorMonth = Number(sched.anchorMonth) || from.month;
+    const anchorDay = Number(sched.anchorDay) || from.day;
+
+    const clampDay = (dt: DateTime, dayNum: number) => {
+      const dim = dt.daysInMonth ?? 31;
+      const safeDay = Math.min(Math.max(1, dayNum), dim);
+      return dt.set({ day: safeDay });
+    };
+
+    let base = from.plus({ years: step }).set({
+      month: Math.min(Math.max(1, anchorMonth), 12),
+    });
+
+    base = base.startOf("month");
+    base = clampDay(base, anchorDay);
+
+    return base;
+  }
+
+  return null;
+}
+
+function computeNextRunAtWithTimes(rem: any, fromDate: Date): Date | null {
+  const sched = rem?.schedule;
+  if (!sched || sched.kind === "once") return null;
+
+  const tz = String(rem.timezone || "America/Chicago");
+  const fromZ = DateTime.fromJSDate(fromDate, { zone: tz });
+
+  if (sched.kind === "interval") {
+    const mins = Number(sched.intervalMinutes);
+    if (!Number.isFinite(mins) || mins <= 0) return null;
+    return fromZ.plus({ minutes: mins }).toJSDate();
+  }
+
+  const times = normalizeTimesOfDay(sched);
+  if (!times.length) return null;
+
+  // 1) later times today
+  const todayStart = fromZ.startOf("day");
+  for (const t of times) {
+    const cand = dateTimeForDayAndTime(todayStart, t);
+    if (cand && cand > fromZ) return cand.toJSDate();
+  }
+
+  // 2) day finished -> next occurrence day -> earliest time
+  const nextDay = nextOccurrenceDay(rem, tz, todayStart);
+  if (!nextDay) return null;
+
+  const first = dateTimeForDayAndTime(nextDay.startOf("day"), times[0]);
+  return first ? first.toJSDate() : null;
+}
+
 /**
  * Timezone-accurate next-run computation for repeating reminders.
  * - interval: now + intervalMinutes
@@ -376,9 +501,7 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
 
       // If repeating, advance to next occurrence and keep it scheduled
       if (kind !== "once") {
-        const nextLuxon = computeNextForRepeatLuxon(rem);
-        const nextFallback = nextLuxon ? null : computeNextForRepeat(rem as any);
-        const nextRunAt = nextLuxon || nextFallback;
+        const nextRunAt = computeNextRunAtWithTimes(rem, new Date());
 
         if (nextRunAt) {
           await Reminder.updateOne(
@@ -545,9 +668,7 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
           await sendReminder(bot, rem);
 
           // Prefer Luxon recurrence (timezone-accurate)
-          const nextForRepeatLuxon = computeNextForRepeatLuxon(rem);
-          const nextForRepeatFallback = nextForRepeatLuxon ? null : computeNextForRepeat(rem);
-          const nextForRepeat = nextForRepeatLuxon || nextForRepeatFallback;
+          const nextForRepeat = computeNextRunAtWithTimes(rem, now());
 
           if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
             await Reminder.updateOne(

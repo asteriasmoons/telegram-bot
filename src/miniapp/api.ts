@@ -59,6 +59,23 @@ async function countNonDeletedReminders(userId: number) {
   });
 }
 
+function normalizeTimesOfDay(schedule: any): string[] {
+  const raw =
+    Array.isArray(schedule?.timesOfDay) && schedule.timesOfDay.length
+      ? schedule.timesOfDay
+      : schedule?.timeOfDay
+        ? [schedule.timeOfDay]
+        : [];
+
+  const times = raw
+    .map((t: any) => String(t || "").trim())
+    .filter((t: string) => /^\d{2}:\d{2}$/.test(t));
+
+  const uniq = Array.from(new Set(times));
+  uniq.sort((a, b) => a.localeCompare(b));
+  return uniq;
+}
+
 // Middleware to validate Telegram Mini App init data
 function validateTelegramWebAppData(initData: string, botToken: string): number | null {
   const urlParams = new URLSearchParams(initData);
@@ -183,6 +200,16 @@ router.post("/reminders", async (req, res) => {
   try {
 const { text, nextRunAt, schedule, timezone } = req.body;
 
+    // ✅ normalize recurring times
+    if (schedule && ["daily", "weekly", "monthly", "yearly"].includes(schedule.kind)) {
+      const times = normalizeTimesOfDay(schedule);
+      if (!times.length) {
+        return res.status(400).json({ error: "Missing schedule.timesOfDay for recurring reminders" });
+      }
+      schedule.timesOfDay = times;
+      schedule.timeOfDay = schedule.timeOfDay || times[0]; // keep legacy compatibility
+    }
+
 if (!text || !nextRunAt) {
   return res.status(400).json({ error: "Missing required fields" });
 }
@@ -276,6 +303,16 @@ if (nextRunAt !== undefined) {
 }
 if (schedule !== undefined) {
   const kind = schedule?.kind || "once";
+  
+    // ✅ normalize recurring times
+  if (["daily", "weekly", "monthly", "yearly"].includes(kind)) {
+    const times = normalizeTimesOfDay(schedule);
+    if (!times.length) {
+      return res.status(400).json({ error: "Missing schedule.timesOfDay for recurring reminders" });
+    }
+    schedule.timesOfDay = times;
+    schedule.timeOfDay = schedule.timeOfDay || times[0];
+  }
 
   // Validate timeOfDay for recurring kinds that use it
 // Validate timeOfDay for recurring kinds that use it

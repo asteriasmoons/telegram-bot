@@ -6019,6 +6019,7 @@ function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
   const [text, setText] = React.useState(reminder?.text || "");
   const [date, setDate] = React.useState("");
   const [time, setTime] = React.useState("");
+  const [timesOfDay, setTimesOfDay] = React.useState([]); // ["09:00","14:30"]
 
   const [scheduleKind, setScheduleKind] = React.useState(reminder?.schedule?.kind || "once");
   // NEW: daily interval (every N days)
@@ -6047,6 +6048,15 @@ const [dailyIntervalStr, setDailyIntervalStr] = React.useState("");
       const d = new Date(reminder.nextRunAt);
 setDate(dateInputValue(d, userTimezone));
 setTime(timeInputValue(d, userTimezone));
+const sched = reminder?.schedule;
+const initialTimes =
+  Array.isArray(sched?.timesOfDay) && sched.timesOfDay.length
+    ? sched.timesOfDay
+    : sched?.timeOfDay
+      ? [sched.timeOfDay]
+      : [timeInputValue(new Date(reminder.nextRunAt), userTimezone)];
+
+setTimesOfDay(Array.from(new Set(initialTimes.map(String))).sort());
 
       const k = reminder?.schedule?.kind || "once";
       setScheduleKind(k);
@@ -6113,6 +6123,7 @@ if (k === "daily") {
       const now = new Date();
       setDate(now.toISOString().split("T")[0]);
       setTime("09:00");
+      setTimesOfDay(["09:00"]);
       setScheduleKind("once");
       setDailyIntervalStr("");
       setIntervalMinutes(30);
@@ -6203,6 +6214,18 @@ const handleSave = async () => {
   // Build a UTC ISO timestamp from the chosen local date+time.
   // Schedule determines repeats after the first run.
   const nextRunAt = DateTime.fromISO(`${date}T${time}`, { zone }).toUTC().toISO();
+  
+  const cleanedTimes = Array.from(
+  new Set((timesOfDay || [])
+    .map(t => String(t || "").trim())
+    .filter(t => /^\d{2}:\d{2}$/.test(t))
+  )
+).sort();
+
+if (["daily","weekly","monthly","yearly"].includes(scheduleKind) && cleanedTimes.length === 0) {
+  tg.showAlert("Please add at least one time.");
+  return;
+}
 
   let schedule;
 
@@ -6222,7 +6245,8 @@ const handleSave = async () => {
 
   schedule = {
     kind: "daily",
-    timeOfDay: time,
+    timesOfDay: cleanedTimes,
+    timeOfDay: cleanedTimes[0],
     interval: Math.trunc(iv),
   };
 
@@ -6236,7 +6260,8 @@ const chosenWeekday = DateTime.fromISO(date, { zone }).weekday % 7; // 0..6 (Sun
 
     schedule = {
       kind: "weekly",
-      timeOfDay: time,
+      timesOfDay: cleanedTimes,
+      timeOfDay: cleanedTimes[0],
       daysOfWeek: days.length ? Array.from(new Set(days)) : [chosenWeekday],
     };
 
@@ -6250,7 +6275,8 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
 
     schedule = {
       kind: "monthly",
-      timeOfDay: time,
+      timesOfDay: cleanedTimes,
+      timeOfDay: cleanedTimes[0],
       dayOfMonth: normalizedDom, // matches your API
     };
 
@@ -6269,7 +6295,8 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
 
     schedule = {
       kind: "yearly",
-      timeOfDay: time,
+      timesOfDay: cleanedTimes,
+      timeOfDay: cleanedTimes[0],
       anchorMonth: m,
       anchorDay: day,
     };
@@ -6337,6 +6364,52 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
               />
             </div>
           </div>
+          
+          {["daily", "weekly", "monthly", "yearly"].includes(scheduleKind) && (
+  <div className="form-group">
+    <label className="form-label">Extra times</label>
+
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {timesOfDay.map((t, idx) => (
+        <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="time"
+            className="form-input"
+            value={t}
+            onChange={(e) => {
+              const v = e.target.value;
+              setTimesOfDay((prev) => {
+                const copy = [...prev];
+                copy[idx] = v;
+                return Array.from(new Set(copy.filter(Boolean))).sort();
+              });
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => setTimesOfDay((prev) => prev.filter((_, i) => i !== idx))}
+            disabled={timesOfDay.length <= 1}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={() => setTimesOfDay((prev) => Array.from(new Set([...prev, "09:00"])).sort())}
+      >
+        Add time
+      </button>
+    </div>
+
+    <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
+      These are additional fire times for the same reminder on its scheduled days.
+    </div>
+  </div>
+)}
 
           <div className="form-group">
             <label className="form-label">Repeat</label>

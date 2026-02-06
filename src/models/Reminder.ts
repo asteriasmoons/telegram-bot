@@ -9,6 +9,9 @@ export type ReminderSchedule = {
 
   // For daily/weekly/monthly/yearly schedules
   timeOfDay?: string;       // "HH:mm" 24-hour, user-local time
+  
+  timesOfDay?: string[];
+  
   interval?: number;        // every X days/weeks/months/years (>= 1)
 
   // Weekly only
@@ -57,6 +60,9 @@ text: string;
 // NEW: preserve Telegram entities so custom emojis survive DB storage.
 entities?: TgEntity[];
 
+runDayKey?: string;       // e.g. "2026-02-05" in the reminder's timezone
+sentTimesOfDay?: string[]; // e.g. ["09:00","14:00"]
+
 status: ReminderStatus;
 
 // Scheduler field
@@ -86,6 +92,12 @@ const ReminderScheduleSchema = new Schema<ReminderSchedule>(
 
     // for daily/weekly/monthly/yearly
     timeOfDay: { type: String, required: false }, // "HH:mm"
+    
+    timesOfDay: { type: [String], required: false, default: [] },
+    
+    runDayKey: { type: String, required: false },
+    sentTimesOfDay: { type: [String], required: false, default: [] },
+    
     interval: { type: Number, required: false, min: 1, default: 1 },
 
     // weekly only
