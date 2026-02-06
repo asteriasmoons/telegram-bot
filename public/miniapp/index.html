@@ -2458,13 +2458,26 @@ img {
   <div id="root"></div>
 
   <script type="text/babel">
-  window.onerror = function (message, source, lineno, colno, error) {
-  alert(
-    "ERROR:\n" +
-    message + "\n" +
-    "Line: " + lineno + "\n" +
-    "Col: " + colno
-  );
+window.onerror = function (message, source, lineno, colno, error) {
+  try {
+    const msg =
+      "JS ERROR:\n" +
+      String(message) +
+      "\n\n" +
+      "Line: " + lineno + ":" + colno;
+    if (window.Telegram?.WebApp?.showAlert) Telegram.WebApp.showAlert(msg);
+    else alert(msg);
+  } catch (e) {}
+};
+
+window.onunhandledrejection = function (event) {
+  try {
+    const msg =
+      "PROMISE ERROR:\n" +
+      String(event?.reason?.message || event?.reason || "Unknown");
+    if (window.Telegram?.WebApp?.showAlert) Telegram.WebApp.showAlert(msg);
+    else alert(msg);
+  } catch (e) {}
 };
     const { useState, useEffect, useRef } = React;
     const { DateTime } = luxon;
