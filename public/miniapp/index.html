@@ -2654,6 +2654,101 @@ img {
 .card .entry-date-row img {
   flex: 0 0 auto;
 }
+
+/* =========================================
+   OVERRIDES -- Card meta rows (Reminders/Journal/Reading)
+   Paste at BOTTOM of CSS
+   ========================================= */
+
+/* 1) Stop the date/author from breaking onto multiple lines (Journal + Reading)
+   Also add ellipsis safety so it stays clean if space is tight. */
+.card-time {
+  min-width: 0; /* allows ellipsis inside flex */
+}
+
+.card-time span {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;       /* THIS fixes the two-line date/author */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Make sure the icon itself doesn't affect baseline weirdly */
+.card-time img {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+}
+
+/* 2) Your ReminderCard header layout (targets your real class: card-time-row)
+   - icon aligned with "Tomorrow"
+   - "Tomorrow..." slightly smaller
+   - extra times render UNDER the Tomorrow line
+   - chips look like translucent pills */
+.card-time-row {
+  display: flex;
+  align-items: flex-start; /* top-align icon with first line of text */
+  gap: 8px;
+  flex-wrap: wrap;         /* lets chips drop below */
+  min-width: 0;
+}
+
+.card-time-icon {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 16px;             /* keeps alignment consistent */
+  height: 16px;
+  margin-top: 2px;         /* tiny nudge to sit perfectly with text */
+  flex: 0 0 16px;
+}
+
+.card-time-icon img {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.card-time-text {
+  font-size: 12.5px;       /* "down by a hair" */
+  line-height: 1.2;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Drop the times under the Tomorrow text and align them with the text start */
+.card-times-inline {
+  flex-basis: 100%;
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+
+  /* indent to start under the text (icon width + gap) */
+  margin-left: 24px;
+}
+
+/* Pill style for additional times */
+.time-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 4px 10px;
+  border-radius: 999px;
+
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-secondary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
 </style>
 </head>
 
