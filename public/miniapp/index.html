@@ -2746,6 +2746,24 @@ img {
 .card-author span {
   line-height: 1.3;
 }
+
+/* --- Journal Card Time --- */
+.card-journal-time {
+  display: flex;
+  align-items: center;        /* baseline-safe */
+  gap: 6px;
+  font-size: 0.9rem;
+  line-height: 1.3;           /* enough for descenders */
+  color: var(--text-secondary);
+  overflow: visible;          /* prevent clipping */
+}
+
+.card-journal-time img {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
 </style>
 </head>
 
@@ -5433,7 +5451,7 @@ function JournalCard({ entry, onView, onEdit, onDelete, onTagSelect }) {
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
             {title}
           </div>
-          <div className="card-time">
+          <div className="card-journal-time">
   <img src="/icons/cal.svg" alt="" />
   <span>{formatShortDate(entry.createdAt)}</span>
 </div>
