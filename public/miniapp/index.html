@@ -6083,7 +6083,7 @@ const getAllTimes = () => {
 
       return (
         <div className="card" onClick={() => setExpanded(!expanded)}>
-          <div className="card-header">
+<div className="card-header">
   <div className="card-time-row">
     <span className="card-time-icon">
       <img src="/icons/alarm.svg" alt="" />
@@ -6099,7 +6099,6 @@ const getAllTimes = () => {
       </div>
     )}
   </div>
-</div>
 
   <span className={getBadgeClass()}>
     {getBadgeLabel()}
@@ -6135,6 +6134,8 @@ const getAllTimes = () => {
       );
     }
     
+    
+   // Extra Reminder Times  
     function ExtraTimesSection({ scheduleKind, timesOfDay, setTimesOfDay }) {
   if (!["daily", "weekly", "monthly", "yearly"].includes(scheduleKind)) return null;
 
