@@ -6013,6 +6013,69 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
         </div>
       );
     }
+    
+    function ExtraTimesSection({ scheduleKind, timesOfDay, setTimesOfDay }) {
+  if (!["daily", "weekly", "monthly", "yearly"].includes(scheduleKind)) return null;
+
+  const safeTimes = Array.isArray(timesOfDay) ? timesOfDay : [];
+
+  const setAt = (idx, v) => {
+    setTimesOfDay((prev) => {
+      const arr = Array.isArray(prev) ? [...prev] : [];
+      arr[idx] = v;
+
+      const cleaned = arr
+        .map((x) => String(x || "").trim())
+        .filter((x) => /^\d{2}:\d{2}$/.test(x));
+
+      return Array.from(new Set(cleaned)).sort();
+    });
+  };
+
+  const removeAt = (idx) => {
+    setTimesOfDay((prev) => {
+      const arr = Array.isArray(prev) ? prev : [];
+      return arr.filter((_, i) => i !== idx);
+    });
+  };
+
+  const addOne = () => {
+    setTimesOfDay((prev) => {
+      const arr = Array.isArray(prev) ? prev : [];
+      return Array.from(new Set([...arr, "09:00"])).sort();
+    });
+  };
+
+  return (
+    <div className="form-group">
+      <label className="form-label">Extra times</label>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {safeTimes.map((t, idx) => (
+          <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="time"
+              className="form-input"
+              value={t}
+              onChange={(e) => setAt(idx, e.target.value)}
+            />
+            <button type="button" className="btn btn-danger" onClick={() => removeAt(idx)}>
+              Remove
+            </button>
+          </div>
+        ))}
+
+        <button type="button" className="btn btn-secondary" onClick={addOne}>
+          Add time
+        </button>
+      </div>
+
+      <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
+        These are additional fire times for the same reminder on its scheduled days.
+      </div>
+    </div>
+  );
+}
 
 // Reminder Modal
 function ReminderModal({ reminder, onClose, onSave, userTimezone }) {
@@ -6383,75 +6446,11 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
             </select>
           </div>
           
-          {["daily", "weekly", "monthly", "yearly"].includes(scheduleKind) && (() => {
-  const safeTimes = Array.isArray(timesOfDay) ? timesOfDay : [];
-
-  return (
-    <div className="form-group">
-      <label className="form-label">Extra times</label>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {safeTimes.map((t, idx) => (
-          <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="time"
-              className="form-input"
-              value={t}
-              onChange={(e) => {
-                const v = e.target.value;
-
-                setTimesOfDay((prev) => {
-                  const arr = Array.isArray(prev) ? [...prev] : [];
-                  arr[idx] = v;
-
-                  // keep only valid HH:mm, unique, sorted
-                  const cleaned = arr
-                    .map((x) => String(x || "").trim())
-                    .filter((x) => /^\d{2}:\d{2}$/.test(x));
-
-                  return Array.from(new Set(cleaned)).sort();
-                });
-              }}
-            />
-
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => {
-                setTimesOfDay((prev) => {
-                  const arr = Array.isArray(prev) ? prev : [];
-                  if (arr.length <= 1) return arr; // don't allow empty
-                  return arr.filter((_, i) => i !== idx);
-                });
-              }}
-              disabled={safeTimes.length <= 1}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => {
-            setTimesOfDay((prev) => {
-              const arr = Array.isArray(prev) ? prev : [];
-              const next = [...arr, "09:00"];
-              return Array.from(new Set(next)).sort();
-            });
-          }}
-        >
-          Add time
-        </button>
-      </div>
-
-      <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
-        These are additional fire times for the same reminder on its scheduled days.
-      </div>
-    </div>
-  );
-})()}
+          <ExtraTimesSection
+  scheduleKind={scheduleKind}
+  timesOfDay={timesOfDay}
+  setTimesOfDay={setTimesOfDay}
+/>
           
           {scheduleKind === "daily" && (
   <div className="form-group">
