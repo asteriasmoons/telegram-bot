@@ -6365,15 +6365,14 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
               />
             </div>
           </div>
-          )}
           
           {["daily", "weekly", "monthly", "yearly"].includes(scheduleKind) && (
   <div className="form-group">
     <label className="form-label">Extra times</label>
 
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {timesOfDay.map((t, idx) => (
-        <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+    <div className="times-list">
+      {(Array.isArray(timesOfDay) ? timesOfDay : []).map((t, idx) => (
+        <div key={idx} className="times-row">
           <input
             type="time"
             className="form-input"
@@ -6381,17 +6380,25 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
             onChange={(e) => {
               const v = e.target.value;
               setTimesOfDay((prev) => {
-                const copy = [...prev];
+                const arr = Array.isArray(prev) ? prev : [];
+                const copy = [...arr];
                 copy[idx] = v;
                 return Array.from(new Set(copy.filter(Boolean))).sort();
               });
             }}
           />
+
           <button
             type="button"
             className="btn btn-danger"
-            onClick={() => setTimesOfDay((prev) => prev.filter((_, i) => i !== idx))}
-            disabled={timesOfDay.length <= 1}
+            onClick={() =>
+              setTimesOfDay((prev) => {
+                const arr = Array.isArray(prev) ? prev : [];
+                if (arr.length <= 1) return arr; // don't let it go empty
+                return arr.filter((_, i) => i !== idx);
+              })
+            }
+            disabled={!Array.isArray(timesOfDay) || timesOfDay.length <= 1}
           >
             Remove
           </button>
@@ -6401,13 +6408,18 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
       <button
         type="button"
         className="btn btn-secondary"
-        onClick={() => setTimesOfDay((prev) => Array.from(new Set([...prev, "09:00"])).sort())}
+        onClick={() =>
+          setTimesOfDay((prev) => {
+            const arr = Array.isArray(prev) ? prev : [];
+            return Array.from(new Set([...arr, "09:00"])).sort();
+          })
+        }
       >
         Add time
       </button>
     </div>
 
-    <div style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.35 }}>
+    <div className="form-hint">
       These are additional fire times for the same reminder on its scheduled days.
     </div>
   </div>
