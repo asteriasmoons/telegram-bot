@@ -2477,33 +2477,53 @@ img {
   justify-content: center;
 }
 
-/* === Reminder card time alignment override === */
-/* === Fix reminder clock icon alignment === */
-
-/* The row that contains the icon + "Tomorrow at ..." text */
-.card-time {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 10px !important;      /* spacing between icon and text */
-  line-height: 1.2 !important;
+/* --- Reminder card time row alignment (override) --- */
+.card .card-time-row {
+  display: flex;
+  align-items: center;            /* vertically align icon + text + chips */
+  gap: 10px;                      /* space between icon and "Tomorrow..." */
 }
 
-/* If the clock is an <img src="/icons/alarm.svg"> */
-.card-time img {
-  width: 18px !important;
-  height: 18px !important;
-  display: block !important;     /* kills baseline weirdness */
-  flex: 0 0 auto !important;
-  margin: 0 !important;
+/* icon wrapper makes SVG predictable */
+.card .card-time-row .card-time-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
 }
 
-/* If the clock is an inline <svg> */
-.card-time svg {
-  width: 18px !important;
-  height: 18px !important;
-  display: block !important;     /* kills baseline weirdness */
-  flex: 0 0 auto !important;
-  margin: 0 !important;
+/* make the svg behave */
+.card .card-time-row .card-time-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;                 /* kills baseline weirdness */
+  opacity: 0.9;
+}
+
+/* time text */
+.card .card-time-row .card-time-text {
+  line-height: 1.2;
+}
+
+/* keep the chips inline and nicely aligned with the row */
+.card .card-time-row .card-times-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;               /* small breathing room after "Tomorrow..." */
+}
+
+/* make time chips feel like pills again */
+.card .card-time-row .time-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  line-height: 1;
+  font-size: 12px;
+  white-space: nowrap;
 }
 </style>
 </head>
@@ -6065,8 +6085,11 @@ const getAllTimes = () => {
         <div className="card" onClick={() => setExpanded(!expanded)}>
           <div className="card-header">
   <div className="card-time-row">
-    <img src="/icons/alarm.svg" alt="" />
-    <span>{formatDateTime(reminder.nextRunAt)}</span>
+    <span className="card-time-icon">
+      <img src="/icons/alarm.svg" alt="" />
+    </span>
+
+    <span className="card-time-text">{formatDateTime(reminder.nextRunAt)}</span>
 
     {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
       <div className="card-times-inline">
@@ -6076,6 +6099,7 @@ const getAllTimes = () => {
       </div>
     )}
   </div>
+</div>
 
   <span className={getBadgeClass()}>
     {getBadgeLabel()}
