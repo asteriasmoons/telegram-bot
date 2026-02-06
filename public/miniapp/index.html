@@ -6032,11 +6032,6 @@ const getAllTimes = () => {
   <span>{formatDateTime(reminder.nextRunAt)}</span>
 </div>
 
-<div className="card-time">
-  <img src="/icons/alarm.svg" alt="" />
-  <span>{formatDateTime(reminder.nextRunAt)}</span>
-</div>
-
 {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
   <div className="card-times">
     {getAllTimes().map((t) => (
