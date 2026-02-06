@@ -6150,7 +6150,8 @@ if (k === "daily") {
     setScheduleKind(k);
 
     const zone = userTimezone || "America/Chicago";
-    const safeDate = date || DateTime.now().setZone(zone).toISODate(); // "YYYY-MM-DD"
+const safeDate = date || luxon.DateTime.now().setZone(zone).toISODate(); // "YYYY-MM-DD"
+
 
     if (k === "daily") {
       setDailyIntervalStr((prev) => {
