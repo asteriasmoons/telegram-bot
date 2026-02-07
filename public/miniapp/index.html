@@ -3057,6 +3057,9 @@ padding: 4px 10px;
 border-radius: 999px;
 font-size: 12px;
 font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .mood-log-body {
@@ -3582,9 +3585,7 @@ return Math.round((total / moods.length) * 100) / 100;
 }
 
 function moodBarColor(score) {
-if (score >= 4) return "linear-gradient(135deg, #4caf50, #66bb6a)";
-if (score >= 3) return "linear-gradient(135deg, #ff9800, #ffb74d)";
-return "linear-gradient(135deg, #f44336, #ef5350)";
+  return "linear-gradient(135deg, #4dd0e1, #64b5f6, #9c7cff)";
 }
 
 function moodBarLabel(score) {
@@ -3598,9 +3599,10 @@ return "Having a tough time";
 }
 
 function moodScoreBadge(score) {
-if (score >= 4) return { bg: "rgba(76, 175, 80, 0.18)", fg: "#4caf50" };
-if (score >= 3) return { bg: "rgba(255, 152, 0, 0.18)", fg: "#ff9800" };
-return { bg: "rgba(244, 67, 54, 0.18)", fg: "#f44336" };
+  return {
+    bg: "rgba(255, 255, 255, 0.14)",
+    fg: "#f6f65a",
+  };
 }
 
 function startOfToday() {
