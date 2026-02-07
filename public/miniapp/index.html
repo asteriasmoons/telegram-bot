@@ -6974,7 +6974,7 @@ function HoroscopeView({ onBack }) {
 }
 
 // Journals View
-function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect }) {
+function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect, onOpenHoroscope }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -7139,8 +7139,6 @@ const handleGeneratePrompt = async () => {
     >
       <img src="/icons/tag.svg" alt="" />
     </button>
-    
-    button>
 
   <button
     className="icon-btn"
@@ -10156,7 +10154,6 @@ return (
 >
   <HoroscopeView
     onBack={goBack}
-    }}
   />
 </div>
       
