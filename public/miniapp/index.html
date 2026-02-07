@@ -2798,7 +2798,7 @@ padding: 12px 16px;
 border-radius: 12px;
 background: rgba(255, 255, 255, 0.07);
 border: 1px solid rgba(255, 255, 255, 0.14);
-color: var(–text-primary);
+color: var(–-text-primary);
 font-size: 15px;
 cursor: pointer;
 display: flex;
@@ -2845,7 +2845,7 @@ border-radius: 8px;
 cursor: pointer;
 transition: background 0.15s;
 font-size: 14px;
-color: var(–text-primary);
+color: var(–-text-primary);
 }
 
 .mood-dropdown-option:hover {
@@ -2854,7 +2854,7 @@ background: rgba(255, 255, 255, 0.08);
 
 .mood-dropdown-option.selected {
 background: rgba(91, 141, 239, 0.20);
-color: var(–accent);
+color: var(–-accent);
 font-weight: 700;
 }
 
@@ -2871,8 +2871,8 @@ transition: all 0.15s;
 }
 
 .mood-dropdown-option.selected .mood-dropdown-check {
-background: var(–accent);
-border-color: var(–accent);
+background: var(–-accent);
+border-color: var(–-accent);
 }
 
 /* Selected pills (bubble style) */
@@ -2927,11 +2927,11 @@ opacity: 1;
 margin: 0 16px 16px;
 padding: 20px;
 border-radius: 16px;
-background: var(–glass-surface);
-border: 1px solid var(–glass-border);
-backdrop-filter: blur(var(–glass-blur)) saturate(150%);
--webkit-backdrop-filter: blur(var(–glass-blur)) saturate(150%);
-box-shadow: 0 14px 40px var(–glass-shadow);
+background: var(–-glass-surface);
+border: 1px solid var(–-glass-border);
+backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
+box-shadow: 0 14px 40px var(–-glass-shadow);
 position: relative;
 overflow: hidden;
 animation: slideUp 0.3s;
@@ -2972,7 +2972,7 @@ z-index: 1;
 display: flex;
 justify-content: space-between;
 font-size: 12px;
-color: var(–text-secondary);
+color: var(–-text-secondary);
 margin-bottom: 8px;
 }
 
@@ -2997,7 +2997,7 @@ text-align: center;
 margin-top: 8px;
 font-size: 14px;
 font-weight: 700;
-color: var(–text-primary);
+color: var(–-text-primary);
 }
 
 /* Mood log history cards */
@@ -3005,10 +3005,10 @@ color: var(–text-primary);
 margin: 0 16px 12px;
 padding: 16px;
 border-radius: 14px;
-background: var(–glass-surface);
-border: 1px solid var(–glass-border);
-backdrop-filter: blur(var(–glass-blur)) saturate(150%);
--webkit-backdrop-filter: blur(var(–glass-blur)) saturate(150%);
+background: var(–-glass-surface);
+border: 1px solid var(–-glass-border);
+backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
 position: relative;
 overflow: hidden;
 }
@@ -3040,7 +3040,7 @@ z-index: 1;
 
 .mood-log-date {
 font-size: 13px;
-color: var(–text-secondary);
+color: var(–-text-secondary);
 display: flex;
 align-items: center;
 gap: 6px;
@@ -3067,7 +3067,7 @@ z-index: 1;
 .mood-log-delete {
 background: none;
 border: none;
-color: var(–danger);
+color: var(–-danger);
 cursor: pointer;
 padding: 4px;
 opacity: 0.7;
@@ -3539,7 +3539,7 @@ const toggle = (val) => {
 if (selected.includes(val)) {
 onChange(selected.filter((v) => v !== val));
 } else {
-onChange([…selected, val]);
+onChange([...selected, val]);
 }
 };
 
@@ -3557,7 +3557,7 @@ return (
   >
     <span>
       {selected.length === 0
-        ? `Select ${label.toLowerCase()}…`
+        ? `Select ${label.toLowerCase()}...`
         : `${selected.length} selected`}
     </span>
     <span className={`mood-dropdown-arrow ${open ? "open" : ""}`}>▼</span>
@@ -3894,7 +3894,7 @@ return name ? <div className="reminders-greeting">Hello {name}</div> : null;
         type="button"
         style={{ width: "100%", justifyContent: "center", padding: 14 }}
       >
-        {saving ? "Logging…" : "Log Mood"}
+        {saving ? "Logging..." : "Log Mood"}
       </button>
     </div>
   )}
@@ -3905,7 +3905,7 @@ return name ? <div className="reminders-greeting">Hello {name}</div> : null;
       {logsLoading ? (
         <div className="loading">
           <div className="spinner" />
-          <div>Loading mood history…</div>
+          <div>Loading mood history...</div>
         </div>
       ) : logs.length === 0 ? (
         <div className="empty-state">
@@ -3928,7 +3928,6 @@ return name ? <div className="reminders-greeting">Hello {name}</div> : null;
     </div>
   )}
 </div>
-
 );
 }
 
@@ -8852,7 +8851,7 @@ useEffect(() => {
        className="icon-btn"
        aria-label="Mood"
        title="Mood"
-       onClick={() => goTo(‘mood’)}
+       onClick={() => goTo('mood')}
      >
       <img src="/icons/star.svg" alt="" />
      </button>
