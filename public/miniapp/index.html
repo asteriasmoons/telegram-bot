@@ -108,8 +108,18 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+
+  /* soft gradient wash under glass */
+  background:
+    linear-gradient(
+      135deg,
+      rgba(224, 25, 212, 0.08), /* pink */
+      rgba(128, 0, 254, 0.07),  /* purple */
+      rgba(0, 219, 255, 0.06),  /* teal */
+      rgba(246, 246, 132, 0.05) /* yellow */
+    );
+
+  opacity: 1;
 }
 
 /* =========================================================
