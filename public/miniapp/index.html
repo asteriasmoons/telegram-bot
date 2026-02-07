@@ -106,26 +106,19 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: -1;
-
   background:
-    /* PURPLE = dominant, top-left-ish */
-    radial-gradient(900px 650px at 25% 18%, rgba(128, 0, 254, 0.32), transparent 62%),
+    radial-gradient(900px 650px at 28% 18%, rgba(128, 0, 254, 0.34), transparent 62%),
+    radial-gradient(950px 720px at 76% 78%, rgba(0, 219, 255, 0.22), transparent 64%),
 
-    /* TEAL = dominant, bottom-right-ish */
-    radial-gradient(950px 700px at 78% 78%, rgba(0, 219, 255, 0.22), transparent 64%),
+    /* Yellow stronger + smaller */
+    radial-gradient(420px 340px at 60% 24%, rgba(246, 246, 132, 0.30), transparent 72%),
 
-    /* YELLOW = tiny accent, keep it AWAY from teal */
-    radial-gradient(520px 420px at 78% 22%, rgba(246, 246, 132, 0.16), transparent 68%),
+    /* Pink stronger + smaller */
+    radial-gradient(420px 340px at 40% 76%, rgba(224, 25, 212, 0.20), transparent 74%);
 
-    /* PINK = even tinier accent, near purple (safe) */
-    radial-gradient(520px 420px at 18% 78%, rgba(224, 25, 212, 0.10), transparent 70%);
-
-  /* IMPORTANT: don't use screen here -- it "adds" light and muddies overlaps */
   background-blend-mode: normal;
   opacity: 1;
-
-  /* keeps it dreamy without smearing colors into each other too much */
-  filter: blur(2px) saturate(1.15);
+  filter: blur(1.5px) saturate(1.22);
 }
 
 /* =========================================================
