@@ -3603,6 +3603,26 @@ if (score >= 3) return { bg: "rgba(255, 152, 0, 0.18)", fg: "#ff9800" };
 return { bg: "rgba(244, 67, 54, 0.18)", fg: "#f44336" };
 }
 
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfToday() {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function isToday(dateValue) {
+  const d = new Date(dateValue);
+  const s = startOfToday().getTime();
+  const e = endOfToday().getTime();
+  const t = d.getTime();
+  return t >= s && t <= e;
+}
+
 
 // MOOD Multi-select dropdown component
 function MoodMultiSelect({ label, options, selected, onChange, pillClass }) {
@@ -3811,6 +3831,107 @@ return (
 );
 }
 
+// MOOD SCORE BAR
+function MoodScoreBar({ score }) {
+  const s = typeof score === "number" ? score : 3;
+  const pct = Math.round(((s - 1) / 4) * 100); // 1–5 → 0–100%
+  const barBg = moodBarColor(s);
+  const label = moodBarLabel(s);
+
+  return (
+    <div className="mood-bar-wrap">
+      <div className="mood-bar-labels">
+        <span>Low</span>
+        <span>High</span>
+      </div>
+
+      <div className="mood-bar-track">
+        <div
+          className="mood-bar-fill"
+          style={{ width: `${pct}%`, background: barBg }}
+        />
+      </div>
+
+      <div className="mood-bar-score">
+        {label} -- {s.toFixed(1)} / 5
+      </div>
+    </div>
+  );
+}
+
+// TODAY MOOD CARD
+function MoodTodayCard({ log, onDelete }) {
+  const score = typeof log?.score === "number" ? log.score : 3;
+
+  const created = log?.createdAt ? new Date(log.createdAt) : null;
+  const dateStr = created
+    ? created.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "";
+
+  const badge = moodScoreBadge(score);
+
+  return (
+    <div className="mood-log-card">
+      <div className="mood-log-header">
+        <div className="mood-log-date">
+          <img src="/icons/cal.svg" alt="" />
+          <span>{dateStr}</span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            className="mood-log-score-badge"
+            style={{ background: badge.bg, color: badge.fg }}
+          >
+            {score.toFixed(1)}
+          </span>
+
+          {onDelete && (
+            <button
+              className="mood-log-delete"
+              onClick={() => onDelete(log._id)}
+              type="button"
+            >
+              <img src="/icons/trash.svg" alt="" style={{ width: 16, height: 16 }} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* THE BAR (this is what you want) */}
+      <MoodScoreBar score={score} />
+
+      {Array.isArray(log?.moods) && log.moods.length > 0 && (
+        <div className="mood-pills-row">
+          {log.moods.map((m) => (
+            <span key={m} className="mood-pill mood-pill-mood">{m}</span>
+          ))}
+        </div>
+      )}
+
+      {Array.isArray(log?.activities) && log.activities.length > 0 && (
+        <div className="mood-pills-row" style={{ marginTop: 8 }}>
+          {log.activities.map((a) => (
+            <span key={a} className="mood-pill mood-pill-activity">{a}</span>
+          ))}
+        </div>
+      )}
+
+      {log?.note && (
+        <div style={{ marginTop: 10, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+          {log.note}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Main Mood View
 function MoodView({ activeView, userDisplayName, onBack }) {
 const [moods, setMoods] = useState([]);
@@ -3825,8 +3946,12 @@ const [lastResult, setLastResult] = useState(null);
 const [logs, setLogs] = useState([]);
 const [logsLoading, setLogsLoading] = useState(true);
 
-// Tab: "log" or "history"
-const [tab, setTab] = useState("log");
+// Tab: "today" | "log" | "history"
+const [tab, setTab] = useState("today");
+
+const todayLogs = Array.isArray(logs)
+  ? logs.filter((l) => l?.createdAt && isToday(l.createdAt))
+  : [];
 
 useEffect(() => {
 if (activeView === "mood") {
@@ -3908,19 +4033,27 @@ return name ? <div className="reminders-greeting">Hello {name}</div> : null;
   </div>
 
   <div className="quick-actions">
-    <div
-      className={`quick-action ${tab === "log" ? "active" : ""}`}
-      onClick={() => setTab("log")}
-    >
-      Log Mood
-    </div>
-    <div
-      className={`quick-action ${tab === "history" ? "active" : ""}`}
-      onClick={() => setTab("history")}
-    >
-      History
-    </div>
+  <div
+    className={`quick-action ${tab === "today" ? "active" : ""}`}
+    onClick={() => setTab("today")}
+  >
+    Today
   </div>
+
+  <div
+    className={`quick-action ${tab === "log" ? "active" : ""}`}
+    onClick={() => setTab("log")}
+  >
+    Log Mood
+  </div>
+
+  <div
+    className={`quick-action ${tab === "history" ? "active" : ""}`}
+    onClick={() => setTab("history")}
+  >
+    History
+  </div>
+</div>
 
   {/* Result card (shows after successful log) */}
   {lastResult && (
@@ -3931,46 +4064,71 @@ return name ? <div className="reminders-greeting">Hello {name}</div> : null;
   )}
 
   {/* LOG TAB */}
-  {tab === "log" && !lastResult && (
-    <div style={{ padding: "0 16px" }}>
-      <MoodMultiSelect
-        label="How are you feeling?"
-        options={DEFAULT_MOODS}
-        selected={moods}
-        onChange={setMoods}
-        pillClass="mood-pill-mood"
+{tab === "log" && (
+  <div style={{ padding: "0 16px" }}>
+    <MoodMultiSelect
+      label="How are you feeling?"
+      options={DEFAULT_MOODS}
+      selected={moods}
+      onChange={setMoods}
+      pillClass="mood-pill-mood"
+    />
+
+    <MoodMultiSelect
+      label="What have you been doing?"
+      options={DEFAULT_ACTIVITIES}
+      selected={activities}
+      onChange={setActivities}
+      pillClass="mood-pill-activity"
+    />
+
+    <div className="form-group">
+      <label className="form-label">Note (optional)</label>
+      <textarea
+        className="form-textarea form-textarea--sm"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Anything else on your mind?"
+        maxLength={1500}
       />
-
-      <MoodMultiSelect
-        label="What have you been doing?"
-        options={DEFAULT_ACTIVITIES}
-        selected={activities}
-        onChange={setActivities}
-        pillClass="mood-pill-activity"
-      />
-
-      <div className="form-group">
-        <label className="form-label">Note (optional)</label>
-        <textarea
-          className="form-textarea form-textarea--sm"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Anything else on your mind?"
-          maxLength={1500}
-        />
-      </div>
-
-      <button
-        className="btn btn-primary"
-        onClick={handleLog}
-        disabled={saving || moods.length === 0}
-        type="button"
-        style={{ width: "100%", justifyContent: "center", padding: 14 }}
-      >
-        {saving ? "Logging..." : "Log Mood"}
-      </button>
     </div>
-  )}
+
+    <button
+      className="btn btn-primary"
+      onClick={handleLog}
+      disabled={saving || moods.length === 0}
+      type="button"
+      style={{ width: "100%", justifyContent: "center", padding: 14 }}
+    >
+      {saving ? "Logging..." : "Log Mood"}
+    </button>
+  </div>
+)}
+  
+  {/* TODAY TAB */}
+{tab === "today" && (
+  <div>
+    {logsLoading ? (
+      <div className="loading">
+        <div className="spinner" />
+        <div>Loading today’s moods...</div>
+      </div>
+    ) : todayLogs.length === 0 ? (
+      <div className="empty-state">
+        <div className="empty-state-icon">
+          <img src="/icons/star.svg" alt="" />
+        </div>
+        <div className="empty-state-text">
+          No mood logs yet today.{"\n"}Log one and it’ll show up here.
+        </div>
+      </div>
+    ) : (
+      todayLogs.map((log) => (
+        <MoodTodayCard key={log._id} log={log} onDelete={handleDelete} />
+      ))
+    )}
+  </div>
+)}
 
   {/* HISTORY TAB */}
   {tab === "history" && (
@@ -3983,7 +4141,7 @@ return name ? <div className="reminders-greeting">Hello {name}</div> : null;
       ) : logs.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">
-            <img src="/icons/star.svg" alt="" />
+            <img src="/icons/bfly.svg" alt="" />
           </div>
           <div className="empty-state-text">
             No mood logs yet.{"\n"}Log your first mood!
