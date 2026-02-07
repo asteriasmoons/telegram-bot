@@ -6881,7 +6881,7 @@ useEffect(() => {
 }
 
 // HOROSCOPE VIEW
-function HoroscopeView({ onBack }) {
+function HoroscopeView({ onBack, activeView }) {
   const ZODIAC = [
   "aries","taurus","gemini","cancer","leo","virgo", "libra","scorpio","sagittarius","capricorn","aquarius","pisces"
   ];
@@ -6889,6 +6889,14 @@ function HoroscopeView({ onBack }) {
   const [zodiac, setZodiac] = useState("aries");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+
+  // Reset when navigating away and back
+  useEffect(() => {
+    if (activeView !== "horoscope") {
+      setResult(null);
+      setLoading(false);
+    }
+  }, [activeView]);
 
   const fetchHoroscope = async () => {
     try {
@@ -6902,6 +6910,10 @@ function HoroscopeView({ onBack }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearResult = () => {
+    setResult(null);
   };
 
   return (
@@ -6940,38 +6952,55 @@ function HoroscopeView({ onBack }) {
             >
               {loading ? "Loading..." : "Get Horoscope"}
             </button>
+
+            {result && (
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={clearResult}
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="card horoscope-result-card">
-        {loading ? (
-          <div className="loading">
-            <div className="spinner" />
-            <div>Fetching your stars...</div>
-          </div>
-        ) : result ? (
-          <>
-            <div className="horoscope-result-header">
-              <div className="horoscope-zodiac">
-                {String(result.zodiac || zodiac).toUpperCase()}
+      {(loading || result) && (
+        <div className="card horoscope-result-card">
+          {loading ? (
+            <div className="loading">
+              <div className="spinner" />
+              <div>Fetching your stars...</div>
+            </div>
+          ) : (
+            <>
+              <div className="horoscope-result-header">
+                <div className="horoscope-zodiac">
+                  {String(result.zodiac || zodiac).toUpperCase()}
+                </div>
+                <div className="horoscope-date">{result.date || ""}</div>
               </div>
-              <div className="horoscope-date">{result.date || ""}</div>
-            </div>
 
-            <div className="horoscope-text">
-              {result.horoscope || ""}
-            </div>
-          </>
-        ) : (
+              <div className="horoscope-text">
+                {result.horoscope || ""}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {!loading && !result && (
+        <div className="card horoscope-result-card">
           <div className="empty-state-text">
             Pick a zodiac sign and tap "Get Horoscope".
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 // Journals View
 function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect, onOpenHoroscope }) {
@@ -10152,9 +10181,7 @@ return (
   className={`view-container ${activeView === 'horoscope' ? 'active' : ''}`}
   data-view="horoscope"
 >
-  <HoroscopeView
-    onBack={goBack}
-  />
+  <HoroscopeView onBack={goBack} activeView={activeView} />
 </div>
       
       <div
