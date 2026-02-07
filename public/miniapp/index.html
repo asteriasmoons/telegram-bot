@@ -3480,26 +3480,99 @@ function parseDateTimeLocalValue(str) {
 
 // -- Mood score helpers --
 const MOOD_SCORE_MAP = {
-amazing: 5, excited: 5, happy: 4.5, grateful: 4.5,
-good: 4, hopeful: 4, calm: 3.8, content: 3.5,
-okay: 3, meh: 2.5, tired: 2.2, frustrated: 2,
-stressed: 2, anxious: 2, overwhelmed: 1.8,
-lonely: 1.5, sad: 1.5, angry: 1.5, sick: 1.2, depressed: 1,
+  happy: 4.3,
+  content: 3.8,
+  inspired: 4.2,
+  productive: 4.1,
+  loved: 4.4,
+  grateful: 4.4,
+  optimistic: 4.0,
+  confident: 4.0,
+  motivated: 4.0,
+  amused: 3.9,
+
+  good: 3.6,
+  okay: 3.0,
+  neutral: 3.0,
+  reflective: 3.2,
+  distracted: 2.7,
+  confused: 2.6,
+
+  sad: 1.8,
+  irritated: 2.0,
+  disappointed: 1.9,
+  angry: 1.7,
+  cynical: 2.0,
+  insecure: 1.9,
+  overwhelmed: 1.6,
+  stressed: 1.7,
+  scared: 1.6,
+  lonely: 1.7,
+  discouraged: 1.8,
 };
 
 const DEFAULT_MOODS = [
-"amazing", "happy", "good", "okay", "meh", "sad", "anxious",
-"stressed", "angry", "tired", "sick", "depressed", "grateful",
-"excited", "calm", "frustrated", "lonely", "hopeful",
-"overwhelmed", "content",
+  "happy",
+  "content",
+  "inspired",
+  "productive",
+  "loved",
+  "grateful",
+  "optimistic",
+  "confident",
+  "motivated",
+  "amused",
+  "sad",
+  "irritated",
+  "disappointed",
+  "angry",
+  "cynical",
+  "insecure",
+  "overwhelmed",
+  "stressed",
+  "scared",
+  "confused",
+  "reflective",
+  "distracted",
+  "lonely",
+  "discouraged",
+  "good",
+  "okay",
+  "neutral",
 ];
 
 const DEFAULT_ACTIVITIES = [
-"work", "exercise", "reading", "cooking", "socializing", "gaming",
-"meditation", "walking", "shopping", "cleaning", "studying",
-"journaling", "music", "movies", "family", "pets", "nature",
-"creative", "rest", "travel", "therapy", "yoga", "self-care",
-"errands", "date",
+  "friends",
+  "family",
+  "community",
+  "dating",
+  "hobby",
+  "creative",
+  "work",
+  "education",
+  "reading",
+
+  "hygiene",
+  "fitness",
+  "health",
+  "self-care",
+  "mindfulness",
+
+  "chores",
+  "errands",
+  "shopping",
+  "baking",
+
+  "pets",
+  "nature",
+
+  "journaling",
+  "spirituality",
+  "religion",
+
+  "entertainment",
+  "social-media",
+  "tech",
 ];
 
 function moodScoreAvg(moods) {
@@ -3883,7 +3956,7 @@ return name ? <div className="reminders-greeting">Hello {name}</div> : null;
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Anything else on your mind?"
-          maxLength={500}
+          maxLength={1500}
         />
       </div>
 
@@ -8853,7 +8926,7 @@ useEffect(() => {
        title="Mood"
        onClick={() => goTo('mood')}
      >
-      <img src="/icons/star.svg" alt="" />
+      <img src="/icons/bfly.svg" alt="" />
      </button>
 
     {/* HISTORY TOGGLE */}

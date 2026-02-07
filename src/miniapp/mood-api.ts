@@ -119,7 +119,7 @@ router.post("/mood", async (req, res) => {
       userId,
       moods: validMoods,
       activities: validActivities,
-      note: note ? String(note).trim().slice(0, 500) : undefined,
+      note: note ? String(note).trim().slice(0, 1500) : undefined,
       score,
     });
 
