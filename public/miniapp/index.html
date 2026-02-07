@@ -2781,6 +2781,302 @@ img {
 
 .card-journal-time span {
   line-height: 1.3;
+}
+
+/* =========================================================
+MOOD LOGGING VIEW
+========================================================= */
+
+/* Mood dropdown (custom select) */
+.mood-select-group {
+margin-bottom: 16px;
+}
+
+.mood-dropdown-trigger {
+width: 100%;
+padding: 12px 16px;
+border-radius: 12px;
+background: rgba(255, 255, 255, 0.07);
+border: 1px solid rgba(255, 255, 255, 0.14);
+color: var(–text-primary);
+font-size: 15px;
+cursor: pointer;
+display: flex;
+align-items: center;
+justify-content: space-between;
+transition: all 0.2s;
+}
+
+.mood-dropdown-trigger:focus,
+.mood-dropdown-trigger.open {
+border-color: rgba(91, 141, 239, 0.60);
+box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18);
+background: rgba(255, 255, 255, 0.09);
+}
+
+.mood-dropdown-arrow {
+font-size: 12px;
+opacity: 0.6;
+transition: transform 0.2s;
+}
+
+.mood-dropdown-arrow.open {
+transform: rotate(180deg);
+}
+
+.mood-dropdown-list {
+margin-top: 8px;
+max-height: 200px;
+overflow-y: auto;
+border-radius: 12px;
+background: rgba(25, 25, 32, 0.95);
+border: 1px solid rgba(255, 255, 255, 0.14);
+backdrop-filter: blur(18px);
+-webkit-backdrop-filter: blur(18px);
+padding: 6px;
+}
+
+.mood-dropdown-option {
+display: flex;
+align-items: center;
+gap: 10px;
+padding: 10px 12px;
+border-radius: 8px;
+cursor: pointer;
+transition: background 0.15s;
+font-size: 14px;
+color: var(–text-primary);
+}
+
+.mood-dropdown-option:hover {
+background: rgba(255, 255, 255, 0.08);
+}
+
+.mood-dropdown-option.selected {
+background: rgba(91, 141, 239, 0.20);
+color: var(–accent);
+font-weight: 700;
+}
+
+.mood-dropdown-check {
+width: 18px;
+height: 18px;
+border-radius: 6px;
+border: 2px solid rgba(255, 255, 255, 0.25);
+display: flex;
+align-items: center;
+justify-content: center;
+flex: 0 0 18px;
+transition: all 0.15s;
+}
+
+.mood-dropdown-option.selected .mood-dropdown-check {
+background: var(–accent);
+border-color: var(–accent);
+}
+
+/* Selected pills (bubble style) */
+.mood-pills-row {
+display: flex;
+flex-wrap: wrap;
+gap: 8px;
+margin-top: 12px;
+}
+
+.mood-pill {
+display: inline-flex;
+align-items: center;
+gap: 6px;
+padding: 6px 12px;
+border-radius: 999px;
+font-size: 13px;
+font-weight: 600;
+border: 1px solid;
+animation: fadeIn 0.2s;
+}
+
+.mood-pill-mood {
+background: linear-gradient(135deg, rgba(139, 125, 239, 0.25), rgba(91, 141, 239, 0.20));
+color: #b4a8ff;
+border-color: rgba(139, 125, 239, 0.40);
+}
+
+.mood-pill-activity {
+background: linear-gradient(135deg, rgba(0, 219, 255, 0.18), rgba(0, 180, 220, 0.14));
+color: #66e0ff;
+border-color: rgba(0, 219, 255, 0.35);
+}
+
+.mood-pill-remove {
+background: none;
+border: none;
+color: inherit;
+opacity: 0.6;
+cursor: pointer;
+font-size: 14px;
+padding: 0;
+line-height: 1;
+}
+
+.mood-pill-remove:hover {
+opacity: 1;
+}
+
+/* Mood result card (shows after logging) */
+.mood-result-card {
+margin: 0 16px 16px;
+padding: 20px;
+border-radius: 16px;
+background: var(–glass-surface);
+border: 1px solid var(–glass-border);
+backdrop-filter: blur(var(–glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(–glass-blur)) saturate(150%);
+box-shadow: 0 14px 40px var(–glass-shadow);
+position: relative;
+overflow: hidden;
+animation: slideUp 0.3s;
+}
+
+.mood-result-card::before {
+content: "";
+position: absolute;
+inset: 0;
+pointer-events: none;
+border-radius: inherit;
+background: linear-gradient(
+135deg,
+rgba(255,255,255,0.18),
+rgba(255,255,255,0.06) 35%,
+rgba(255,255,255,0.00) 60%
+);
+opacity: 0.55;
+mix-blend-mode: screen;
+}
+
+.mood-result-title {
+font-size: 18px;
+font-weight: 800;
+margin-bottom: 14px;
+position: relative;
+z-index: 1;
+}
+
+/* Mood progress / sentiment bar */
+.mood-bar-wrap {
+margin-bottom: 16px;
+position: relative;
+z-index: 1;
+}
+
+.mood-bar-labels {
+display: flex;
+justify-content: space-between;
+font-size: 12px;
+color: var(–text-secondary);
+margin-bottom: 8px;
+}
+
+.mood-bar-track {
+width: 100%;
+height: 14px;
+background: rgba(255, 255, 255, 0.08);
+border: 1px solid rgba(255, 255, 255, 0.12);
+border-radius: 999px;
+overflow: hidden;
+position: relative;
+}
+
+.mood-bar-fill {
+height: 100%;
+border-radius: 999px;
+transition: width 0.6s ease, background 0.4s ease;
+}
+
+.mood-bar-score {
+text-align: center;
+margin-top: 8px;
+font-size: 14px;
+font-weight: 700;
+color: var(–text-primary);
+}
+
+/* Mood log history cards */
+.mood-log-card {
+margin: 0 16px 12px;
+padding: 16px;
+border-radius: 14px;
+background: var(–glass-surface);
+border: 1px solid var(–glass-border);
+backdrop-filter: blur(var(–glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(–glass-blur)) saturate(150%);
+position: relative;
+overflow: hidden;
+}
+
+.mood-log-card::before {
+content: "";
+position: absolute;
+inset: 0;
+pointer-events: none;
+border-radius: inherit;
+background: linear-gradient(
+135deg,
+rgba(255,255,255,0.18),
+rgba(255,255,255,0.06) 35%,
+rgba(255,255,255,0.00) 60%
+);
+opacity: 0.55;
+mix-blend-mode: screen;
+}
+
+.mood-log-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 10px;
+position: relative;
+z-index: 1;
+}
+
+.mood-log-date {
+font-size: 13px;
+color: var(–text-secondary);
+display: flex;
+align-items: center;
+gap: 6px;
+}
+
+.mood-log-date img {
+width: 14px;
+height: 14px;
+opacity: 0.8;
+}
+
+.mood-log-score-badge {
+padding: 4px 10px;
+border-radius: 999px;
+font-size: 12px;
+font-weight: 700;
+}
+
+.mood-log-body {
+position: relative;
+z-index: 1;
+}
+
+.mood-log-delete {
+background: none;
+border: none;
+color: var(–danger);
+cursor: pointer;
+padding: 4px;
+opacity: 0.7;
+transition: opacity 0.2s;
+}
+
+.mood-log-delete:hover {
+opacity: 1;
+}
 </style>
 </head>
 
@@ -3181,6 +3477,462 @@ function parseDateTimeLocalValue(str) {
 
   return d;
 }
+
+// -- Mood score helpers --
+const MOOD_SCORE_MAP = {
+amazing: 5, excited: 5, happy: 4.5, grateful: 4.5,
+good: 4, hopeful: 4, calm: 3.8, content: 3.5,
+okay: 3, meh: 2.5, tired: 2.2, frustrated: 2,
+stressed: 2, anxious: 2, overwhelmed: 1.8,
+lonely: 1.5, sad: 1.5, angry: 1.5, sick: 1.2, depressed: 1,
+};
+
+const DEFAULT_MOODS = [
+"amazing", "happy", "good", "okay", "meh", "sad", "anxious",
+"stressed", "angry", "tired", "sick", "depressed", "grateful",
+"excited", "calm", "frustrated", "lonely", "hopeful",
+"overwhelmed", "content",
+];
+
+const DEFAULT_ACTIVITIES = [
+"work", "exercise", "reading", "cooking", "socializing", "gaming",
+"meditation", "walking", "shopping", "cleaning", "studying",
+"journaling", "music", "movies", "family", "pets", "nature",
+"creative", "rest", "travel", "therapy", "yoga", "self-care",
+"errands", "date",
+];
+
+function moodScoreAvg(moods) {
+if (!moods || moods.length === 0) return 3;
+const total = moods.reduce((s, m) => s + (MOOD_SCORE_MAP[m] ?? 3), 0);
+return Math.round((total / moods.length) * 100) / 100;
+}
+
+function moodBarColor(score) {
+if (score >= 4) return "linear-gradient(135deg, #4caf50, #66bb6a)";
+if (score >= 3) return "linear-gradient(135deg, #ff9800, #ffb74d)";
+return "linear-gradient(135deg, #f44336, #ef5350)";
+}
+
+function moodBarLabel(score) {
+if (score >= 4.5) return "Feeling amazing!";
+if (score >= 4) return "Feeling great";
+if (score >= 3.5) return "Doing well";
+if (score >= 3) return "Doing okay";
+if (score >= 2.5) return "Could be better";
+if (score >= 2) return "Feeling low";
+return "Having a tough time";
+}
+
+function moodScoreBadge(score) {
+if (score >= 4) return { bg: "rgba(76, 175, 80, 0.18)", fg: "#4caf50" };
+if (score >= 3) return { bg: "rgba(255, 152, 0, 0.18)", fg: "#ff9800" };
+return { bg: "rgba(244, 67, 54, 0.18)", fg: "#f44336" };
+}
+
+
+// MOOD Multi-select dropdown component
+function MoodMultiSelect({ label, options, selected, onChange, pillClass }) {
+const [open, setOpen] = useState(false);
+
+const toggle = (val) => {
+if (selected.includes(val)) {
+onChange(selected.filter((v) => v !== val));
+} else {
+onChange([…selected, val]);
+}
+};
+
+const remove = (val) => {
+onChange(selected.filter((v) => v !== val));
+};
+
+return (
+<div className="mood-select-group">
+<label className="form-label">{label}</label>
+
+  <div
+    className={`mood-dropdown-trigger ${open ? "open" : ""}`}
+    onClick={() => setOpen(!open)}
+  >
+    <span>
+      {selected.length === 0
+        ? `Select ${label.toLowerCase()}…`
+        : `${selected.length} selected`}
+    </span>
+    <span className={`mood-dropdown-arrow ${open ? "open" : ""}`}>▼</span>
+  </div>
+
+  {open && (
+    <div className="mood-dropdown-list">
+      {options.map((opt) => {
+        const isOn = selected.includes(opt);
+        return (
+          <div
+            key={opt}
+            className={`mood-dropdown-option ${isOn ? "selected" : ""}`}
+            onClick={() => toggle(opt)}
+          >
+            <div className="mood-dropdown-check">
+              {isOn && (
+                <img
+                  src="/icons/check.svg"
+                  alt=""
+                  style={{ width: 12, height: 12, opacity: 1 }}
+                />
+              )}
+            </div>
+            <span>{opt}</span>
+          </div>
+        );
+      })}
+    </div>
+  )}
+
+  {selected.length > 0 && (
+    <div className="mood-pills-row">
+      {selected.map((val) => (
+        <span key={val} className={`mood-pill ${pillClass}`}>
+          {val}
+          <button
+            className="mood-pill-remove"
+            onClick={(e) => {
+              e.stopPropagation();
+              remove(val);
+            }}
+            type="button"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  )}
+</div>
+);
+}
+
+// Result card shown after logging
+function MoodResultCard({ log, onDismiss }) {
+if (!log) return null;
+
+const score = log.score ?? moodScoreAvg(log.moods || []);
+const pct = Math.round(((score - 1) / 4) * 100); // 1–5 → 0–100%
+const barBg = moodBarColor(score);
+const label = moodBarLabel(score);
+const badge = moodScoreBadge(score);
+
+return (
+<div className="mood-result-card">
+<div className="mood-result-title">Mood Logged</div>
+
+  <div className="mood-bar-wrap">
+    <div className="mood-bar-labels">
+      <span>Low</span>
+      <span>High</span>
+    </div>
+
+    <div className="mood-bar-track">
+      <div
+        className="mood-bar-fill"
+        style={{ width: `${pct}%`, background: barBg }}
+      />
+    </div>
+
+    <div className="mood-bar-score">
+      {label} -- {score.toFixed(1)} / 5
+    </div>
+  </div>
+
+  {Array.isArray(log.moods) && log.moods.length > 0 && (
+    <div className="mood-pills-row">
+      {log.moods.map((m) => (
+        <span key={m} className="mood-pill mood-pill-mood">{m}</span>
+      ))}
+    </div>
+  )}
+
+  {Array.isArray(log.activities) && log.activities.length > 0 && (
+    <div className="mood-pills-row" style={{ marginTop: 8 }}>
+      {log.activities.map((a) => (
+        <span key={a} className="mood-pill mood-pill-activity">{a}</span>
+      ))}
+    </div>
+  )}
+
+  <div className="card-actions" style={{ marginTop: 16 }}>
+    <button className="btn btn-secondary" onClick={onDismiss} type="button">
+      Dismiss
+    </button>
+  </div>
+</div>
+);
+}
+
+// History log card
+function MoodLogHistoryCard({ log, onDelete }) {
+const score = log.score ?? 3;
+const badge = moodScoreBadge(score);
+
+const created = log.createdAt ? new Date(log.createdAt) : null;
+const dateStr = created
+? created.toLocaleDateString("en-US", {
+month: "short",
+day: "numeric",
+year: "numeric",
+hour: "numeric",
+minute: "2-digit",
+})
+: "";
+
+return (
+<div className="mood-log-card">
+<div className="mood-log-header">
+<div className="mood-log-date">
+<img src="/icons/cal.svg" alt="" />
+<span>{dateStr}</span>
+</div>
+
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span
+        className="mood-log-score-badge"
+        style={{ background: badge.bg, color: badge.fg }}
+      >
+        {score.toFixed(1)}
+      </span>
+
+      <button
+        className="mood-log-delete"
+        onClick={() => onDelete(log._id)}
+        type="button"
+      >
+        <img src="/icons/trash.svg" alt="" style={{ width: 16, height: 16 }} />
+      </button>
+    </div>
+  </div>
+
+  <div className="mood-log-body">
+    {Array.isArray(log.moods) && log.moods.length > 0 && (
+      <div className="mood-pills-row">
+        {log.moods.map((m) => (
+          <span key={m} className="mood-pill mood-pill-mood">{m}</span>
+        ))}
+      </div>
+    )}
+
+    {Array.isArray(log.activities) && log.activities.length > 0 && (
+      <div className="mood-pills-row" style={{ marginTop: 8 }}>
+        {log.activities.map((a) => (
+          <span key={a} className="mood-pill mood-pill-activity">{a}</span>
+        ))}
+      </div>
+    )}
+
+    {log.note && (
+      <div style={{ marginTop: 10, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        {log.note}
+      </div>
+    )}
+  </div>
+</div>
+);
+}
+
+// Main Mood View
+function MoodView({ activeView, userDisplayName, onBack }) {
+const [moods, setMoods] = useState([]);
+const [activities, setActivities] = useState([]);
+const [note, setNote] = useState("");
+const [saving, setSaving] = useState(false);
+
+// Result after logging
+const [lastResult, setLastResult] = useState(null);
+
+// History
+const [logs, setLogs] = useState([]);
+const [logsLoading, setLogsLoading] = useState(true);
+
+// Tab: "log" or "history"
+const [tab, setTab] = useState("log");
+
+useEffect(() => {
+if (activeView === "mood") {
+loadLogs();
+}
+}, [activeView]);
+
+const loadLogs = async () => {
+try {
+setLogsLoading(true);
+const data = await apiCall("/mood/mood?limit=30");
+setLogs(Array.isArray(data?.logs) ? data.logs : []);
+} catch (e) {
+tg?.showAlert?.("Failed to load mood logs: " + (e?.message || String(e)));
+setLogs([]);
+} finally {
+setLogsLoading(false);
+}
+};
+
+const handleLog = async () => {
+if (moods.length === 0) {
+tg?.showAlert?.("Please select at least one mood");
+return;
+}
+
+try {
+  setSaving(true);
+  const data = await apiCall("/mood/mood", {
+    method: "POST",
+    body: JSON.stringify({
+      moods,
+      activities,
+      note: note.trim() || undefined,
+    }),
+  });
+
+  if (data?.log) {
+    setLastResult(data.log);
+    // Reset form
+    setMoods([]);
+    setActivities([]);
+    setNote("");
+    // Refresh history
+    loadLogs();
+  }
+} catch (e) {
+  tg?.showAlert?.("Failed to log mood: " + (e?.message || String(e)));
+} finally {
+  setSaving(false);
+}
+
+};
+
+const handleDelete = async (id) => {
+try {
+await apiCall(`/mood/mood/${id}`, { method: "DELETE" });
+tg?.showPopup?.({ message: "Mood log deleted" });
+loadLogs();
+} catch (e) {
+tg?.showAlert?.("Failed to delete: " + (e?.message || String(e)));
+}
+};
+
+return (
+<div>
+<div className="header">
+<div>
+<h1>Mood</h1>
+{(() => {
+const name = (userDisplayName || "").trim();
+return name ? <div className="reminders-greeting">Hello {name}</div> : null;
+})()}
+</div>
+
+    <button className="btn btn-secondary" type="button" onClick={onBack}>
+      Back
+    </button>
+  </div>
+
+  <div className="quick-actions">
+    <div
+      className={`quick-action ${tab === "log" ? "active" : ""}`}
+      onClick={() => setTab("log")}
+    >
+      Log Mood
+    </div>
+    <div
+      className={`quick-action ${tab === "history" ? "active" : ""}`}
+      onClick={() => setTab("history")}
+    >
+      History
+    </div>
+  </div>
+
+  {/* Result card (shows after successful log) */}
+  {lastResult && (
+    <MoodResultCard
+      log={lastResult}
+      onDismiss={() => setLastResult(null)}
+    />
+  )}
+
+  {/* LOG TAB */}
+  {tab === "log" && !lastResult && (
+    <div style={{ padding: "0 16px" }}>
+      <MoodMultiSelect
+        label="How are you feeling?"
+        options={DEFAULT_MOODS}
+        selected={moods}
+        onChange={setMoods}
+        pillClass="mood-pill-mood"
+      />
+
+      <MoodMultiSelect
+        label="What have you been doing?"
+        options={DEFAULT_ACTIVITIES}
+        selected={activities}
+        onChange={setActivities}
+        pillClass="mood-pill-activity"
+      />
+
+      <div className="form-group">
+        <label className="form-label">Note (optional)</label>
+        <textarea
+          className="form-textarea form-textarea--sm"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Anything else on your mind?"
+          maxLength={500}
+        />
+      </div>
+
+      <button
+        className="btn btn-primary"
+        onClick={handleLog}
+        disabled={saving || moods.length === 0}
+        type="button"
+        style={{ width: "100%", justifyContent: "center", padding: 14 }}
+      >
+        {saving ? "Logging…" : "Log Mood"}
+      </button>
+    </div>
+  )}
+
+  {/* HISTORY TAB */}
+  {tab === "history" && (
+    <div>
+      {logsLoading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading mood history…</div>
+        </div>
+      ) : logs.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <img src="/icons/star.svg" alt="" />
+          </div>
+          <div className="empty-state-text">
+            No mood logs yet.{"\n"}Log your first mood!
+          </div>
+        </div>
+      ) : (
+        logs.map((log) => (
+          <MoodLogHistoryCard
+            key={log._id}
+            log={log}
+            onDelete={handleDelete}
+          />
+        ))
+      )}
+    </div>
+  )}
+</div>
+
+);
+}
+
+
 
 // =========================
 // HABITS UI (FIXED for iOS WebView strict input formats)
@@ -8093,6 +8845,17 @@ useEffect(() => {
     >
       <img src="/icons/plus.svg" alt="" />
     </button>
+    
+    {/* MOOD ICON BUTTON */}
+        <button
+      type="button"
+       className="icon-btn"
+       aria-label="Mood"
+       title="Mood"
+       onClick={() => goTo(‘mood’)}
+     >
+      <img src="/icons/star.svg" alt="" />
+     </button>
 
     {/* HISTORY TOGGLE */}
     <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
@@ -8944,6 +9707,17 @@ return (
     onBack={goBack}
   />
 </div>
+
+   <div
+     className={`view-container ${activeView === 'mood' ? 'active' : ''}`}
+     data-view="mood"
+   >
+     <MoodView
+       activeView={activeView}
+       userDisplayName={userDisplayName}
+       onBack={goBack}
+     />
+   </div>
 
 <div
   className={`view-container ${activeView === 'checklist' ? 'active' : ''}`}

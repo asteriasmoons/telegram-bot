@@ -18,6 +18,8 @@ import checklistRouter from "./miniapp/checklist-api";
 
 import intentionsRouter from "./miniapp/intentions-api";
 
+import moodRouter from "./miniapp/mood-api";
+
 
 
 type StartServerOpts = {
@@ -116,6 +118,7 @@ app.use("/api/miniapp/eventShare", miniAppAuth, eventShareApiRouter);
 app.use("/api/miniapp/habits", miniAppAuth, habitsRouter);
 app.use("/api/miniapp/checklist", miniAppAuth, checklistRouter);
 app.use("/api/miniapp/intentions", miniAppAuth, intentionsRouter);
+app.use("/api/miniapp/mood", miniAppAuth, moodRouter);
 
 
   // ---- Mini App static files (if you serve them here) ----
