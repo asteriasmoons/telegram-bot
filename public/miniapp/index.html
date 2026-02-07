@@ -3080,6 +3080,40 @@ transition: opacity 0.2s;
 .mood-log-delete:hover {
 opacity: 1;
 }
+
+.horoscope-card,
+.horoscope-result-card {
+  margin: 0 16px 16px;
+}
+
+.horoscope-form {
+  display: grid;
+  gap: 10px;
+}
+
+.horoscope-result-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.horoscope-zodiac {
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.horoscope-date {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.horoscope-text {
+  white-space: pre-line;
+  line-height: 1.55;
+  opacity: 0.95;
+}
 </style>
 </head>
 
@@ -6846,6 +6880,99 @@ useEffect(() => {
   );
 }
 
+// HOROSCOPE VIEW
+function HoroscopeView({ onBack }) {
+  const ZODIAC = [
+  "aries","taurus","gemini","cancer","leo","virgo", "libra","scorpio","sagittarius","capricorn","aquarius","pisces"
+  ];
+
+  const [zodiac, setZodiac] = useState("aries");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const fetchHoroscope = async () => {
+    try {
+      setLoading(true);
+      setResult(null);
+
+      const data = await apiCall(`/horoscope/horoscope?zodiac=${encodeURIComponent(zodiac)}`);
+      setResult(data?.horoscope || null);
+    } catch (e) {
+      tg.showAlert("Failed to fetch horoscope: " + (e?.message || "Unknown error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="header">
+        <h1>Horoscope</h1>
+        <div className="journal-header-actions">
+          <button className="btn btn-secondary" type="button" onClick={onBack}>
+            Back
+          </button>
+        </div>
+      </div>
+
+      <div className="card horoscope-card">
+        <div className="horoscope-form">
+          <label className="form-label">Choose your zodiac</label>
+
+          <select
+            className="form-input"
+            value={zodiac}
+            onChange={(e) => setZodiac(e.target.value)}
+          >
+            {ZODIAC.map((z) => (
+              <option key={z} value={z}>
+                {z[0].toUpperCase() + z.slice(1)}
+              </option>
+            ))}
+          </select>
+
+          <div className="card-actions">
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={fetchHoroscope}
+              disabled={loading}
+            >
+              {loading ? "Loading..." : "Get Horoscope"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card horoscope-result-card">
+        {loading ? (
+          <div className="loading">
+            <div className="spinner" />
+            <div>Fetching your stars...</div>
+          </div>
+        ) : result ? (
+          <>
+            <div className="horoscope-result-header">
+              <div className="horoscope-zodiac">
+                {String(result.zodiac || zodiac).toUpperCase()}
+              </div>
+              <div className="horoscope-date">{result.date || ""}</div>
+            </div>
+
+            <div className="horoscope-text">
+              {result.horoscope || ""}
+            </div>
+          </>
+        ) : (
+          <div className="empty-state-text">
+            Pick a zodiac sign and tap "Get Horoscope".
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Journals View
 function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect }) {
   const [entries, setEntries] = useState([]);
@@ -7012,6 +7139,18 @@ const handleGeneratePrompt = async () => {
     >
       <img src="/icons/tag.svg" alt="" />
     </button>
+    
+    button>
+
+  <button
+    className="icon-btn"
+    type="button"
+    onClick={() => onOpenHoroscope && onOpenHoroscope()}
+    aria-label="Horoscope"
+    title="Horoscope"
+  >
+    <img src="/icons/planet.svg" alt="" />
+  </button>
 
     <button
       className="btn btn-prompt"
@@ -9863,6 +10002,10 @@ if (data?.settings?.displayName !== undefined) {
   function openHabitsFromReminders() {
   goTo("habits");
 }
+
+function openHoroscope() {
+  goTo("horoscope");
+}
   
   function openJournalTag(tag) {
   const clean = String(tag || "").trim().toLowerCase().replace(/^#/, "");
@@ -9990,6 +10133,7 @@ return (
   onOpenTags={() => goTo("journal_tags")}
   onClearTag={() => setJournalTagFilter("")}
   onTagSelect={openJournalTag}
+  onOpenHoroscope={openHoroscope}
 />
       </div>
       
@@ -10002,6 +10146,16 @@ return (
     onPickTag={(tag) => {
       setJournalTagFilter(tag);
       goTo("journal");
+    }}
+  />
+</div>
+
+    <div
+  className={`view-container ${activeView === 'horoscope' ? 'active' : ''}`}
+  data-view="horoscope"
+>
+  <HoroscopeView
+    onBack={goBack}
     }}
   />
 </div>
