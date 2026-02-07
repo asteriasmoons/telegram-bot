@@ -106,19 +106,23 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: -1;
+
   background:
+    /* Purple dominant */
     radial-gradient(900px 650px at 28% 18%, rgba(128, 0, 254, 0.34), transparent 62%),
+
+    /* Teal/Blue dominant */
     radial-gradient(950px 720px at 76% 78%, rgba(0, 219, 255, 0.22), transparent 64%),
 
-    /* Yellow stronger + smaller */
-    radial-gradient(420px 340px at 60% 24%, rgba(246, 246, 132, 0.30), transparent 72%),
+    /* Yellow accent - pull it into the visible "top middle" */
+    radial-gradient(520px 420px at 58% 26%, rgba(246, 246, 132, 0.22), transparent 70%),
 
-    /* Pink stronger + smaller */
-    radial-gradient(420px 340px at 40% 76%, rgba(224, 25, 212, 0.20), transparent 74%);
+    /* Pink accent - pull it into the visible "lower middle-left" */
+    radial-gradient(520px 420px at 42% 74%, rgba(224, 25, 212, 0.14), transparent 72%);
 
   background-blend-mode: normal;
   opacity: 1;
-  filter: blur(1.5px) saturate(1.22);
+  filter: blur(2px) saturate(1.18);
 }
 
 /* =========================================================
