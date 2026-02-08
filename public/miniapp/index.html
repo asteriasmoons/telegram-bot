@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Lystaria</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -44,6 +44,8 @@
 
   /* Telegram viewport height (will be set by JS) */
   --tg-viewport-height: 100vh;
+  --tg-safe-top: 0px;
+  --tg-safe-bottom: 0px;
 
   --gradient-blue: linear-gradient(135deg, #5b8def 0%, #8b7def 100%);
 
@@ -326,8 +328,10 @@ body::after {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
 }
+
 
 /* =========================================================
    BOTTOM NAV
@@ -337,10 +341,9 @@ body::after {
   bottom: 0;
   left: 0;
   right: 0;
-
   display: flex;
   justify-content: space-around;
-  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+  padding: 12px 0 calc(12px + var(--tg-safe-bottom, env(safe-area-inset-bottom)));
   z-index: 1000;
 }
 
@@ -3329,6 +3332,24 @@ function syncTelegramViewportHeight() {
 
 syncTelegramViewportHeight();
 tg.onEvent("viewportChanged", syncTelegramViewportHeight);
+
+// --- Telegram content safe area insets (fullscreen mode) ---
+function syncSafeAreaInsets() {
+  try {
+    const sa = tg.safeAreaInset || {};
+    const csa = tg.contentSafeAreaInset || {};
+
+    const topInset = (sa.top || 0) + (csa.top || 0);
+    const bottomInset = (sa.bottom || 0) + (csa.bottom || 0);
+
+    document.documentElement.style.setProperty("--tg-safe-top", `${topInset}px`);
+    document.documentElement.style.setProperty("--tg-safe-bottom", `${bottomInset}px`);
+  } catch (e) {}
+}
+
+syncSafeAreaInsets();
+tg.onEvent("safeAreaChanged", syncSafeAreaInsets);
+tg.onEvent("contentSafeAreaChanged", syncSafeAreaInsets);
 // ---------------------------------------------------------------------------
 
     // Helper function to make API calls
