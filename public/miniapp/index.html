@@ -3114,6 +3114,134 @@ opacity: 1;
   line-height: 1.55;
   opacity: 0.95;
 }
+
+/* ============================================ */
+/* SPECIFIC ICON BTN IMAGES */
+/* ============================================ */
+
+/* ----------- CHECKLIST PAGE BTN --------------*/
+.checklist-icon-btn {
+  background: rgba(91, 141, 239, 0.15);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #5b8def;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checklist-icon-btn img {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;           /* kills baseline weirdness */
+  opacity: 0.9;             /* optional: makes it match your muted text */
+  transform: translateY(1px); /* optical alignment (tweak 0–2px) */
+}
+
+/* ----------- MOOD PAGE BTN -----------------*/
+
+.mood-icon-btn {
+  background: rgba(91, 141, 239, 0.15);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #5b8def;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mood-icon-btn img {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;           /* kills baseline weirdness */
+  opacity: 0.9;             /* optional: makes it match your muted text */
+  transform: translateY(1px); /* optical alignment (tweak 0–2px) */
+}
+
+/* ----------- HABITS PAGE BTN -----------------*/
+
+.habits-icon-btn {
+  background: rgba(91, 141, 239, 0.15);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #5b8def;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.habits-icon-btn img {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;           /* kills baseline weirdness */
+  opacity: 0.9;             /* optional: makes it match your muted text */
+  transform: translateY(1px); /* optical alignment (tweak 0–2px) */
+}
+
+/* ----------- TAGS PAGE BTN -----------------*/
+
+.tags-icon-btn {
+  background: rgba(91, 141, 239, 0.15);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #5b8def;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tags-icon-btn img {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;           /* kills baseline weirdness */
+  opacity: 0.9;             /* optional: makes it match your muted text */
+  transform: translateY(1px); /* optical alignment (tweak 0–2px) */
+}
+
+/* ----------- HOROSCOPE PAGE BTN --------------*/
+
+.horoscope-icon-btn {
+  background: rgba(91, 141, 239, 0.15);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: #5b8def;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.horoscope-icon-btn img {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;           /* kills baseline weirdness */
+  opacity: 0.9;             /* optional: makes it match your muted text */
+  transform: translateY(1px); /* optical alignment (tweak 0–2px) */
+}
 </style>
 </head>
 
@@ -7160,7 +7288,7 @@ const handleGeneratePrompt = async () => {
 
   <div className="journal-header-actions">
     <button
-      className="icon-btn"
+      className="tags-icon-btn"
       type="button"
       onClick={() => onOpenTags && onOpenTags()}
       aria-label="Tags"
@@ -7170,7 +7298,7 @@ const handleGeneratePrompt = async () => {
     </button>
 
   <button
-    className="icon-btn"
+    className="horoscope-icon-btn"
     type="button"
     onClick={() => onOpenHoroscope && onOpenHoroscope()}
     aria-label="Horoscope"
@@ -9225,7 +9353,7 @@ useEffect(() => {
     {/* CHECKLIST ICON BUTTON */}
     <button
       type="button"
-      className="icon-btn"
+      className="checklist-icon-btn"
       aria-label="Checklist"
       title="Checklist"
       onClick={() => goTo('checklist')}
@@ -9236,7 +9364,7 @@ useEffect(() => {
     {/* HABITS ICON BUTTON */}
     <button
       type="button"
-      className="icon-btn"
+      className="habits-icon-btn"
       aria-label="Habits"
       title="Habits"
       onClick={onOpenHabits}
@@ -9247,7 +9375,7 @@ useEffect(() => {
     {/* MOOD ICON BUTTON */}
         <button
       type="button"
-       className="icon-btn"
+       className="mood-icon-btn"
        aria-label="Mood"
        title="Mood"
        onClick={() => goTo('mood')}
