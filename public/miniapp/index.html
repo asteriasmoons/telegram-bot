@@ -3245,6 +3245,44 @@ opacity: 1;
   opacity: 0.9;             /* optional: makes it match your muted text */
   transform: translateY(1px); /* optical alignment (tweak 0–2px) */
 }
+
+/* =========================================================
+   EVENT PREVIEW MODAL
+   ========================================================= */
+.event-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.event-preview-row img {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  opacity: 0.85;
+}
+
+.event-preview-row span {
+  min-width: 0;
+}
+
+.event-preview-recurrence span {
+  text-transform: capitalize;
+}
+
+.event-preview-description {
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(139, 125, 239, 0.08);
+  border-left: 3px solid #8b7def;
+  border-radius: 8px;
+  white-space: pre-line;
+  line-height: 1.6;
+  font-size: 15px;
+}
 </style>
 </head>
 
@@ -8987,6 +9025,113 @@ const toggleWeekday = (idx) => {
 }
 
 
+    // Event Preview Modal (read-only detail view)
+    function EventPreviewModal({ event, onClose, onEdit, onDelete }) {
+      useEffect(() => {
+        document.body.classList.add('modal-open');
+        return () => document.body.classList.remove('modal-open');
+      }, []);
+
+      if (!event) return null;
+
+      const title = (event.title || event.text || event.name || "(untitled event)").trim();
+      const startDate = event.startDate ? new Date(event.startDate) : null;
+
+      const dateStr = startDate
+        ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+        : "";
+
+      const timeStr = event.allDay
+        ? "All day"
+        : formatEventTime(event);
+
+      const hasRem = hasReminder(event);
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{title}</h2>
+              <button className="modal-close" onClick={onClose} type="button">×</button>
+            </div>
+
+            <div className="modal-body">
+              {dateStr && (
+                <div className="event-preview-row">
+                  <img src="/icons/cal.svg" alt="" />
+                  <span>{dateStr}</span>
+                </div>
+              )}
+
+              {timeStr && (
+                <div className="event-preview-row">
+                  <img src="/icons/alarm.svg" alt="" />
+                  <span>{timeStr}</span>
+                </div>
+              )}
+
+              {event.location && (
+                <div className="event-preview-row">
+                  <img src="/icons/location.svg" alt="" />
+                  <span>{event.location}</span>
+                </div>
+              )}
+
+              {hasRem && (
+                <div className="event-preview-row">
+                  <img src="/icons/bell.svg" alt="" />
+                  <span>Reminder set</span>
+                </div>
+              )}
+
+              {event.recurrence && event.recurrence.freq && (
+                <div className="event-preview-row event-preview-recurrence">
+                  <img src="/icons/calendar.svg" alt="" />
+                  <span>
+                    Repeats {event.recurrence.freq}
+                    {event.recurrence.interval && event.recurrence.interval > 1
+                      ? ` every ${event.recurrence.interval}`
+                      : ""}
+                  </span>
+                </div>
+              )}
+
+              {event.description && (
+                <div className="event-preview-description">
+                  {event.description}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions journal-preview-actions">
+              <button className="btn btn-primary" onClick={() => onEdit(event)} type="button">
+                <img src="/icons/pencil.svg" alt="" />
+                Edit
+              </button>
+
+              <button className="btn btn-secondary" onClick={onClose} type="button">
+                Close
+              </button>
+
+              <button
+                className="btn btn-danger"
+                type="button"
+                onClick={() => {
+                  if (!event?._id) return;
+                  onDelete(event._id);
+                  onClose();
+                }}
+              >
+                <img src="/icons/trash.svg" alt="" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+
     // Calendar View - Day List Style
 function CalendarView({ onOpenSettings, userTimezone, onOpenEventShare }) {
       const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -8995,6 +9140,7 @@ function CalendarView({ onOpenSettings, userTimezone, onOpenEventShare }) {
       const [showEventModal, setShowEventModal] = useState(false);
       const [editingEvent, setEditingEvent] = useState(null);
       const [selectedDate, setSelectedDate] = useState(null);
+            const [previewEvent, setPreviewEvent] = useState(null);
       const createEventRefs = useRef({});
 
       useEffect(() => {
@@ -9183,9 +9329,9 @@ const data = await apiCall(
                         ) : (
                           <div>
                             {dayEvents.map(event => (
-                              <div
+                                                            <div
                                 key={event._id}
-                                onClick={() => handleEditEvent(event)}
+                                onClick={() => setPreviewEvent(event)}
                                 className="calendar-event"
                               >
                                 <div className="calendar-event-top">
@@ -9241,6 +9387,22 @@ const data = await apiCall(
   data-create-event="1"
   onClick={() => handleCreateEvent(new Date())}
 />
+
+          {previewEvent && !showEventModal && (
+            <EventPreviewModal
+              event={previewEvent}
+              onClose={() => setPreviewEvent(null)}
+              onEdit={(ev) => {
+                setPreviewEvent(null);
+                handleEditEvent(ev);
+              }}
+              onDelete={(id) => {
+                setPreviewEvent(null);
+                handleDeleteEvent(id, { stopPropagation: () => {} });
+              }}
+            />
+          )}
+
           {showEventModal && (
             <EventModal
   event={editingEvent}
