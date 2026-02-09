@@ -29,17 +29,16 @@ export type ReminderSchedule = {
 };
 
 export type ReminderLock = {
-lockedAt?: Date;
-lockExpiresAt?: Date;
-lockedBy?: string;
+  lockedAt?: Date;
+  lockExpiresAt?: Date;
+  lockedBy?: string;
 };
 
 /**
-
-- Telegram message entities (minimal shape).
-- We store them as plain objects so Telegraf/Telegram can re-use them on send.
-  */
-  export type TgEntity = {
+ * Telegram message entities (minimal shape).
+ * We store them as plain objects so Telegraf/Telegram can re-use them on send.
+ */
+export type TgEntity = {
   type: string;
   offset: number;
   length: number;
@@ -47,39 +46,42 @@ lockedBy?: string;
   user?: any;
   language?: string;
   custom_emoji_id?: string;
-  };
+};
 
 export type ReminderDoc = {
-_id: Types.ObjectId;
+  _id: Types.ObjectId;
 
-userId: number; // Telegram user id
-chatId: number; // Telegram chat id where reminder is sent
+  userId: number; // Telegram user id
+  chatId: number; // Telegram chat id where reminder is sent
 
-text: string;
+  text: string;
 
-// NEW: preserve Telegram entities so custom emojis survive DB storage.
-entities?: TgEntity[];
+  // NEW: preserve Telegram entities so custom emojis survive DB storage.
+  entities?: TgEntity[];
 
-runDayKey?: string;       // e.g. "2026-02-05" in the reminder's timezone
-sentTimesOfDay?: string[]; // e.g. ["09:00","14:00"]
+  runDayKey?: string;       // e.g. "2026-02-05" in the reminder's timezone
+  sentTimesOfDay?: string[]; // e.g. ["09:00","14:00"]
 
-status: ReminderStatus;
+  status: ReminderStatus;
 
-// Scheduler field
-nextRunAt: Date;
+  // Scheduler field
+  nextRunAt: Date;
 
-// Optional schedule metadata (for repeating reminders)
-schedule?: ReminderSchedule;
+  // Pre-computed next run for recurring reminders (set on fire, consumed on Done)
+  pendingNextRunAt?: Date;
 
-timezone: string;
+  // Optional schedule metadata (for repeating reminders)
+  schedule?: ReminderSchedule;
 
-// Execution bookkeeping
-createdAt: Date;
-updatedAt: Date;
-lastRunAt?: Date;
+  timezone: string;
 
-// Locking for multi-process safety
-lock?: ReminderLock;
+  // Execution bookkeeping
+  createdAt: Date;
+  updatedAt: Date;
+  lastRunAt?: Date;
+
+  // Locking for multi-process safety
+  lock?: ReminderLock;
 };
 
 const ReminderScheduleSchema = new Schema<ReminderSchedule>(
@@ -114,47 +116,46 @@ const ReminderScheduleSchema = new Schema<ReminderSchedule>(
 );
 
 const ReminderLockSchema = new Schema<ReminderLock>(
-{
-lockedAt: { type: Date, required: false },
-lockExpiresAt: { type: Date, required: false },
-lockedBy: { type: String, required: false }
-},
-{ _id: false }
+  {
+    lockedAt: { type: Date, required: false },
+    lockExpiresAt: { type: Date, required: false },
+    lockedBy: { type: String, required: false }
+  },
+  { _id: false }
 );
 
 const ReminderSchema = new Schema<ReminderDoc>(
-{
-userId: { type: Number, required: true, index: true },
-chatId: { type: Number, required: true, index: true },
-text: { type: String, required: true },
+  {
+    userId: { type: Number, required: true, index: true },
+    chatId: { type: Number, required: true, index: true },
+    text: { type: String, required: true },
 
+    // NEW: store entities as plain objects (Mixed) so we don't fight Telegram typing.
+    entities: { type: [Schema.Types.Mixed], required: false },
 
-// NEW: store entities as plain objects (Mixed) so we don't fight Telegram typing.
-entities: { type: [Schema.Types.Mixed], required: false },
+    status: {
+      type: String,
+      required: true,
+      enum: ["scheduled", "sent", "paused", "deleted"],
+      default: "scheduled"
+    },
 
-status: {
-  type: String,
-  required: true,
-  enum: ["scheduled", "sent", "paused", "deleted"],
-  default: "scheduled"
-},
+    nextRunAt: { type: Date, required: true, index: true },
 
-nextRunAt: { type: Date, required: true, index: true },
+    pendingNextRunAt: { type: Date, required: false },
 
-runDayKey: { type: String, required: false },
-sentTimesOfDay: { type: [String], required: false, default: [] },
+    runDayKey: { type: String, required: false },
+    sentTimesOfDay: { type: [String], required: false, default: [] },
 
-schedule: { type: ReminderScheduleSchema, required: false },
+    schedule: { type: ReminderScheduleSchema, required: false },
 
-timezone: { type: String, required: true },
+    timezone: { type: String, required: true },
 
-lastRunAt: { type: Date, required: false },
+    lastRunAt: { type: Date, required: false },
 
-lock: { type: ReminderLockSchema, required: false, default: () => ({}) }
-
-
-},
-{ timestamps: true }
+    lock: { type: ReminderLockSchema, required: false, default: () => ({}) }
+  },
+  { timestamps: true }
 );
 
 // Helpful compound indexes for polling + filtering
@@ -162,5 +163,5 @@ ReminderSchema.index({ status: 1, nextRunAt: 1 });
 ReminderSchema.index({ "lock.lockExpiresAt": 1 });
 
 export const Reminder: Model<ReminderDoc> =
-(mongoose.models.Reminder as Model<ReminderDoc>) ||
-mongoose.model<ReminderDoc>("Reminder", ReminderSchema);
+  (mongoose.models.Reminder as Model<ReminderDoc>) ||
+  mongoose.model<ReminderDoc>("Reminder", ReminderSchema);

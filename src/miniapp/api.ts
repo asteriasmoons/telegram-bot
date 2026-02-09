@@ -141,16 +141,14 @@ router.get("/reminders", async (req, res) => {
       // For active reminders, include:
       // 1. All "scheduled" reminders
       // 2. "sent" reminders with recurring schedules that are due today or in the future
-      query.$or = [
+            query.$or = [
         { status: "scheduled" },
         {
           status: "sent",
           schedule: { $exists: true, $ne: null },
           "schedule.kind": { $in: ["daily", "weekly", "monthly", "yearly", "interval"] },
-          nextRunAt: { $lte: new Date(Date.now() + 24 * 60 * 60 * 1000) } // Due within next 24 hours
         }
       ];
-    }
 
     const reminders = await Reminder.find(query)
       .sort({ nextRunAt: 1 })
@@ -541,15 +539,21 @@ const tz = settings?.timezone || rem.timezone || "America/Chicago";
       return res.json({ reminder: updated });
     }
 
-    // Recurring reminders: advance nextRunAt and keep scheduled
-const next = computeNextRunAtWithTimes(rem, now);
+        // Recurring reminders: advance nextRunAt and keep scheduled
+    const next = rem.pendingNextRunAt
+      ? new Date(rem.pendingNextRunAt)
+      : computeNextRunAtWithTimes(rem, now);
+
     if (!next) {
       return res.status(500).json({ error: "Could not compute next run time" });
     }
 
     const updated = await Reminder.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
-      { $set: { status: "scheduled", lastRunAt: now, nextRunAt: next } },
+      {
+        $set: { status: "scheduled", lastRunAt: now, nextRunAt: next },
+        $unset: { pendingNextRunAt: 1 },
+      },
       { new: true }
     ).lean();
 

@@ -500,8 +500,10 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
       const kind = rem.schedule?.kind || "once";
 
       // If repeating, advance to next occurrence and keep it scheduled
-      if (kind !== "once") {
-        const nextRunAt = computeNextRunAtWithTimes(rem, new Date());
+            if (kind !== "once") {
+        const nextRunAt = rem.pendingNextRunAt
+          ? new Date(rem.pendingNextRunAt)
+          : computeNextRunAtWithTimes(rem, new Date());
 
         if (nextRunAt) {
           await Reminder.updateOne(
@@ -512,6 +514,7 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
                 lastRunAt: new Date(),
                 nextRunAt,
               },
+              $unset: { pendingNextRunAt: 1 },
             }
           );
 
@@ -521,7 +524,14 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
         }
 
         // If for some reason we can't compute next, just mark sent.
-        await Reminder.updateOne({ _id: id, userId }, { $set: { status: "sent", lastRunAt: new Date() } });
+        await Reminder.updateOne(
+          { _id: id, userId },
+          {
+            $set: { status: "sent", lastRunAt: new Date() },
+            $unset: { pendingNextRunAt: 1 },
+          }
+        );
+
         await ctx.reply("Marked done.");
         return;
       }
@@ -670,14 +680,14 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
           // Prefer Luxon recurrence (timezone-accurate)
           const nextForRepeat = computeNextRunAtWithTimes(rem, now());
 
-          if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
+                    if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
             await Reminder.updateOne(
               { _id: rem._id },
               {
                 $set: {
-                  nextRunAt: nextForRepeat,
+                  pendingNextRunAt: nextForRepeat,
                   lastRunAt: now(),
-                  status: "scheduled",
+                  status: "sent",
                 },
               }
             );
