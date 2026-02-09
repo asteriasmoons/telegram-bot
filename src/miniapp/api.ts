@@ -149,6 +149,7 @@ router.get("/reminders", async (req, res) => {
           "schedule.kind": { $in: ["daily", "weekly", "monthly", "yearly", "interval"] },
         }
       ];
+    } 
 
     const reminders = await Reminder.find(query)
       .sort({ nextRunAt: 1 })
