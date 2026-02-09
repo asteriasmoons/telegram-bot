@@ -6,6 +6,7 @@ import { Reminder } from "../models/Reminder";
 import { UserSettings } from "../models/UserSettings";
 import crypto from "crypto";
 import { DateTime } from "luxon";
+import { computeNextRunAtWithTimes } from "../scheduler";
 
 // ✅ ADDED (for Premium unlimited)
 import { Premium } from "../models/Premium";
@@ -541,7 +542,7 @@ const tz = settings?.timezone || rem.timezone || "America/Chicago";
     }
 
     // Recurring reminders: advance nextRunAt and keep scheduled
-const next = computeNextRunFromSchedule(rem.schedule || { kind: "once" }, tz, now);
+const next = computeNextRunAtWithTimes(rem, now);
     if (!next) {
       return res.status(500).json({ error: "Could not compute next run time" });
     }

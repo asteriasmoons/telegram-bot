@@ -186,7 +186,7 @@ function nextOccurrenceDay(rem: any, tz: string, fromDayStart: DateTime): DateTi
   return null;
 }
 
-function computeNextRunAtWithTimes(rem: any, fromDate: Date): Date | null {
+export function computeNextRunAtWithTimes(rem: any, fromDate: Date): Date | null {
   const sched = rem?.schedule;
   if (!sched || sched.kind === "once") return null;
 
