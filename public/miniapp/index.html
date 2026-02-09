@@ -3283,6 +3283,26 @@ opacity: 1;
   line-height: 1.6;
   font-size: 15px;
 }
+
+/* =========================================================
+   REMINDER TIME-STATUS BADGES
+   ========================================================= */
+.badge-due-now {
+  background: rgba(255, 183, 37, 0.22);
+  color: #ffb725;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+.badge-upcoming {
+  background: rgba(0, 219, 255, 0.18);
+  color: #00dbff;
+}
+
+@keyframes badgePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.65; }
+}
+
 </style>
 </head>
 
@@ -7689,6 +7709,30 @@ function formatTime12h(hhmm) {
   return `${h}:${m} ${suffix}`;
 }
 
+      const getStatusBadge = () => {
+  const st = reminder.status;
+  const nextRun = reminder.nextRunAt ? new Date(reminder.nextRunAt) : null;
+  const now = new Date();
+
+  if (st === "sent") {
+    return { label: "DUE NOW", className: "badge-due-now" };
+  }
+
+  if (st === "scheduled" && nextRun) {
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    if (nextRun >= now && nextRun < todayEnd) {
+      return { label: "UPCOMING", className: "badge-upcoming" };
+    }
+  }
+
+  return null;
+};
+
+      const statusBadge = getStatusBadge();
+
       return (
         <div className="card" onClick={() => setExpanded(!expanded)}>
 <div className="card-header">
@@ -7710,9 +7754,17 @@ function formatTime12h(hhmm) {
     )}
   </div>
 
-  <span className={getBadgeClass()}>
-    {getBadgeLabel()}
-  </span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+    <span className={getBadgeClass()}>
+      {getBadgeLabel()}
+    </span>
+
+    {statusBadge && (
+      <span className={`card-badge ${statusBadge.className}`}>
+        {statusBadge.label}
+      </span>
+    )}
+  </div>
 </div>
 
           <div className="card-text">{reminder.text}</div>
