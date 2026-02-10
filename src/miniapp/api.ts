@@ -166,15 +166,22 @@ router.get("/reminders", async (req, res) => {
     const reminders = await Reminder.find(query).lean();
 
     // ✅ Pin DUE NOW (status="sent") at the top, then sort by nextRunAt
-    const sortedReminders = reminders.sort((a: any, b: any) => {
-      const aDue = a.status === "sent" ? 0 : 1;
-      const bDue = b.status === "sent" ? 0 : 1;
-      if (aDue !== bDue) return aDue - bDue;
+const isDueNow = (r: any) => {
+  const kind = r?.schedule?.kind || "once";
+  const isOnce = !r.schedule || kind === "once";
+  const unacked = r.acknowledgedAt == null;
+  return r.status === "sent" && isOnce && unacked;
+};
 
-      const aTime = a.nextRunAt ? new Date(a.nextRunAt).getTime() : 0;
-      const bTime = b.nextRunAt ? new Date(b.nextRunAt).getTime() : 0;
-      return aTime - bTime;
-    });
+const sortedReminders = reminders.sort((a: any, b: any) => {
+  const aDue = isDueNow(a) ? 0 : 1;
+  const bDue = isDueNow(b) ? 0 : 1;
+  if (aDue !== bDue) return aDue - bDue;
+
+  const aTime = a.nextRunAt ? new Date(a.nextRunAt).getTime() : 0;
+  const bTime = b.nextRunAt ? new Date(b.nextRunAt).getTime() : 0;
+  return aTime - bTime;
+});
 
     // For display purposes, treat recurring "sent" reminders as "scheduled" if they're due soon
     const processedReminders = sortedReminders.map((r: any) => {
