@@ -131,60 +131,57 @@ router.use((req, res, next) => {
 // GET /api/miniapp/reminders - Get all reminders for user
 router.get("/reminders", async (req, res) => {
   try {
-    const { status = "scheduled", includeHistory = "false" } = req.query;
+    const { includeHistory = "false" } = req.query;
 
     const query: any = { userId: req.userId };
 
     if (includeHistory === "true") {
       query.status = { $in: ["scheduled", "sent"] };
     } else {
-      // For active reminders, include:
-      // 1. All "scheduled" reminders
-      // 2. "sent" reminders with recurring schedules that are due today or in the future
-            query.$or = [
-  // Normal scheduled reminders
-  { status: "scheduled" },
+      // Active reminders:
+      // - scheduled
+      // - recurring sent (so they can show as scheduled in UI)
+      // - one-time sent BUT not acknowledged (so they stay as DUE NOW)
+      query.$or = [
+        { status: "scheduled" },
 
-  // Recurring reminders that were sent but not completed yet (your existing behavior)
-  {
-    status: "sent",
-    schedule: { $exists: true, $ne: null },
-    "schedule.kind": { $in: ["daily", "weekly", "monthly", "yearly", "interval"] },
-  },
+        {
+          status: "sent",
+          schedule: { $exists: true, $ne: null },
+          "schedule.kind": { $in: ["daily", "weekly", "monthly", "yearly", "interval"] },
+        },
 
-  // ✅ NEW: one-time reminders that fired should remain visible as "DUE NOW"
-  // until the user acknowledges (Done) them.
-  {
-    status: "sent",
-    $or: [
-      { schedule: { $exists: false } },
-      { schedule: null },
-      { "schedule.kind": "once" },
-    ],
-    acknowledgedAt: { $in: [null, undefined] },
-  },
-];
+        {
+          status: "sent",
+          $or: [
+            { schedule: { $exists: false } },
+            { schedule: null },
+            { "schedule.kind": "once" },
+          ],
+          acknowledgedAt: { $in: [null, undefined] },
+        },
+      ];
+    }
 
-const reminders = await Reminder.find(query).lean();
+    const reminders = await Reminder.find(query).lean();
 
-// ✅ Pin DUE NOW (status="sent") at the top, then sort by nextRunAt
-const sortedReminders = reminders.sort((a: any, b: any) => {
-  const aDue = a.status === "sent" ? 0 : 1;
-  const bDue = b.status === "sent" ? 0 : 1;
-  if (aDue !== bDue) return aDue - bDue;
+    // ✅ Pin DUE NOW (status="sent") at the top, then sort by nextRunAt
+    const sortedReminders = reminders.sort((a: any, b: any) => {
+      const aDue = a.status === "sent" ? 0 : 1;
+      const bDue = b.status === "sent" ? 0 : 1;
+      if (aDue !== bDue) return aDue - bDue;
 
-  const aTime = a.nextRunAt ? new Date(a.nextRunAt).getTime() : 0;
-  const bTime = b.nextRunAt ? new Date(b.nextRunAt).getTime() : 0;
-  return aTime - bTime;
-});
+      const aTime = a.nextRunAt ? new Date(a.nextRunAt).getTime() : 0;
+      const bTime = b.nextRunAt ? new Date(b.nextRunAt).getTime() : 0;
+      return aTime - bTime;
+    });
 
     // For display purposes, treat recurring "sent" reminders as "scheduled" if they're due soon
-const processedReminders = sortedReminders.map(r => {
+    const processedReminders = sortedReminders.map((r: any) => {
       if (r.status === "sent" && r.schedule && r.schedule.kind !== "once") {
         const nextRun = new Date(r.nextRunAt);
         const now = new Date();
 
-        // If nextRunAt is today or future, show it as scheduled
         if (nextRun >= now || nextRun.toDateString() === now.toDateString()) {
           return { ...r, displayStatus: "scheduled" };
         }
