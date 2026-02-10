@@ -66,6 +66,9 @@ export type ReminderDoc = {
 
   // Scheduler field
   nextRunAt: Date;
+  
+    // For one-time reminders: keep visible as DUE NOW until user acknowledges
+  acknowledgedAt?: Date | null;
 
   // Pre-computed next run for recurring reminders (set on fire, consumed on Done)
   pendingNextRunAt?: Date;
