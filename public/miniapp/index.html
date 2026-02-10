@@ -9829,16 +9829,21 @@ useEffect(() => {
       };
 
       const handleDone = async (id) => {
-        try {
-          await apiCall(`/reminders/${id}/done`, {
-            method: 'POST',
-          });
-          tg.showPopup({ message: 'Marked as done!' });
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to mark as done: ' + error.message);
-        }
-      };
+  try {
+    await apiCall(`/reminders/${id}/done`, {
+      method: 'POST',
+    });
+    tg.showPopup({ message: 'Marked as done!' });
+    
+    // Optimistically remove from local state for instant feedback
+    setReminders(prev => prev.filter(r => r._id !== id));
+    
+    // Then refresh from server to get accurate state
+    setTimeout(loadReminders, 400);
+  } catch (error) {
+    tg.showAlert('Failed to mark as done: ' + error.message);
+  }
+};
 
       const handleDelete = async (id) => {
         try {
