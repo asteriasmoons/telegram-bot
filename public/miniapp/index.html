@@ -8457,6 +8457,16 @@ function PlacesAutocomplete({ value, onChange, onPlaceSelect, enabled }) {
       ? crypto.randomUUID()
       : String(Date.now())
   );
+    const [userLoc, setUserLoc] = useState(null);
+
+  useEffect(() => {
+    if (enabled && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {} // silent fail, backend uses default
+      );
+    }
+  }, [enabled]);
   const debounceRef = useRef(null);
   const wrapRef = useRef(null);
 
@@ -8489,7 +8499,11 @@ function PlacesAutocomplete({ value, onChange, onPlaceSelect, enabled }) {
       setLoading(true);
       const data = await apiCall("/places/autocomplete", {
         method: "POST",
-        body: JSON.stringify({ input, sessionToken }),
+                body: JSON.stringify({
+          input,
+          sessionToken,
+          ...(userLoc ? { lat: userLoc.lat, lng: userLoc.lng, radius: 50000 } : {}),
+        }),
       });
       const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
       setSuggestions(list);
