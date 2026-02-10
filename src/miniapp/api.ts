@@ -541,9 +541,13 @@ const tz = settings?.timezone || rem.timezone || "America/Chicago";
     }
 
         // Recurring reminders: advance nextRunAt and keep scheduled
+    // Use whichever is later (now vs nextRunAt) so we always skip
+    // past the current occurrence -- even if marked done early.
+    const currentRunAt = rem.nextRunAt ? new Date(rem.nextRunAt) : now;
+    const fromDate = new Date(Math.max(now.getTime(), currentRunAt.getTime()));
     const next = rem.pendingNextRunAt
       ? new Date(rem.pendingNextRunAt)
-      : computeNextRunAtWithTimes(rem, now);
+      : computeNextRunAtWithTimes(rem, fromDate);
 
     if (!next) {
       return res.status(500).json({ error: "Could not compute next run time" });
