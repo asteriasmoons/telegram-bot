@@ -3371,6 +3371,34 @@ opacity: 1;
   color: var(--text-secondary);
   text-align: center;
 }
+
+.form-help {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.checkbox-row--spaced {
+  margin-top: 8px;
+}
+
+.event-preview-link {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.event-preview-link-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+}
 </style>
 </head>
 
@@ -8626,6 +8654,7 @@ function EventModal({ event, selectedDate, userTimezone, onClose, onSave }) {
   const [time, setTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [allDay, setAllDay] = useState(event?.allDay || false);
+const [meetingUrl, setMeetingUrl] = useState(event?.meetingUrl || "");
   const [location, setLocation] = useState(event?.location || '');
   
   // EVENT SHARE STATE
@@ -8693,52 +8722,64 @@ const [shareLoading, setShareLoading] = useState(false);
     };
   }, []);
 
-  useEffect(() => {
-    // -----------------------------
-    // Base event fields
-    // -----------------------------
-        if (event) {
-      const d = new Date(event.startDate);
-setDate(dateInputValue(d, userTimezone));
-setTime(timeInputValue(d, userTimezone));
-      setAllDay(!!event.allDay);
-      setLocation(event.location || '');
-      setLocationPlaceId(event.locationPlaceId || null);
-      setLocationCoords(event.locationCoords || null);
-      setPlacesEnabled(!!(event.locationPlaceId));
-      setDescription(event.description || '');
-      setTitle(event.title || '');
+useEffect(() => {
+  // -----------------------------
+  // Base event fields
+  // -----------------------------
+  if (event) {
+    const d = new Date(event.startDate);
+    setDate(dateInputValue(d, userTimezone));
+    setTime(timeInputValue(d, userTimezone));
+    setAllDay(!!event.allDay);
 
-      if (event.endDate) {
-        const e = new Date(event.endDate);
-        setEndTime(e.toTimeString().slice(0, 5));
-      } else {
-        setEndTime('');
-      }
-        } else if (selectedDate) {
-setDate(dateInputValue(selectedDate, userTimezone));
-      setTime('09:00');
-      setEndTime('10:00');
-      setAllDay(false);
-      setLocation('');
-      setLocationPlaceId(null);
-      setLocationCoords(null);
-      setPlacesEnabled(false);
-      setDescription('');
-      setTitle('');
-     } else {
-      const now = new Date();
-      setDate(now.toISOString().split('T')[0]);
-      setTime('09:00');
-      setEndTime('10:00');
-      setAllDay(false);
-      setLocation('');
-      setLocationPlaceId(null);
-      setLocationCoords(null);
-      setPlacesEnabled(false);
-      setDescription('');
-      setTitle('');
+    // NEW: meeting url
+    setMeetingUrl(event.meetingUrl || '');
+
+    setLocation(event.location || '');
+    setLocationPlaceId(event.locationPlaceId || null);
+    setLocationCoords(event.locationCoords || null);
+    setPlacesEnabled(!!(event.locationPlaceId));
+    setDescription(event.description || '');
+    setTitle(event.title || '');
+
+    if (event.endDate) {
+      const e = new Date(event.endDate);
+      setEndTime(e.toTimeString().slice(0, 5));
+    } else {
+      setEndTime('');
     }
+  } else if (selectedDate) {
+    setDate(dateInputValue(selectedDate, userTimezone));
+    setTime('09:00');
+    setEndTime('10:00');
+    setAllDay(false);
+
+    // NEW: meeting url
+    setMeetingUrl('');
+
+    setLocation('');
+    setLocationPlaceId(null);
+    setLocationCoords(null);
+    setPlacesEnabled(false);
+    setDescription('');
+    setTitle('');
+  } else {
+    const now = new Date();
+    setDate(now.toISOString().split('T')[0]);
+    setTime('09:00');
+    setEndTime('10:00');
+    setAllDay(false);
+
+    // NEW: meeting url
+    setMeetingUrl('');
+
+    setLocation('');
+    setLocationPlaceId(null);
+    setLocationCoords(null);
+    setPlacesEnabled(false);
+    setDescription('');
+    setTitle('');
+  }
 
     // -----------------------------
     // Reminder defaults + prefill
@@ -8826,7 +8867,7 @@ setRepeatInterval(intervalStr);
         }
       }
     }
-  }, [event, selectedDate]);
+}, [event, selectedDate]);
   
   useEffect(() => {
   if (
@@ -8950,18 +8991,22 @@ if (repeatEndKind === "count") {
       };
     }
 
-        await onSave({
-      title,
-      description,
-      startDate: startISO,
-      endDate: endISO || undefined,
-      allDay,
-      location,
-      locationPlaceId: locationPlaceId || null,
-      locationCoords: locationCoords || null,
-      reminder: reminderPayload,
-      recurrence,
-    });
+await onSave({
+  title,
+  description,
+  startDate: startISO,
+  endDate: endISO || undefined,
+  allDay,
+
+  meetingUrl: meetingUrl ? String(meetingUrl).trim() : "",
+
+  location,
+  locationPlaceId: locationPlaceId || null,
+  locationCoords: locationCoords || null,
+
+  reminder: reminderPayload,
+  recurrence,
+});
   };
 
   const ReminderModeButton = ({ value, label }) => {
@@ -9116,43 +9161,61 @@ const toggleWeekday = (idx) => {
             </div>
           )}
 
-            <div className="form-group">
-            <label className="form-label">Location</label>
-            <PlacesAutocomplete
-              value={location}
-              onChange={(val) => {
-                setLocation(val);
-                if (!placesEnabled) {
-                  setLocationPlaceId(null);
-                  setLocationCoords(null);
-                }
-              }}
-              onPlaceSelect={(place) => {
-                setLocationPlaceId(place.placeId || null);
-                setLocationCoords(
-                  place.lat != null && place.lng != null
-                    ? { lat: place.lat, lng: place.lng }
-                    : null
-                );
-              }}
-              enabled={placesEnabled}
-            />
+<div className="form-group">
+  <label className="form-label">URL</label>
+  <input
+    type="url"
+    className="form-input"
+    value={meetingUrl}
+    onChange={(e) => setMeetingUrl(e.target.value)}
+    placeholder="https://zoom.us/... or https://meet.google.com/..."
+    inputMode="url"
+    autoCapitalize="none"
+    autoCorrect="off"
+    spellCheck={false}
+  />
+  <div className="form-help">
+    Optional. Add a link for an online meeting.
+  </div>
+</div>
 
-            <label className="checkbox-row" style={{ marginTop: 8 }}>
-              <input
-                type="checkbox"
-                checked={placesEnabled}
-                onChange={(e) => {
-                  setPlacesEnabled(e.target.checked);
-                  if (!e.target.checked) {
-                    setLocationPlaceId(null);
-                    setLocationCoords(null);
-                  }
-                }}
-              />
-              <span>Search Google Places</span>
-            </label>
-          </div>
+<div className="form-group">
+  <label className="form-label">Location</label>
+  <PlacesAutocomplete
+    value={location}
+    onChange={(val) => {
+      setLocation(val);
+      if (!placesEnabled) {
+        setLocationPlaceId(null);
+        setLocationCoords(null);
+      }
+    }}
+    onPlaceSelect={(place) => {
+      setLocationPlaceId(place.placeId || null);
+      setLocationCoords(
+        place.lat != null && place.lng != null
+          ? { lat: place.lat, lng: place.lng }
+          : null
+      );
+    }}
+    enabled={placesEnabled}
+  />
+
+  <label className="checkbox-row checkbox-row--spaced">
+    <input
+      type="checkbox"
+      checked={placesEnabled}
+      onChange={(e) => {
+        setPlacesEnabled(e.target.checked);
+        if (!e.target.checked) {
+          setLocationPlaceId(null);
+          setLocationCoords(null);
+        }
+      }}
+    />
+    <span>Search Google Places</span>
+  </label>
+</div>
 
           {/* =============================
               Reminder section (existing)
@@ -9382,6 +9445,19 @@ const toggleWeekday = (idx) => {
         : formatEventTime(event);
 
       const hasRem = hasReminder(event);
+      
+      const openMeetingUrl = () => {
+  const url = String(event.meetingUrl || "").trim();
+  if (!url) return;
+
+  // Prefer Telegram WebApp openLink if available
+  if (typeof tg !== "undefined" && tg?.openLink) {
+    tg.openLink(url);
+    return;
+  }
+
+  window.open(url, "_blank", "noopener,noreferrer");
+};
 
       return (
         <div className="modal-overlay" onClick={onClose}>
@@ -9406,12 +9482,23 @@ const toggleWeekday = (idx) => {
                 </div>
               )}
 
-              {event.location && (
-                <div className="event-preview-row">
-                  <img src="/icons/location.svg" alt="" />
-                  <span>{event.location}</span>
-                </div>
-              )}
+              {event.meetingUrl && (
+  <button
+    type="button"
+    className="event-preview-row event-preview-link"
+    onClick={openMeetingUrl}
+  >
+    <img src="/icons/link.svg" alt="" />
+    <span className="event-preview-link-text">{event.meetingUrl}</span>
+  </button>
+)}
+
+{event.location && (
+  <div className="event-preview-row">
+    <img src="/icons/location.svg" alt="" />
+    <span>{event.location}</span>
+  </div>
+)}
 
               {hasRem && (
                 <div className="event-preview-row">

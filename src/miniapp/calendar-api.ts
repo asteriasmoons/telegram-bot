@@ -48,6 +48,7 @@ async function countReminderEvents(userId: number) {
 function buildEventReminderText(event: {
   title: string;
   description?: string;
+  meetingUrl?: string;
   location?: string;
 }) {
   const parts: string[] = [];
@@ -57,8 +58,12 @@ function buildEventReminderText(event: {
     parts.push(event.description.trim());
   }
 
+   if (event.meetingUrl && event.meetingUrl.trim()) {
+    parts.push(`${event.meetingUrl.trim()}`);
+  }
+
   if (event.location && event.location.trim()) {
-    parts.push(`📍 ${event.location.trim()}`);
+    parts.push(`${event.location.trim()}`);
   }
 
   // IMPORTANT: join with blank line to keep formatting readable in mini app
@@ -710,19 +715,20 @@ router.get("/events/:id", async (req, res) => {
 router.post("/events", async (req, res) => {
   try {
   console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
-        const {
-      title,
-      description,
-      startDate,
-      endDate,
-      allDay,
-      color,
-      location,
-      locationPlaceId,
-      locationCoords,
-      reminder, // <-- NEW
-      recurrence
-    } = req.body as any;
+const {
+  title,
+  description,
+  startDate,
+  endDate,
+  allDay,
+  color,
+  meetingUrl,
+  location,
+  locationPlaceId,
+  locationCoords,
+  reminder,
+  recurrence
+} = req.body as any;
 
     if (!title || !startDate) {
       return res.status(400).json({ error: "title and startDate required" });
@@ -758,6 +764,7 @@ const event = await Event.create({
   endDate: end,
   allDay: allDay || false,
   color,
+  meetingUrl: meetingUrl || undefined,
   location,
   locationPlaceId: locationPlaceId || null,
   locationCoords: locationCoords || null,
@@ -801,7 +808,7 @@ const { reminderId } = await upsertEventReminder({
   userId: req.userId!,
   eventId: String(event._id),
   existingReminderId: null,
-  eventDataForText: { title, description, location },
+eventDataForText: { title, description, meetingUrl, location },
   nextRunAt,
   eventStart: start,
   recurrence: recurrence || undefined
@@ -835,19 +842,20 @@ const { reminderId } = await upsertEventReminder({
 router.put("/events/:id", async (req, res) => {
   try {
   console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
-        const {
-      title,
-      description,
-      startDate,
-      endDate,
-      allDay,
-      color,
-      location,
-      locationPlaceId,
-      locationCoords,
-      reminder, // <-- NEW
-      recurrence
-    } = req.body as any;
+const {
+  title,
+  description,
+  startDate,
+  endDate,
+  allDay,
+  color,
+  meetingUrl,
+  location,
+  locationPlaceId,
+  locationCoords,
+  reminder,
+  recurrence
+} = req.body as any;
 
     const current = await Event.findOne({
       _id: req.params.id,
@@ -886,6 +894,7 @@ if (endDate !== undefined) {
 
 if (allDay !== undefined) $set.allDay = allDay;
 if (color !== undefined) $set.color = color;
+if (meetingUrl !== undefined) $set.meetingUrl = meetingUrl || null;
 if (location !== undefined) $set.location = location;
 if (locationPlaceId !== undefined) $set.locationPlaceId = locationPlaceId || null;
 if (locationCoords !== undefined) $set.locationCoords = locationCoords || null;
@@ -948,11 +957,12 @@ const { reminderId } = await upsertEventReminder({
   userId: req.userId!,
   eventId: String(event._id),
   existingReminderId: event.reminderId,
-  eventDataForText: {
-    title: event.title,
-    description: event.description,
-    location: event.location
-  },
+eventDataForText: {
+  title: event.title,
+  description: event.description,
+  meetingUrl: (event as any).meetingUrl,
+  location: event.location
+},
   nextRunAt,
   eventStart: start,
   recurrence: event.recurrence || undefined
