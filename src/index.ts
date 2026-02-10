@@ -6,6 +6,41 @@ import { startServer } from "./health";
 import { startScheduler, makeInstanceId } from "./scheduler";
 import { startHabitScheduler } from "./habitScheduler";
 
+async function backfillAcknowledgedAtForOldSentOnce() {
+  // Run only when explicitly enabled (so it never surprises you)
+  if (process.env.RUN_ACK_BACKFILL !== "true") return;
+
+  console.log("[MIGRATION] Backfilling acknowledgedAt for old sent once reminders...");
+
+  // Mark any already-sent one-time reminders as acknowledged so they don't show DUE NOW forever.
+  // We set acknowledgedAt to lastRunAt if present, otherwise updatedAt/createdAt.
+  const res = await mongoose.connection.collection("reminders").updateMany(
+    {
+      status: "sent",
+      acknowledgedAt: null,
+      $or: [
+        { schedule: { $exists: false } },
+        { schedule: null },
+        { "schedule.kind": "once" },
+      ],
+    },
+    [
+      {
+        $set: {
+          acknowledgedAt: {
+            $ifNull: ["$lastRunAt", { $ifNull: ["$updatedAt", "$createdAt"] }],
+          },
+        },
+      },
+    ] as any
+  );
+
+  console.log("[MIGRATION] Backfill complete:", {
+    matched: (res as any).matchedCount,
+    modified: (res as any).modifiedCount,
+  });
+}
+
 async function main() {
   const token = process.env.BOT_TOKEN;
   const mongoUri = process.env.MONGODB_URI;
@@ -25,6 +60,8 @@ async function main() {
   // Connect DB first
   await mongoose.connect(mongoUri);
   console.log("Connected to MongoDB");
+  
+  await backfillAcknowledgedAtForOldSentOnce();
 
   // Start HTTP server with Mini App support
   await startServer({ bot, webhookPath });

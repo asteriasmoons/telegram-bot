@@ -158,7 +158,7 @@ router.get("/reminders", async (req, res) => {
             { schedule: null },
             { "schedule.kind": "once" },
           ],
-          acknowledgedAt: { $in: [null, undefined] },
+          acknowledgedAt: null,
         },
       ];
     }
