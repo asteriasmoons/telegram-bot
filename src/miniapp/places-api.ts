@@ -20,9 +20,18 @@ router.post("/autocomplete", async (req: Request, res: Response) => {
 
     const url = "https://places.googleapis.com/v1/places:autocomplete";
 
-    const body: any = {
+        const body: any = {
       input: input.trim(),
       languageCode: "en",
+      locationBias: {
+        circle: {
+          center: {
+            latitude: req.body.lat ?? 34.7304,
+            longitude: req.body.lng ?? -86.5861,
+          },
+          radius: req.body.radius ?? 50000.0,
+        },
+      },
     };
 
     if (sessionToken) {
