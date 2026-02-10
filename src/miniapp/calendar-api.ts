@@ -48,8 +48,8 @@ async function countReminderEvents(userId: number) {
 function buildEventReminderText(event: {
   title: string;
   description?: string;
-  meetingUrl?: string;
   location?: string;
+  meetingUrl?: string;
 }) {
   const parts: string[] = [];
   parts.push(event.title);
@@ -58,12 +58,12 @@ function buildEventReminderText(event: {
     parts.push(event.description.trim());
   }
 
-   if (event.meetingUrl && event.meetingUrl.trim()) {
-    parts.push(`${event.meetingUrl.trim()}`);
-  }
-
   if (event.location && event.location.trim()) {
     parts.push(`${event.location.trim()}`);
+  }
+
+  if (event.meetingUrl && String(event.meetingUrl).trim()) {
+    parts.push(`${String(event.meetingUrl).trim()}`);
   }
 
   // IMPORTANT: join with blank line to keep formatting readable in mini app
@@ -310,7 +310,7 @@ async function upsertEventReminder(args: {
   userId: number;
   eventId: string;
   existingReminderId?: any;
-  eventDataForText: { title: string; description?: string; location?: string };
+  eventDataForText: { title: string; description?: string; location?: string; meetingUrl?: string };
   nextRunAt: Date | null;
   eventStart: Date;
   recurrence?: any;
@@ -764,7 +764,7 @@ const event = await Event.create({
   endDate: end,
   allDay: allDay || false,
   color,
-  meetingUrl: meetingUrl || undefined,
+  meetingUrl: meetingUrl ? String(meetingUrl).trim() : "",
   location,
   locationPlaceId: locationPlaceId || null,
   locationCoords: locationCoords || null,
@@ -894,7 +894,7 @@ if (endDate !== undefined) {
 
 if (allDay !== undefined) $set.allDay = allDay;
 if (color !== undefined) $set.color = color;
-if (meetingUrl !== undefined) $set.meetingUrl = meetingUrl || null;
+if (meetingUrl !== undefined) $set.meetingUrl = meetingUrl ? String(meetingUrl).trim() : "";
 if (location !== undefined) $set.location = location;
 if (locationPlaceId !== undefined) $set.locationPlaceId = locationPlaceId || null;
 if (locationCoords !== undefined) $set.locationCoords = locationCoords || null;
@@ -960,8 +960,8 @@ const { reminderId } = await upsertEventReminder({
 eventDataForText: {
   title: event.title,
   description: event.description,
-  meetingUrl: (event as any).meetingUrl,
-  location: event.location
+  location: event.location,
+  meetingUrl: (event as any).meetingUrl
 },
   nextRunAt,
   eventStart: start,
