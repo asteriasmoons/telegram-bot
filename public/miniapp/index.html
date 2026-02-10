@@ -3399,6 +3399,74 @@ opacity: 1;
   display: inline-block;
   max-width: 100%;
 }
+
+/* ============== CUSTOM SNOOZE ============= */
+
+.csnooze-modal-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0,0,0,0.45);
+}
+
+.csnooze-modal{
+  width: min(420px, 100%);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(40, 25, 70, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+
+.csnooze-modal-title{
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.csnooze-modal-row{
+  display: flex;
+  gap: 10px;
+}
+
+.csnooze-modal-input{
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  outline: none;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: inherit;
+}
+
+.csnooze-modal-select{
+  width: 130px;
+  padding: 12px;
+  border-radius: 12px;
+  outline: none;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: inherit;
+}
+
+.csnooze-modal-error{
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(255, 170, 190, 1);
+}
+
+.csnooze-modal-actions{
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
 </style>
 </head>
 
@@ -7751,6 +7819,74 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
     // Reminder Card Component
     function ReminderCard({ reminder, onEdit, onSnooze, onDone, onDelete }) {
       const [expanded, setExpanded] = useState(false);
+      
+      const [customOpen, setCustomOpen] = useState(false);
+const [customValue, setCustomValue] = useState("");
+const [customUnit, setCustomUnit] = useState("minutes"); // "minutes" | "hours" | "days"
+const [customError, setCustomError] = useState("");
+
+function openCustomSnooze() {
+  setCustomValue("");
+  setCustomUnit("minutes");
+  setCustomError("");
+  setCustomOpen(true);
+}
+
+function closeCustomSnooze() {
+  setCustomOpen(false);
+  setCustomValue("");
+  setCustomError("");
+}
+
+function unitToMinutes(unit) {
+  if (unit === "hours") return 60;
+  if (unit === "days") return 1440;
+  return 1; // minutes
+}
+
+function unitLabel(unit, value) {
+  const v = Number(value);
+  if (unit === "hours") return `${v} hour${v === 1 ? "" : "s"}`;
+  if (unit === "days") return `${v} day${v === 1 ? "" : "s"}`;
+  return `${v} minute${v === 1 ? "" : "s"}`;
+}
+
+function submitCustomSnooze() {
+  const raw = String(customValue).trim();
+  if (!raw) {
+    setCustomError("Enter a number.");
+    return;
+  }
+
+  const n = Number(raw);
+
+  if (!Number.isFinite(n) || n <= 0) {
+    setCustomError("Must be a number greater than 0.");
+    return;
+  }
+
+  // Optional guardrails (tweak as you like)
+  if (n > 365 && customUnit === "days") {
+    setCustomError("Please keep it under 365 days.");
+    return;
+  }
+  if (n > 24 * 365 && customUnit === "hours") {
+    setCustomError("Please keep it under 8760 hours.");
+    return;
+  }
+  if (n > 60 * 24 * 365 && customUnit === "minutes") {
+    setCustomError("Please keep it under 525600 minutes.");
+    return;
+  }
+
+  const minutes = Math.round(n * unitToMinutes(customUnit));
+  const label = unitLabel(customUnit, Math.round(n));
+
+  // IMPORTANT: stopPropagation already handled by card-actions wrapper,
+  // but modal lives outside actions area, so keep the card from collapsing.
+  onSnooze(reminder._id, minutes, label);
+  closeCustomSnooze();
+}
 
       const getBadgeClass = () => {
         const kind = reminder.schedule?.kind || 'once';
@@ -7830,67 +7966,128 @@ function formatTime12h(hhmm) {
       const statusBadge = getStatusBadge();
 
       return (
-        <div className="card" onClick={() => setExpanded(!expanded)}>
-<div className="card-header">
-  <div className="card-time-row">
-    <span className="card-time-icon">
-      <img src="/icons/alarm.svg" alt="" />
-    </span>
+  <div className="card" onClick={() => setExpanded(!expanded)}>
+    <div className="card-header">
+      <div className="card-time-row">
+        <span className="card-time-icon">
+          <img src="/icons/alarm.svg" alt="" />
+        </span>
 
-    <span className="card-time-text">{formatDateTime(reminder.nextRunAt)}</span>
+        <span className="card-time-text">{formatDateTime(reminder.nextRunAt)}</span>
 
-    {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
-      <div className="card-times-inline">
-        {getAllTimes().map((t) => (
-  <span key={t} className="time-chip">
-    {formatTime12h(t)}
-  </span>
-))}
+        {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
+          <div className="card-times-inline">
+            {getAllTimes().map((t) => (
+              <span key={t} className="time-chip">
+                {formatTime12h(t)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+        <span className={getBadgeClass()}>
+          {getBadgeLabel()}
+        </span>
+
+        {statusBadge && (
+          <span className={`card-badge ${statusBadge.className}`}>
+            {statusBadge.label}
+          </span>
+        )}
+      </div>
+    </div>
+
+    <div className="card-text">{reminder.text}</div>
+
+    {expanded && (
+      <div className="card-actions" onClick={e => e.stopPropagation()}>
+        <button className="btn btn-primary" onClick={() => onEdit(reminder)}>
+          <img src="/icons/pencil.svg" alt="" />
+          Edit
+        </button>
+
+        <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 15)}>
+          <img src="/icons/alarm.svg" alt="" />
+          15m
+        </button>
+
+        <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 60)}>
+          <img src="/icons/alarm.svg" alt="" />
+          1h
+        </button>
+
+        {/* ✅ ADD THIS BUTTON */}
+        <button className="btn btn-secondary" onClick={openCustomSnooze}>
+          <img src="/icons/alarm.svg" alt="" />
+          Custom
+        </button>
+
+        <button className="btn btn-primary" onClick={() => onDone(reminder._id)}>
+          <img src="/icons/check.svg" alt="" />
+          Done
+        </button>
+
+        <button className="btn btn-danger" onClick={() => onDelete(reminder._id)}>
+          <img src="/icons/trash.svg" alt="" />
+        </button>
       </div>
     )}
-  </div>
 
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-    <span className={getBadgeClass()}>
-      {getBadgeLabel()}
-    </span>
+    {/* ✅✅✅ THIS IS THE EXACT PLACE TO ADD #4 (RENDER THE MODAL) */}
+    {customOpen && (
+      <div className="csnooze-modal-overlay" onClick={closeCustomSnooze}>
+        <div className="csnooze-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="csnooze-modal-title">Custom Snooze</div>
 
-    {statusBadge && (
-      <span className={`card-badge ${statusBadge.className}`}>
-        {statusBadge.label}
-      </span>
-    )}
-  </div>
-</div>
+          <div className="csnooze-modal-row">
+            <input
+              className="csnooze-modal-input"
+              inputMode="numeric"
+              placeholder="Amount"
+              value={customValue}
+              onChange={(e) => {
+                setCustomValue(e.target.value);
+                setCustomError("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitCustomSnooze();
+                if (e.key === "Escape") closeCustomSnooze();
+              }}
+            />
 
-          <div className="card-text">{reminder.text}</div>
+            <select
+              className="csnooze-modal-select"
+              value={customUnit}
+              onChange={(e) => {
+                setCustomUnit(e.target.value);
+                setCustomError("");
+              }}
+            >
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+          </div>
 
-          {expanded && (
-            <div className="card-actions" onClick={e => e.stopPropagation()}>
-              <button className="btn btn-primary" onClick={() => onEdit(reminder)}>
-  <img src="/icons/pencil.svg" alt="" />
-  Edit
-</button>
-              <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 15)}>
-  <img src="/icons/alarm.svg" alt="" />
-  15m
-</button>
-              <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 60)}>
-  <img src="/icons/alarm.svg" alt="" />
-  1h
-</button>
-              <button className="btn btn-success" onClick={() => onDone(reminder._id)}>
-  <img src="/icons/check.svg" alt="" />
-  Done
-</button>
-              <button className="btn btn-danger" onClick={() => onDelete(reminder._id)}>
-  <img src="/icons/trash.svg" alt="" />
-</button>
-            </div>
-          )}
+          {customError && <div className="csnooze-modal-error">{customError}</div>}
+
+          <div className="csnooze-modal-actions">
+            <button className="btn btn-secondary" onClick={closeCustomSnooze} type="button">
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={submitCustomSnooze} type="button">
+              Snooze
+            </button>
+          </div>
         </div>
-      );
-    }
+      </div>
+    )}
+    {/* ✅✅✅ END MODAL */}
+  </div>
+ );
+}
     
     
    // Extra Reminder Times  
@@ -9904,18 +10101,19 @@ useEffect(() => {
         }
       };
 
-      const handleSnooze = async (id, minutes) => {
-        try {
-          await apiCall(`/reminders/${id}/snooze`, {
-            method: 'POST',
-            body: JSON.stringify({ minutes }),
-          });
-          tg.showPopup({ message: `Snoozed for ${minutes} minutes` });
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to snooze: ' + error.message);
-        }
-      };
+      const handleSnooze = async (id, minutes, label = null) => {
+  try {
+    await apiCall(`/reminders/${id}/snooze`, {
+      method: 'POST',
+      body: JSON.stringify({ minutes }),
+    });
+
+    tg.showPopup({ message: label ? `Snoozed for ${label}` : `Snoozed for ${minutes} minutes` });
+    loadReminders();
+  } catch (error) {
+    tg.showAlert('Failed to snooze: ' + error.message);
+  }
+};
 
       const handleDone = async (id) => {
   try {
