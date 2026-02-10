@@ -9483,14 +9483,15 @@ const toggleWeekday = (idx) => {
               )}
 
               {event.meetingUrl && (
-  <button
-    type="button"
-    className="event-preview-row event-preview-link"
-    onClick={openMeetingUrl}
-  >
-    <img src="/icons/link.svg" alt="" />
-    <span className="event-preview-link-text">{event.meetingUrl}</span>
-  </button>
+  <div className="event-preview-row">
+    <img src="/icons/url.svg" alt="" />
+    <button
+      type="button"
+      className="event-link-button"
+      onClick={() => tg.openLink(event.meetingUrl)}
+    >
+      Join meeting
+    </button>
 )}
 
 {event.location && (
