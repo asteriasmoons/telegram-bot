@@ -514,7 +514,7 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
                 lastRunAt: new Date(),
                 nextRunAt,
               },
-              $unset: { pendingNextRunAt: 1 },
+$unset: { pendingNextRunAt: 1, acknowledgedAt: 1 },
             }
           );
 
@@ -578,7 +578,13 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
 
       const newTime = new Date(Date.now() + minutes * 60 * 1000);
 
-      await Reminder.updateOne({ _id: id, userId }, { $set: { nextRunAt: newTime, status: "scheduled" } });
+      await Reminder.updateOne(
+  { _id: id, userId },
+  {
+    $set: { nextRunAt: newTime, status: "scheduled" },
+    $unset: { acknowledgedAt: 1 }
+  }
+);
 
       const tz = String(rem.timezone || "America/Chicago");
       const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");

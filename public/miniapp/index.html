@@ -7978,7 +7978,7 @@ function formatTime12h(hhmm) {
 }
 
       const getStatusBadge = () => {
-  const st = reminder.status;
+const st = reminder.displayStatus || reminder.status;
   const nextRun = reminder.nextRunAt ? new Date(reminder.nextRunAt) : null;
   const now = new Date();
 

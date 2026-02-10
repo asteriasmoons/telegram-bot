@@ -141,6 +141,8 @@ const ReminderSchema = new Schema<ReminderDoc>(
     },
 
     nextRunAt: { type: Date, required: true, index: true },
+    
+    acknowledgedAt: { type: Date, default: null },
 
     pendingNextRunAt: { type: Date, required: false },
 
