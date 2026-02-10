@@ -3402,26 +3402,49 @@ opacity: 1;
 
 /* ============== CUSTOM SNOOZE ============= */
 
+/* ============== CUSTOM SNOOZE ============= */
+
+/* IMPORTANT: absurdly high z-index to beat any fixed FAB/header */
 .csnooze-modal-overlay{
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 2147483647;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0,0,0,0.45);
+
+  /* darker overlay */
+  background: rgba(0,0,0,0.70);
+
+  /* helps iOS/webview layering sometimes */
+  transform: translateZ(0);
 }
 
+/* Modal itself */
 .csnooze-modal{
   width: min(420px, 100%);
   border-radius: 18px;
-  padding: 14px;
-  background: rgba(40, 25, 70, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+
+  /* more padding + safe area helps when keyboard pushes */
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+
+  /* darker "glass" */
+  background: rgba(18, 10, 38, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.55);
+
+  /* keep buttons reachable on small height (keyboard open) */
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+
+  /* make sure modal is above anything within overlay */
+  position: relative;
+  z-index: 2147483647;
 }
 
 .csnooze-modal-title{
@@ -3440,8 +3463,10 @@ opacity: 1;
   padding: 12px;
   border-radius: 12px;
   outline: none;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.14);
+
+  /* slightly darker input */
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.16);
   color: inherit;
 }
 
@@ -3450,8 +3475,9 @@ opacity: 1;
   padding: 12px;
   border-radius: 12px;
   outline: none;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.14);
+
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.16);
   color: inherit;
 }
 
@@ -3461,11 +3487,19 @@ opacity: 1;
   color: rgba(255, 170, 190, 1);
 }
 
+/* Make actions stick to bottom when modal scrolls */
 .csnooze-modal-actions{
   display: flex;
   gap: 10px;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+/* Hide FAB while Custom Snooze modal is open */
+.csnooze-open .fab,
+.csnooze-open .fab-button,
+.csnooze-open .floating-action-button {
+  display: none !important;
 }
 </style>
 </head>
@@ -7825,17 +7859,15 @@ const [customValue, setCustomValue] = useState("");
 const [customUnit, setCustomUnit] = useState("minutes"); // "minutes" | "hours" | "days"
 const [customError, setCustomError] = useState("");
 
+
 function openCustomSnooze() {
-  setCustomValue("");
-  setCustomUnit("minutes");
-  setCustomError("");
+  document.body.classList.add("csnooze-open");
   setCustomOpen(true);
 }
 
 function closeCustomSnooze() {
+  document.body.classList.remove("csnooze-open");
   setCustomOpen(false);
-  setCustomValue("");
-  setCustomError("");
 }
 
 function unitToMinutes(unit) {
