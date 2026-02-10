@@ -710,7 +710,7 @@ router.get("/events/:id", async (req, res) => {
 router.post("/events", async (req, res) => {
   try {
   console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
-    const {
+        const {
       title,
       description,
       startDate,
@@ -718,6 +718,8 @@ router.post("/events", async (req, res) => {
       allDay,
       color,
       location,
+      locationPlaceId,
+      locationCoords,
       reminder, // <-- NEW
       recurrence
     } = req.body as any;
@@ -757,8 +759,11 @@ const event = await Event.create({
   allDay: allDay || false,
   color,
   location,
+  locationPlaceId: locationPlaceId || null,
+  locationCoords: locationCoords || null,
   recurrence: recurrence || undefined
 });
+
 
     // Handle optional reminder link
     if (reminder) {
@@ -830,7 +835,7 @@ const { reminderId } = await upsertEventReminder({
 router.put("/events/:id", async (req, res) => {
   try {
   console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
-    const {
+        const {
       title,
       description,
       startDate,
@@ -838,6 +843,8 @@ router.put("/events/:id", async (req, res) => {
       allDay,
       color,
       location,
+      locationPlaceId,
+      locationCoords,
       reminder, // <-- NEW
       recurrence
     } = req.body as any;
@@ -880,6 +887,8 @@ if (endDate !== undefined) {
 if (allDay !== undefined) $set.allDay = allDay;
 if (color !== undefined) $set.color = color;
 if (location !== undefined) $set.location = location;
+if (locationPlaceId !== undefined) $set.locationPlaceId = locationPlaceId || null;
+if (locationCoords !== undefined) $set.locationCoords = locationCoords || null;
 
 // recurrence handling stays the same
 if (recurrence !== undefined) {

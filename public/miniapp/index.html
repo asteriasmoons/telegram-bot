@@ -3303,6 +3303,74 @@ opacity: 1;
   50%      { opacity: 0.65; }
 }
 
+/* =========================================================
+   PLACES AUTOCOMPLETE
+   ========================================================= */
+.places-autocomplete-wrap {
+  position: relative;
+}
+
+.places-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 3000;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 4px;
+  border-radius: 12px;
+  background: rgba(25, 25, 32, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.places-suggestion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.places-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.places-suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.places-suggestion-main {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.places-suggestion-secondary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.places-powered {
+  padding: 6px 14px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: right;
+  opacity: 0.7;
+}
+
+.places-loading-row {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
 </style>
 </head>
 
@@ -8376,6 +8444,164 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
   );
 }
 
+// =========================
+// PLACES AUTOCOMPLETE COMPONENT
+// =========================
+function PlacesAutocomplete({ value, onChange, onPlaceSelect, enabled }) {
+  const [query, setQuery] = useState(value || "");
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [sessionToken] = useState(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now())
+  );
+  const debounceRef = useRef(null);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, []);
+
+  const fetchSuggestions = async (input) => {
+    if (!input || input.length < 2) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await apiCall("/places/autocomplete", {
+        method: "POST",
+        body: JSON.stringify({ input, sessionToken }),
+      });
+      const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      setSuggestions(list);
+      setShowDropdown(list.length > 0);
+    } catch (e) {
+      setSuggestions([]);
+      setShowDropdown(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    onChange(val);
+
+    if (!enabled) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 350);
+  };
+
+  const handleSelect = async (suggestion) => {
+    setShowDropdown(false);
+    setQuery(suggestion.text || suggestion.mainText || "");
+    onChange(suggestion.text || suggestion.mainText || "");
+
+    if (!suggestion.placeId) return;
+
+    try {
+      const data = await apiCall("/places/details", {
+        method: "POST",
+        body: JSON.stringify({ placeId: suggestion.placeId, sessionToken }),
+      });
+
+      if (data?.place) {
+        const displayStr = data.place.address || data.place.name || suggestion.text;
+        setQuery(displayStr);
+        onChange(displayStr);
+
+        if (onPlaceSelect) {
+          onPlaceSelect({
+            placeId: data.place.placeId,
+            name: data.place.name,
+            address: data.place.address,
+            lat: data.place.lat,
+            lng: data.place.lng,
+          });
+        }
+      }
+    } catch (e) {
+      // Silent fail on detail fetch; user still has the text
+    }
+  };
+
+  if (!enabled) {
+    return (
+      <input
+        type="text"
+        className="form-input"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          onChange(e.target.value);
+        }}
+        placeholder="Add location"
+      />
+    );
+  }
+
+  return (
+    <div className="places-autocomplete-wrap" ref={wrapRef}>
+      <input
+        type="text"
+        className="form-input"
+        value={query}
+        onChange={handleInput}
+        onFocus={() => {
+          if (suggestions.length > 0) setShowDropdown(true);
+        }}
+        placeholder="Search for a place..."
+        autoComplete="off"
+      />
+
+      {showDropdown && (
+        <div className="places-suggestions">
+          {loading && <div className="places-loading-row">Searching...</div>}
+
+          {suggestions.map((s, idx) => (
+            <div
+              key={s.placeId || idx}
+              className="places-suggestion-item"
+              onClick={() => handleSelect(s)}
+            >
+              <div className="places-suggestion-main">
+                {s.mainText || s.text}
+              </div>
+              {s.secondaryText && (
+                <div className="places-suggestion-secondary">
+                  {s.secondaryText}
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div className="places-powered">Powered by Google</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 // Event Modal
@@ -8392,6 +8618,12 @@ function EventModal({ event, selectedDate, userTimezone, onClose, onSave }) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
 const [shareToken, setShareToken] = useState("");
 const [shareLoading, setShareLoading] = useState(false);
+
+  // Places autocomplete state
+  const [placesEnabled, setPlacesEnabled] = useState(false);
+  const [locationPlaceId, setLocationPlaceId] = useState(event?.locationPlaceId || null);
+  const [locationCoords, setLocationCoords] = useState(event?.locationCoords || null);
+
 
   // Reminder UI state (default OFF)
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -8451,12 +8683,15 @@ const [shareLoading, setShareLoading] = useState(false);
     // -----------------------------
     // Base event fields
     // -----------------------------
-    if (event) {
+        if (event) {
       const d = new Date(event.startDate);
 setDate(dateInputValue(d, userTimezone));
 setTime(timeInputValue(d, userTimezone));
       setAllDay(!!event.allDay);
       setLocation(event.location || '');
+      setLocationPlaceId(event.locationPlaceId || null);
+      setLocationCoords(event.locationCoords || null);
+      setPlacesEnabled(!!(event.locationPlaceId));
       setDescription(event.description || '');
       setTitle(event.title || '');
 
@@ -8466,21 +8701,27 @@ setTime(timeInputValue(d, userTimezone));
       } else {
         setEndTime('');
       }
-    } else if (selectedDate) {
+        } else if (selectedDate) {
 setDate(dateInputValue(selectedDate, userTimezone));
       setTime('09:00');
       setEndTime('10:00');
       setAllDay(false);
       setLocation('');
+      setLocationPlaceId(null);
+      setLocationCoords(null);
+      setPlacesEnabled(false);
       setDescription('');
       setTitle('');
-    } else {
+     } else {
       const now = new Date();
       setDate(now.toISOString().split('T')[0]);
       setTime('09:00');
       setEndTime('10:00');
       setAllDay(false);
       setLocation('');
+      setLocationPlaceId(null);
+      setLocationCoords(null);
+      setPlacesEnabled(false);
       setDescription('');
       setTitle('');
     }
@@ -8695,13 +8936,15 @@ if (repeatEndKind === "count") {
       };
     }
 
-    await onSave({
+        await onSave({
       title,
       description,
       startDate: startISO,
-endDate: endISO || undefined,
+      endDate: endISO || undefined,
       allDay,
       location,
+      locationPlaceId: locationPlaceId || null,
+      locationCoords: locationCoords || null,
       reminder: reminderPayload,
       recurrence,
     });
@@ -8859,15 +9102,42 @@ const toggleWeekday = (idx) => {
             </div>
           )}
 
-          <div className="form-group">
+            <div className="form-group">
             <label className="form-label">Location</label>
-            <input
-              type="text"
-              className="form-input"
+            <PlacesAutocomplete
               value={location}
-              onChange={e => setLocation(e.target.value)}
-              placeholder="Add location"
+              onChange={(val) => {
+                setLocation(val);
+                if (!placesEnabled) {
+                  setLocationPlaceId(null);
+                  setLocationCoords(null);
+                }
+              }}
+              onPlaceSelect={(place) => {
+                setLocationPlaceId(place.placeId || null);
+                setLocationCoords(
+                  place.lat != null && place.lng != null
+                    ? { lat: place.lat, lng: place.lng }
+                    : null
+                );
+              }}
+              enabled={placesEnabled}
             />
+
+            <label className="checkbox-row" style={{ marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={placesEnabled}
+                onChange={(e) => {
+                  setPlacesEnabled(e.target.checked);
+                  if (!e.target.checked) {
+                    setLocationPlaceId(null);
+                    setLocationCoords(null);
+                  }
+                }}
+              />
+              <span>Search Google Places</span>
+            </label>
           </div>
 
           {/* =============================

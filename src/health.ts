@@ -22,6 +22,7 @@ import moodRouter from "./miniapp/mood-api";
 
 import horoscopeRouter from "./miniapp/horoscope-api";
 
+import placesRouter from "./miniapp/places-api";
 
 
 type StartServerOpts = {
@@ -122,6 +123,8 @@ app.use("/api/miniapp/checklist", miniAppAuth, checklistRouter);
 app.use("/api/miniapp/intentions", miniAppAuth, intentionsRouter);
 app.use("/api/miniapp/mood", miniAppAuth, moodRouter);
 app.use("/api/miniapp/horoscope", miniAppAuth, horoscopeRouter);
+app.use("/api/miniapp/places", miniAppAuth, placesRouter);
+
 
 
   // ---- Mini App static files (if you serve them here) ----
