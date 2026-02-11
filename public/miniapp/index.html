@@ -3569,6 +3569,75 @@ opacity: 1;
   vertical-align: middle;
   transform: translateY(-1px);
 }
+
+/* =========================
+   MODAL: SCROLL FIX (iOS-safe)
+   ========================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+
+  /* dim background */
+  background: rgba(0, 0, 0, 0.45);
+
+  /* prevent the overlay from scrolling */
+  overflow: hidden;
+}
+
+.modal {
+  width: min(500px, 92vw);
+  border-radius: 20px;
+  padding: 24px;
+
+  /* IMPORTANT: constrain modal to viewport */
+  max-height: min(80vh, 80dvh);
+  height: auto;
+
+  /* IMPORTANT: modal itself should NOT scroll */
+  overflow: hidden;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modal-body {
+  /* THIS is the scroll container */
+  flex: 1;
+  min-height: 0; /* critical for flex scroll */
+
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+
+  /* spacing inside the scrolling area */
+  padding: 0 2px 12px;
+
+  /* text containment */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.modal-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
 </style>
 </head>
 
