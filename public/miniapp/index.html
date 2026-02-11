@@ -5099,6 +5099,145 @@ body.modal-open {
 .bottom-nav {
   padding-bottom: calc(10px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
 }
+
+/* ===============================
+READING FILTER TABS -- ISOLATED
+=============================== */
+
+.book-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  justify-content: center; /* center the whole strip */
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 12px;
+  box-sizing: border-box;
+}
+
+.book-quick-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+  white-space: nowrap;
+
+  padding: 6px 14px;
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+
+  flex: 0 0 auto;
+}
+
+.book-quick-action.active {
+  backdrop-filter: blur(10px);
+}
+
+/* =========================
+HABIT BADGES -- STOP SHRINK / COLLAPSE
+========================= */
+
+/* The stack container (you already have .habit-badges in your patch) */
+.habit-badges {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 6px !important;
+  min-width: max-content !important;   /* key: prevents squeeze */
+}
+
+/* Make any badge inside habits refuse to compress */
+.habit-badges .card-badge,
+.habit-badges [class^="badge-"],
+.habit-badges [class*=" badge-"] {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;           /* key: no shrinking */
+  white-space: nowrap !important;
+  min-width: max-content !important;   /* key: keep pill width */
+}
+
+/* If a parent column is squeezing (common in card layouts) */
+.habit-badges,
+.habit-badges * {
+  min-height: 0 !important;
+}
+
+/* =========================
+MODAL HARD CONTAIN + SCROLL INSIDE
+(Uses your exact class names)
+========================= */
+
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2000 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  /* keep it off the edges + respect safe areas */
+  padding-top: calc(14px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) !important;
+  padding-right: 14px !important;
+  padding-bottom: calc(14px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+  padding-left: 14px !important;
+
+  box-sizing: border-box !important;
+}
+
+.modal {
+  width: min(520px, 100%) !important;
+  max-width: 100% !important;
+
+  /* hard cap height to viewport */
+  max-height: calc(
+    100dvh - 28px
+    - var(--tg-safe-top, env(safe-area-inset-top, 0px))
+    - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))
+  ) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  /* IMPORTANT: modal itself is not the scroller */
+  overflow: hidden !important;
+
+  box-sizing: border-box !important;
+}
+
+.modal-header {
+  flex: 0 0 auto !important;
+}
+
+/* THIS is the scroller */
+.modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+
+  box-sizing: border-box !important;
+
+  /* gives you room to reach the bottom */
+  padding-bottom: 28px !important;
+}
+
+/* If anything inside is forcing width/scroll weirdness, neutralize it */
+.modal-body > * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 </style>
 </head>
 
@@ -8401,39 +8540,39 @@ const loadBooks = async () => {
   onCheckIn={handleCheckIn}
 />
 
-      <div className="quick-actions">
+      <div className="book-quick-actions">
         <div
-          className={`quick-action ${filter === "all" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "all" ? "active" : ""}`}
           onClick={() => setFilter("all")}
         >
           All
         </div>
         <div
-          className={`quick-action ${filter === "tbr" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "tbr" ? "active" : ""}`}
           onClick={() => setFilter("tbr")}
         >
           TBR
         </div>
         <div
-          className={`quick-action ${filter === "reading" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "reading" ? "active" : ""}`}
           onClick={() => setFilter("reading")}
         >
           Reading
         </div>
         <div
-          className={`quick-action ${filter === "finished" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "finished" ? "active" : ""}`}
           onClick={() => setFilter("finished")}
         >
           Finished
         </div>
         <div
-          className={`quick-action ${filter === "paused" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "paused" ? "active" : ""}`}
           onClick={() => setFilter("paused")}
         >
           Paused
         </div>
         <div
-          className={`quick-action ${filter === "dnf" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "dnf" ? "active" : ""}`}
           onClick={() => setFilter("dnf")}
         >
           DNF
