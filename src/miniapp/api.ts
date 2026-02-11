@@ -206,6 +206,13 @@ const processedReminders = sortedReminders.map((r: any) => {
 
   return { ...r, displayStatus: r.status };
 });
+    res.json({ reminders: processedReminders });
+  } catch (error) {
+    console.error("Error fetching reminders:", error);
+    res.status(500).json({ error: "Failed to fetch reminders" });
+  }
+});
+
 
 // GET /api/miniapp/reminders/:id - Get single reminder
 router.get("/reminders/:id", async (req, res) => {
