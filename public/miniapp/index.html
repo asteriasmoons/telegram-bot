@@ -3613,6 +3613,105 @@ opacity: 1;
 .modal-actions {
   flex-shrink: 0;
 }
+
+/* ============================
+   MODAL OVERRIDES (PASTE LAST)
+   File: index.html
+   ============================ */
+
+/* Give the overlay some breathing room + safe-area padding */
+.modal-overlay {
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Make the modal a fixed-height container and prevent inner overflow spill */
+.modal {
+  width: min(500px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  height: auto;
+
+  display: flex;
+  flex-direction: column;
+
+  /* IMPORTANT: contain all children; scrolling happens in .modal-body */
+  overflow: hidden;
+}
+
+/* Keep header from shrinking weirdly */
+.modal-header {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/* The ONLY scrolling area */
+.modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+
+  padding: 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+
+/* Keep action buttons visible and not clipped */
+.modal-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 16px;
+  padding-top: 12px;
+  box-sizing: border-box;
+
+  /* If there isn't enough width, wrap instead of squishing */
+  flex-wrap: wrap;
+}
+
+/* Prevent any child from forcing overflow */
+.modal-body * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Textareas/inputs/selects should never overflow the modal */
+.modal-body input,
+.modal-body select,
+.modal-body textarea,
+.modal-body button {
+  max-width: 100%;
+}
+
+/* If you use the 2-col grid rows, force them to stack on small screens */
+@media (max-width: 420px) {
+  .modal .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Fix "Remove" button breaking into two lines */
+.modal .btn-danger,
+.modal button.btn-danger {
+  white-space: nowrap;
+}
+
+/* If your extra-times rows use .times-item, make them stack cleanly */
+.modal .times-item {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.modal .times-item button,
+.modal .times-item .btn {
+  align-self: flex-end;
+}
 </style>
 </head>
 
