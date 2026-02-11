@@ -4751,34 +4751,6 @@ Prevent horizontal clipping and overflow on all views.
   box-sizing: border-box !important;
 }
 
-/* --- 3. READING TABS CENTERING --- */
-.reading-tabs,
-.book-filter-tabs,
-.filter-tabs {
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  flex-wrap: nowrap !important;
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-  gap: 6px !important;
-  padding: 4px 12px !important;
-  box-sizing: border-box !important;
-  width: 100% !important;
-}
-
-.reading-tabs button,
-.book-filter-tabs button,
-.filter-tabs button {
-  flex: 0 0 auto !important;
-  text-align: center !important;
-  white-space: nowrap !important;
-  padding: 6px 14px !important;
-  font-size: 12px !important;
-  border-radius: 20px !important;
-  min-width: 0 !important;
-}
-
 /* --- 4. APP-WIDE OVERFLOW GUARD --- */
 html, body, #root, #app {
   max-width: 100vw !important;
@@ -4990,103 +4962,6 @@ body.modal-open {
   overflow: visible !important;
 }
 
-/* ---------- 3) READING FILTER TABS: TRUE CENTERED LABELS ---------- */
-.reading-tabs,
-.book-filter-tabs,
-.filter-tabs {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-  padding: 6px 12px !important;
-}
-
-/* Buttons: force centered text */
-.reading-tabs button,
-.book-filter-tabs button,
-.filter-tabs button,
-.reading-tabs .pill,
-.book-filter-tabs .pill,
-.filter-tabs .pill {
-  flex: 0 0 auto !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-  white-space: nowrap !important;
-  line-height: 1 !important;
-  padding: 8px 14px !important;
-  min-width: 64px !important;
-  box-sizing: border-box !important;
-}
-
-/* If your pills are spans/links inside buttons, center them too */
-.reading-tabs button > *,
-.book-filter-tabs button > *,
-.filter-tabs button > * {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-}
-
-/* ---------- 4) HABIT BADGES: STOP SHRINKING / COLLAPSING ---------- */
-.habit-badges {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-end !important;
-  gap: 6px !important;
-}
-
-/* Any badge-like element inside habit cards: never shrink */
-.habit-badges .card-badge,
-.habit-badges [class*="badge"],
-.badge-once,
-.badge-daily,
-.badge-weekly,
-.badge-monthly,
-.badge-interval,
-.badge-habit-daily,
-.badge-habit-weekly,
-.badge-habit-active,
-.badge-habit-paused,
-.badge-completed,
-.badge-due-now,
-.badge-upcoming,
-.card-badge {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-
-  flex: 0 0 auto !important;
-  flex-shrink: 0 !important;
-
-  padding: 4px 10px !important;
-  border-radius: 999px !important;
-
-  line-height: 1.15 !important;
-  white-space: nowrap !important;
-
-  min-width: max-content !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-/* Badge icons don’t collapse the line box */
-.card-badge img,
-.card-badge .badge-icon,
-[class*="badge"] img {
-  width: 12px !important;
-  height: 12px !important;
-  flex: 0 0 12px !important;
-}
-
 /* ---------- 5) FIX A SYNTAX LANDMINE (smart quotes / bad dash) ---------- */
 /* If you have this anywhere, this correct selector prevents a broken rule from being ignored */
 .qh-toggle input[type="checkbox"] {
@@ -5100,123 +4975,56 @@ body.modal-open {
   padding-bottom: calc(10px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
 }
 
-/* ===============================
-READING FILTER TABS -- ISOLATED
-=============================== */
+/* ==========================================================
+LYSTARIA -- HARD STOP PATCH (MODALS + READING TABS + HABIT BADGES)
+Paste this block at the VERY END of your <style> tag.
+========================================================== */
 
-.book-quick-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ----------------------------------------------------------
+1) MODALS: SHORT + SCROLL INSIDE (header/actions stay visible)
+---------------------------------------------------------- */
 
-  justify-content: center; /* center the whole strip */
-  overflow-x: auto;
-  overflow-y: hidden;
-
-  -webkit-overflow-scrolling: touch;
-  padding: 6px 12px;
-  box-sizing: border-box;
-}
-
-.book-quick-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  text-align: center;
-  white-space: nowrap;
-
-  padding: 6px 14px;
-  border-radius: 999px;
-
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-
-  flex: 0 0 auto;
-}
-
-.book-quick-action.active {
-  backdrop-filter: blur(10px);
-}
-
-/* =========================
-HABIT BADGES -- STOP SHRINK / COLLAPSE
-========================= */
-
-/* The stack container (you already have .habit-badges in your patch) */
-.habit-badges {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-end !important;
-  gap: 6px !important;
-  min-width: max-content !important;   /* key: prevents squeeze */
-}
-
-/* Make any badge inside habits refuse to compress */
-.habit-badges .card-badge,
-.habit-badges [class^="badge-"],
-.habit-badges [class*=" badge-"] {
-  flex: 0 0 auto !important;
-  flex-shrink: 0 !important;           /* key: no shrinking */
-  white-space: nowrap !important;
-  min-width: max-content !important;   /* key: keep pill width */
-}
-
-/* If a parent column is squeezing (common in card layouts) */
-.habit-badges,
-.habit-badges * {
-  min-height: 0 !important;
-}
-
-/* =========================
-MODAL HARD CONTAIN + SCROLL INSIDE
-(Uses your exact class names)
-========================= */
-
+/* Overlay: start near top so modal never "centers tall" */
 .modal-overlay {
   position: fixed !important;
   inset: 0 !important;
   z-index: 2000 !important;
 
   display: flex !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   justify-content: center !important;
 
-  /* keep it off the edges + respect safe areas */
-  padding-top: calc(14px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) !important;
-  padding-right: 14px !important;
-  padding-bottom: calc(14px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
-  padding-left: 14px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: calc(16px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) !important;
+  padding-bottom: calc(16px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
 
   box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
+/* The modal itself: capped height, NO outer scroll */
 .modal {
-  width: min(520px, 100%) !important;
-  max-width: 100% !important;
+  width: 100% !important;
+  max-width: 500px !important;
 
-  /* hard cap height to viewport */
-  max-height: calc(
-    100dvh - 28px
-    - var(--tg-safe-top, env(safe-area-inset-top, 0px))
-    - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))
-  ) !important;
+  /* make it SHORT */
+  max-height: calc(100vh - 160px - var(--tg-safe-top, env(safe-area-inset-top, 0px)) - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
 
   display: flex !important;
   flex-direction: column !important;
 
-  /* IMPORTANT: modal itself is not the scroller */
-  overflow: hidden !important;
-
+  overflow: hidden !important; /* IMPORTANT: prevents the whole modal from scrolling */
   box-sizing: border-box !important;
 }
 
+/* Header: fixed height area */
 .modal-header {
   flex: 0 0 auto !important;
+  margin-bottom: 14px !important;
 }
 
-/* THIS is the scroller */
+/* Body: the ONLY scrolling region */
 .modal-body {
   flex: 1 1 auto !important;
   min-height: 0 !important;
@@ -5227,16 +5035,114 @@ MODAL HARD CONTAIN + SCROLL INSIDE
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior: contain !important;
 
+  padding: 12px 12px 16px !important;
   box-sizing: border-box !important;
-
-  /* gives you room to reach the bottom */
-  padding-bottom: 28px !important;
 }
 
-/* If anything inside is forcing width/scroll weirdness, neutralize it */
-.modal-body > * {
-  max-width: 100% !important;
+/* Actions/footer: pinned inside modal */
+.modal-actions {
+  flex: 0 0 auto !important;
+  margin-top: 12px !important;
+
+  position: sticky !important;
+  bottom: 0 !important;
+
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+
+  /* subtle fade/solid base so buttons always readable */
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0),
+    rgba(0,0,0,0.35) 35%,
+    rgba(0,0,0,0.55)
+  ) !important;
+
   box-sizing: border-box !important;
+}
+
+/* Kill any "modal inner fights scroll" rules from other patches */
+.modal > div {
+  max-height: none !important;
+}
+
+/* ----------------------------------------------------------
+2) READING TABS: center the text and keep layout stable
+Your classes: .book-quick-actions + .book-quick-action
+---------------------------------------------------------- */
+
+.book-quick-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 8px !important;
+  padding: 6px 12px !important;
+  margin: 0 12px 12px !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+}
+
+.book-quick-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  text-align: center !important;
+
+  padding: 8px 14px !important;
+  border-radius: 999px !important;
+
+  line-height: 1 !important;
+  white-space: nowrap !important;
+
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+}
+
+/* If your "active" state is a class toggle */
+.book-quick-action.active {
+  text-align: center !important;
+}
+
+/* ----------------------------------------------------------
+3) HABIT BADGES: stop shrinking/squishing, keep pill width
+---------------------------------------------------------- */
+
+.habit-badges {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: flex-start !important;
+
+  gap: 6px !important;
+  min-width: max-content !important;
+}
+
+.habit-badges .card-badge,
+.habit-badges .badge-once,
+.habit-badges .badge-daily,
+.habit-badges .badge-weekly,
+.habit-badges .badge-monthly,
+.habit-badges .badge-interval,
+.habit-badges .badge-habit-daily,
+.habit-badges .badge-habit-weekly,
+.habit-badges .badge-habit-active,
+.habit-badges .badge-habit-paused,
+.habit-badges .badge-completed,
+.habit-badges .badge-due-now,
+.habit-badges .badge-upcoming {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: max-content !important;
+
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
 }
 </style>
 </head>
