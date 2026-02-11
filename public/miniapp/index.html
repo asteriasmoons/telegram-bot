@@ -565,37 +565,6 @@ body::after {
   color: #eab308;
 }
 
-/* CARD TEXT CSS */
-.card-text {
-  font-size: 15px;
-  line-height: 1.5;
-  margin-bottom: 16px;
-  color: var(--text-primary);
-  white-space: pre-line;
-  word-break: break-word;
-
-  /* Improve symbol rendering */
-  font-family:
-    system-ui,
-    -apple-system,
-    "SF Pro Text",
-    "SF Pro Display",
-    "Segoe UI",
-    Roboto,
-    Helvetica,
-    Arial,
-    "Apple Color Emoji",
-    "Segoe UI Emoji",
-    "Segoe UI Symbol",
-    "Apple Symbols",
-    "Noto Sans Symbols",
-    "Noto Sans Symbols 2",
-    sans-serif;
-
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
 .card-actions {
   display: flex;
   gap: 8px;
@@ -3526,6 +3495,42 @@ opacity: 1;
 
 .csnooze-open {
   overflow: hidden;
+}
+
+/* CARD TEXT CSS */
+.card-text {
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  white-space: pre-line;
+  word-break: break-word;
+
+  /*
+    Force iOS to prefer Apple’s symbol-capable fonts earlier.
+    This fixes "tiny / deformed" dingbat-style glyphs like ✦ ✻ ✧ etc.
+  */
+  font-family:
+    -apple-system,
+    system-ui,
+    "SF Pro Text",
+    "SF Pro Display",
+    "Apple Symbols",
+    "Segoe UI Symbol",
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    sans-serif;
+
+  /* iOS/Safari: stop any automatic text scaling surprises */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  
+  font-kerning: normal;
+  font-variant-ligatures: none;
+
+  /* Don’t let Safari get "clever" with symbol shaping */
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
 }
 </style>
 </head>
