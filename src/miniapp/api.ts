@@ -167,10 +167,10 @@ router.get("/reminders", async (req, res) => {
 
     // ✅ Pin DUE NOW (status="sent") at the top, then sort by nextRunAt
 const isDueNow = (r: any) => {
-  const kind = r?.schedule?.kind || "once";
-  const isOnce = !r.schedule || kind === "once";
   const unacked = r.acknowledgedAt == null;
-  return r.status === "sent" && isOnce && unacked;
+  const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
+  const firedToday = firedAt && firedAt.toDateString() === new Date().toDateString();
+  return r.status === "sent" && unacked && firedToday;
 };
 
 const sortedReminders = reminders.sort((a: any, b: any) => {
@@ -183,24 +183,28 @@ const sortedReminders = reminders.sort((a: any, b: any) => {
   return aTime - bTime;
 });
 
-    // For display purposes, treat recurring "sent" reminders as "scheduled" if they're due soon
-    const processedReminders = sortedReminders.map((r: any) => {
-      if (r.status === "sent" && r.schedule && r.schedule.kind !== "once") {
-        const nextRun = new Date(r.nextRunAt);
-        const now = new Date();
 
-        if (nextRun >= now || nextRun.toDateString() === now.toDateString()) {
-          return { ...r, displayStatus: "scheduled" };
-        }
-      }
-      return { ...r, displayStatus: r.status };
-    });
+const processedReminders = sortedReminders.map((r: any) => {
+  const kind = r?.schedule?.kind || "once";
+  const isOnce = !r.schedule || kind === "once";
+  const now = new Date();
+  const today = now.toDateString();
 
-    res.json({ reminders: processedReminders });
-  } catch (error) {
-    console.error("Error fetching reminders:", error);
-    res.status(500).json({ error: "Failed to fetch reminders" });
+  if (r.status === "sent" && r.acknowledgedAt == null) {
+    const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
+    const firedToday = firedAt && firedAt.toDateString() === today;
+
+    if (firedToday) {
+      return { ...r, displayStatus: "sent" };
+    }
+
+    // Fired but not today -- recurring shows as scheduled, once passes through
+    if (!isOnce) {
+      return { ...r, displayStatus: "scheduled" };
+    }
   }
+
+  return { ...r, displayStatus: r.status };
 });
 
 // GET /api/miniapp/reminders/:id - Get single reminder

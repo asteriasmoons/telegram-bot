@@ -687,24 +687,26 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
           const nextForRepeat = computeNextRunAtWithTimes(rem, now());
 
                     if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
-            await Reminder.updateOne(
-              { _id: rem._id },
-              {
-                $set: {
-                  pendingNextRunAt: nextForRepeat,
-                  lastRunAt: now(),
-                  status: "sent",
-                },
-              }
-            );
-          } else {
-            await Reminder.updateOne(
-              { _id: rem._id },
-              {
-                $set: { lastRunAt: now(), status: "sent" },
-              }
-            );
-          }
+  await Reminder.updateOne(
+    { _id: rem._id },
+    {
+      $set: {
+        pendingNextRunAt: nextForRepeat,
+        lastRunAt: now(),
+        status: "sent",
+      },
+      $unset: { acknowledgedAt: 1 },   // <-- ADD THIS
+    }
+  );
+} else {
+  await Reminder.updateOne(
+    { _id: rem._id },
+    {
+      $set: { lastRunAt: now(), status: "sent" },
+      $unset: { acknowledgedAt: 1 },   // <-- ADD THIS
+    }
+  );
+}
         } catch (err) {
           console.error("Scheduler send error:", err);
 

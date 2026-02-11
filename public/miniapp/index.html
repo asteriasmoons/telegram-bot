@@ -7978,7 +7978,7 @@ function formatTime12h(hhmm) {
 }
 
       const getStatusBadge = () => {
-const st = reminder.displayStatus || reminder.status;
+  const st = reminder.displayStatus || reminder.status;
   const nextRun = reminder.nextRunAt ? new Date(reminder.nextRunAt) : null;
   const now = new Date();
 
@@ -7987,11 +7987,9 @@ const st = reminder.displayStatus || reminder.status;
   }
 
   if (st === "scheduled" && nextRun) {
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
+    const msUntil = nextRun.getTime() - now.getTime();
 
-    if (nextRun >= now && nextRun < todayEnd) {
+    if (msUntil > 0 && msUntil <= 24 * 60 * 60 * 1000) {
       return { label: "UPCOMING", className: "badge-upcoming" };
     }
   }
