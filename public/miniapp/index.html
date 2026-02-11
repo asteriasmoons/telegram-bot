@@ -4653,6 +4653,156 @@ Prevent horizontal clipping and overflow on all views.
   height: 38px;
 }
 
+/* ============================================
+   LYSTARIA HOTFIX PATCH v2 -- Feb 11 2026
+   Fixes: mood clipping, reading tab centering,
+   modal containment + internal scroll
+   ============================================ */
+
+/* --- 1. MODAL CONTAINMENT + SCROLL --- */
+/* All modals: cap height, scroll inside */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+}
+
+.modal,
+.modal-content,
+.journal-modal,
+.edit-modal,
+.reminder-modal,
+.event-modal,
+.view-modal,
+.summary-modal,
+.recs-modal,
+.checklist-modal,
+.book-modal,
+.share-modal,
+.event-view-modal,
+.intention-modal,
+.tag-modal,
+.confirm-modal,
+.settings-modal,
+[class*="-modal"] {
+  max-height: 85vh !important;
+  max-width: calc(100vw - 32px) !important;
+  width: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Modal inner content shouldn't fight the scroll */
+.modal-body,
+.modal-inner,
+.modal > div {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* --- 2. MOOD PAGE CLIPPING FIX --- */
+.mood-container,
+.mood-section,
+.mood-log-form,
+.mood-content,
+[class*="mood"] {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
+
+.mood-log-form select,
+.mood-log-form textarea,
+.mood-log-form input,
+.mood-container select,
+.mood-container textarea,
+.mood-container input {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.mood-log-form .form-group,
+.mood-log-form label,
+.mood-container .form-group {
+  max-width: 100% !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* The "Log Mood" button and note textarea */
+.mood-log-form button,
+.mood-container button[type="submit"],
+.mood-container .btn-primary {
+  max-width: calc(100% - 24px) !important;
+  margin-left: 12px !important;
+  margin-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* --- 3. READING TABS CENTERING --- */
+.reading-tabs,
+.book-filter-tabs,
+.filter-tabs {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  gap: 6px !important;
+  padding: 4px 12px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.reading-tabs button,
+.book-filter-tabs button,
+.filter-tabs button {
+  flex: 0 0 auto !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  padding: 6px 14px !important;
+  font-size: 12px !important;
+  border-radius: 20px !important;
+  min-width: 0 !important;
+}
+
+/* --- 4. APP-WIDE OVERFLOW GUARD --- */
+html, body, #root, #app {
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+}
+
+.app-container,
+.page-content,
+.content-area,
+main,
+[class*="container"] {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* Don't double-pad things already inside containers */
+.card,
+[class*="card"] {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 /* –––––––––––––––––––––––––––––
 END OF PATCH
 ––––––––––––––––––––––––––––– */
