@@ -4806,6 +4806,299 @@ main,
 /* –––––––––––––––––––––––––––––
 END OF PATCH
 ––––––––––––––––––––––––––––– */
+
+/* ==========================================================
+LYSTARIA -- HARD STOP PATCH (MODALS + MOOD + READING TABS + BADGES)
+Paste this block at the VERY END of your <style> tag.
+========================================================== */
+
+/* ---------- 0) APP-WIDE: KILL HORIZONTAL SCROLL (keep safe vars) ---------- */
+html,
+body {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden !important;
+}
+
+#app,
+#root,
+.app-shell,
+.app-content,
+.view-container {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+/* If any child tries to exceed viewport, force containment */
+.view-container * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Keep your safe-area behavior, but prevent side bleed */
+.app-content {
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  overflow-x: hidden !important;
+}
+
+/* ---------- 1) MODALS: FIT TO SCREEN + SCROLL TO THE TRUE BOTTOM ---------- */
+/* Overlay fills viewport and centers modal, with safe padding */
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: calc(12px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) 12px
+    calc(12px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* The modal itself must NOT scroll; the BODY inside it scrolls */
+.modal,
+.modal-content,
+.journal-modal,
+.edit-modal,
+.reminder-modal,
+.event-modal,
+.view-modal,
+.summary-modal,
+.recs-modal,
+.checklist-modal,
+.book-modal,
+.share-modal,
+.event-view-modal,
+.intention-modal,
+.tag-modal,
+.confirm-modal,
+.settings-modal,
+[class*="-modal"] {
+  width: 100% !important;
+  max-width: 520px !important;
+
+  /* hard fit */
+  max-height: calc(
+    100dvh - (24px + var(--tg-safe-top, env(safe-area-inset-top, 0px)) + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))
+  ) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  /* IMPORTANT: modal container must clip; inner area scrolls */
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+
+  box-sizing: border-box !important;
+}
+
+/* Make sure flex children can actually shrink (iOS safari fix) */
+.modal > *,
+.modal-content > *,
+[class*="-modal"] > * {
+  min-height: 0 !important;
+}
+
+/* Header + actions must stay visible; body is the scroll region */
+.modal-header {
+  flex: 0 0 auto !important;
+}
+
+.modal-actions {
+  flex: 0 0 auto !important;
+}
+
+/* The scrolling region */
+.modal-body,
+.modal-inner,
+.modal-content-body,
+.modal .modal-body,
+[class*="-modal"] .modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  max-height: none !important;
+}
+
+/* If any nested wrapper was forcing overflow visible, kill it */
+.modal-body * ,
+.modal-inner * ,
+[class*="-modal"] .modal-body * {
+  overflow-x: hidden;
+}
+
+/* Prevent background scroll when modal open (safe + stable) */
+body.modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  inset: 0 !important;
+}
+
+/* ---------- 2) MOOD: TEXTAREA CUT-OFF / CONTAINMENT ---------- */
+.mood-container,
+.mood-section,
+.mood-log-form,
+.mood-content,
+[class*="mood"] {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Force all form controls to stay inside */
+.mood-container select,
+.mood-container textarea,
+.mood-container input,
+.mood-log-form select,
+.mood-log-form textarea,
+.mood-log-form input {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* The NOTE textarea specifically: make it tall enough and not clipped by parents */
+.mood-container textarea,
+.mood-log-form textarea {
+  min-height: 140px !important;
+  line-height: 1.45 !important;
+  resize: vertical !important;
+  overflow: auto !important;
+}
+
+/* If a parent card is clipping, allow the textarea to render fully */
+.mood-container .card,
+.mood-log-form .card,
+.mood-container [class*="card"],
+.mood-log-form [class*="card"] {
+  overflow: visible !important;
+}
+
+/* ---------- 3) READING FILTER TABS: TRUE CENTERED LABELS ---------- */
+.reading-tabs,
+.book-filter-tabs,
+.filter-tabs {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 6px 12px !important;
+}
+
+/* Buttons: force centered text */
+.reading-tabs button,
+.book-filter-tabs button,
+.filter-tabs button,
+.reading-tabs .pill,
+.book-filter-tabs .pill,
+.filter-tabs .pill {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  padding: 8px 14px !important;
+  min-width: 64px !important;
+  box-sizing: border-box !important;
+}
+
+/* If your pills are spans/links inside buttons, center them too */
+.reading-tabs button > *,
+.book-filter-tabs button > *,
+.filter-tabs button > * {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+/* ---------- 4) HABIT BADGES: STOP SHRINKING / COLLAPSING ---------- */
+.habit-badges {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 6px !important;
+}
+
+/* Any badge-like element inside habit cards: never shrink */
+.habit-badges .card-badge,
+.habit-badges [class*="badge"],
+.badge-once,
+.badge-daily,
+.badge-weekly,
+.badge-monthly,
+.badge-interval,
+.badge-habit-daily,
+.badge-habit-weekly,
+.badge-habit-active,
+.badge-habit-paused,
+.badge-completed,
+.badge-due-now,
+.badge-upcoming,
+.card-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+
+  min-width: max-content !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Badge icons don’t collapse the line box */
+.card-badge img,
+.card-badge .badge-icon,
+[class*="badge"] img {
+  width: 12px !important;
+  height: 12px !important;
+  flex: 0 0 12px !important;
+}
+
+/* ---------- 5) FIX A SYNTAX LANDMINE (smart quotes / bad dash) ---------- */
+/* If you have this anywhere, this correct selector prevents a broken rule from being ignored */
+.qh-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+/* Also fix any accidental "en dash" in safe var usage by overriding bottom-nav safely */
+.bottom-nav {
+  padding-bottom: calc(10px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+}
 </style>
 </head>
 
