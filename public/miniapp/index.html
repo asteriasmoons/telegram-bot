@@ -5066,48 +5066,72 @@ Paste this block at the VERY END of your <style> tag.
   max-height: none !important;
 }
 
-/* ----------------------------------------------------------
-2) READING TABS: center the text and keep layout stable
-Your classes: .book-quick-actions + .book-quick-action
----------------------------------------------------------- */
+/* ================================
+READING TABS -- GLASS PILL BUBBLES
+Targets your actual classes:
+.book-quick-actions / .book-quick-action
+================================ */
 
+/* container row */
 .book-quick-actions {
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  gap: 10px !important;
 
-  gap: 8px !important;
-  padding: 6px 12px !important;
+  padding: 10px 12px !important;
   margin: 0 12px 12px !important;
 
   overflow-x: auto !important;
   overflow-y: hidden !important;
   -webkit-overflow-scrolling: touch !important;
 
-  white-space: nowrap !important;
-  box-sizing: border-box !important;
+  /* keep it from looking like a weird bar */
+  background: transparent !important;
+  border: 0 !important;
 }
 
+/* each pill */
 .book-quick-action {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
 
-  text-align: center !important;
-
-  padding: 8px 14px !important;
+  padding: 10px 16px !important;
   border-radius: 999px !important;
 
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.2px !important;
   line-height: 1 !important;
   white-space: nowrap !important;
+
+  /* GLASS PILL LOOK */
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.30) !important;
+
+  -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+  backdrop-filter: blur(12px) saturate(150%) !important;
+
+  cursor: pointer !important;
+  user-select: none !important;
 
   flex: 0 0 auto !important;
   min-width: max-content !important;
 }
 
-/* If your "active" state is a class toggle */
+/* pressed/hover feel */
+.book-quick-action:active {
+  transform: translateY(1px) !important;
+}
+
+/* active pill */
 .book-quick-action.active {
-  text-align: center !important;
+  background: rgba(139, 125, 239, 0.18) !important;
+  border-color: rgba(139, 125, 239, 0.40) !important;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.35),
+    0 0 0 3px rgba(139, 125, 239, 0.12) !important;
 }
 
 /* ----------------------------------------------------------
