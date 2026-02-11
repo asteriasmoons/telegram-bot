@@ -3712,6 +3712,35 @@ opacity: 1;
 .modal .times-item .btn {
   align-self: flex-end;
 }
+
+/* =========================================
+   FIX: Intention textarea getting clipped
+   File: index.html (your main CSS)
+   Paste at the very bottom
+   ========================================= */
+
+.intention-card {
+  overflow: visible; /* stop clipping the textarea */
+}
+
+/* keep your glow overlay behind everything */
+.intention-card::before {
+  z-index: 0;
+}
+
+/* force all real content above the overlay */
+.intention-header,
+.intention-input-group,
+.intention-display {
+  position: relative;
+  z-index: 1;
+}
+
+/* make sure the textarea box model never overflows */
+.intention-textarea {
+  box-sizing: border-box;
+  display: block;
+}
 </style>
 </head>
 
