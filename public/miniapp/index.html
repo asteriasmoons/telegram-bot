@@ -3551,6 +3551,12 @@ opacity: 1;
   line-height: 1;
   transform: translateY(1px);
 }
+
+.reminder-inline-svg {
+  display: inline-block;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
 </style>
 </head>
 
@@ -4117,25 +4123,22 @@ function isToday(dateValue) {
 // SYMBOLS HELPER FOR DECOR
 function renderTextWithSymbolSpans(text) {
   const s = String(text ?? "");
-
-  // Misc Symbols + Dingbats (covers ✦ ✧ ✿ ❀ etc.)
-  const symbolRe = /([\u2600-\u26FF\u2700-\u27BF])/g;
-
   const lines = s.split("\n");
+
+  // Match both symbol ranges AND specific mapped characters
+  const allMapped = Object.keys(SYMBOL_SVG_MAP).join('');
+  const symbolRe = new RegExp(`([${allMapped}\\u2600-\\u26FF\\u2700-\\u27BF])`, 'g');
 
   return lines.map((line, lineIdx) => {
     const parts = line.split(symbolRe);
-
     return (
       <React.Fragment key={`line-${lineIdx}`}>
         {parts.map((part, i) => {
-          // wrap only single-character symbol matches
+          if (part.length === 1 && SYMBOL_SVG_MAP[part]) {
+            return <React.Fragment key={`svg-${lineIdx}-${i}`}>{SYMBOL_SVG_MAP[part]}</React.Fragment>;
+          }
           if (part.length === 1 && /[\u2600-\u26FF\u2700-\u27BF]/.test(part)) {
-            return (
-              <span key={`sym-${lineIdx}-${i}`} className="reminder-text-symbol">
-                {part}
-              </span>
-            );
+            return <span key={`sym-${lineIdx}-${i}`} className="reminder-text-symbol">{part}</span>;
           }
           return <React.Fragment key={`txt-${lineIdx}-${i}`}>{part}</React.Fragment>;
         })}
@@ -4144,6 +4147,17 @@ function renderTextWithSymbolSpans(text) {
     );
   });
 }
+
+
+const SYMBOL_SVG_MAP = {
+  '♡': (
+    <svg key="heart-outline" className="reminder-inline-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 21C12 21 3 13.5 3 8.5C3 5.42 5.42 3 8.5 3C10.24 3 11.91 3.81 12 5C12.09 3.81 13.76 3 15.5 3C18.58 3 21 5.42 21 8.5C21 13.5 12 21 12 21Z"/>
+    </svg>
+  ),
+};
+
+
 
 
 // MOOD Multi-select dropdown component
