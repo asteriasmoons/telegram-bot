@@ -3806,16 +3806,69 @@ opacity: 1;
   display: block;
 }
 
+/* ==============================
+   HARD STOP: horizontal app drift
+   (keeps Telegram safe vars)
+   ============================== */
+
+/* Document never scrolls (prevents sideways panning) */
 html, body {
-  height: 100%;
   width: 100%;
-  overflow-x: hidden;    /* stops sideways page drift */
+  height: 100%;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  touch-action: pan-y;
+  margin: 0;
 }
 
+/* App shell is the fixed viewport */
 .app-shell {
-  height: 100%;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Only this scrolls vertically */
+.app-content {
+  flex: 1;
+  min-height: 0;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
   width: 100%;
-  overflow: hidden;      /* app shell should not scroll/pan */
+  max-width: 100%;
+  box-sizing: border-box;
+
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
+
+  touch-action: pan-y;
+
+  /* ✅ KEEP YOUR SAFE VARS (full-screen + safe areas) */
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+/* Stop any child from forcing horizontal overflow */
+.app-content,
+.app-content * {
+  max-width: 100%;
+}
+
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Flex overflow insurance (prevents "push width" bugs) */
+.app-content * {
+  min-width: 0;
 }
 </style>
 </head>
