@@ -3973,6 +3973,689 @@ img, svg, video, canvas {
   flex: 0 0 auto;
   opacity: 0.95;
 }
+
+
+/* ==========================================================
+LYSTARIA -- MASTER FIX PATCH
+Paste this block at the VERY END of your <style> tag,
+AFTER every other rule. It overrides broken sizing,
+clipping, badge inconsistency, settings layout, and
+the overall "too large" feel.
+========================================================== */
+
+/* –––––––––––––––––––––––––––––
+1. GLOBAL SCALE-DOWN
+   Everything felt too large. Pull base font down slightly
+   and tighten card padding across the board.
+––––––––––––––––––––––––––––– */
+body {
+  font-size: 14px;
+}
+
+.card {
+  padding: 16px;
+  margin: 0 12px 10px;
+  border-radius: 14px;
+}
+
+.header {
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+
+.header h1 {
+  font-size: 24px;
+}
+
+.quick-actions {
+  margin: 0 12px 18px;
+  gap: 6px;
+}
+
+.quick-action {
+  padding: 8px 16px;
+  font-size: 12px;
+  border-radius: 18px;
+}
+
+/* –––––––––––––––––––––––––––––
+2. UNIFIED BADGE SYSTEM
+One consistent badge style for ALL badges everywhere:
+habits, reading, reminders, journal, etc.
+––––––––––––––––––––––––––––– */
+.card-badge,
+.badge-once,
+.badge-daily,
+.badge-weekly,
+.badge-monthly,
+.badge-interval,
+.badge-habit-daily,
+.badge-habit-weekly,
+.badge-habit-active,
+.badge-habit-paused,
+.badge-completed,
+.badge-due-now,
+.badge-upcoming {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+
+  padding: 4px 10px !important;
+  min-height: unset !important;
+  height: auto !important;
+
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+
+  /* Base glass look (overridden per-type below) */
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+}
+
+.card-badge .badge-icon {
+  width: 11px !important;
+  height: 11px !important;
+  flex: 0 0 11px !important;
+}
+
+/* Re-apply specific badge colors at this specificity */
+.badge-once {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #3b82f6 !important;
+}
+.badge-daily {
+  background: rgba(168, 85, 247, 0.18) !important;
+  color: #a855f7 !important;
+}
+.badge-weekly {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+}
+.badge-monthly {
+  background: rgba(236, 72, 153, 0.18) !important;
+  color: #ec4899 !important;
+}
+.badge-interval {
+  background: rgba(234, 179, 8, 0.22) !important;
+  color: #eab308 !important;
+}
+.badge-habit-daily {
+  background: rgba(91, 141, 239, 0.15) !important;
+  color: #5b8def !important;
+}
+.badge-habit-weekly {
+  background: rgba(233, 160, 72, 0.18) !important;
+  color: #e9a048 !important;
+}
+.badge-habit-active {
+  background: rgba(76, 175, 80, 0.15) !important;
+  color: #4caf50 !important;
+}
+.badge-habit-paused {
+  background: rgba(244, 67, 54, 0.12) !important;
+  color: #f44336 !important;
+}
+.badge-due-now {
+  background: rgba(255, 183, 37, 0.22) !important;
+  color: #ffb725 !important;
+}
+.badge-upcoming {
+  background: rgba(0, 219, 255, 0.18) !important;
+  color: #00dbff !important;
+}
+
+/* Completed badge -- same size system, just with icon */
+.card-badge.badge-completed {
+  padding: 4px 10px !important;
+  min-height: unset !important;
+  gap: 5px !important;
+  background: rgba(76, 175, 80, 0.15) !important;
+  color: #4caf50 !important;
+}
+
+/* Habits badge column -- stack them neatly */
+.habit-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* –––––––––––––––––––––––––––––
+3. TAGS PAGE -- FIX CLIPPING
+The tag items + counts were being cut off on the right.
+––––––––––––––––––––––––––––– */
+.tags-list {
+  padding: 0 14px 16px;
+}
+
+.tag-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.tag-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.tag-item-count {
+  font-size: 12px;
+  font-weight: 700;
+  flex: 0 0 auto;
+  padding-left: 8px;
+}
+
+.tags-search {
+  margin: 0 14px 14px;
+}
+
+/* –––––––––––––––––––––––––––––
+4. SETTINGS PAGE -- QUIET HOURS LAYOUT FIX
+The checkbox label was wrapping weirdly ("Enable\nQuiet\nHours")
+because the toggle container was too constrained.
+––––––––––––––––––––––––––––– */
+.qh-box {
+  padding: 14px;
+  border-radius: 12px;
+  margin-top: 14px;
+}
+
+.qh-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.qh-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap; /* KEY FIX: stop "Enable Quiet Hours" from wrapping */
+  flex: 1;
+  min-width: 0;
+}
+
+.qh-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+/* Settings card general tightening */
+.settings-card {
+  padding: 16px;
+  margin: 0 12px 12px;
+}
+
+.settings-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.settings-help {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.qh-title {
+  font-size: 13px;
+}
+
+.qh-sub {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+/* Quiet hours time inputs -- ensure they don’t overflow */
+.qh-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+5. APP CONTENT CONTAINMENT
+Prevent horizontal clipping and overflow on all views.
+––––––––––––––––––––––––––––– */
+.app-content {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Safety: nothing should exceed viewport */
+.view-container,
+.view-container > div {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Cards must never push past edges */
+.card,
+.intention-card,
+.mood-result-card,
+.mood-log-card,
+.horoscope-card,
+.horoscope-result-card,
+.event-share-card,
+.settings-card,
+.qh-box {
+  max-width: calc(100% - 24px);
+  margin-left: 12px;
+  margin-right: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* –––––––––––––––––––––––––––––
+6. READING PAGE -- SMOOTHER BADGES + TIGHTER CARDS
+––––––––––––––––––––––––––––– */
+/* Reading card header: title + badge on same row */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Book title */
+.card-header > div:first-child > div:first-child {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+/* Author row */
+.card-author {
+  font-size: 13px;
+  gap: 5px;
+}
+
+.card-author img {
+  width: 12px;
+  height: 12px;
+}
+
+/* Star rating -- slightly smaller */
+.star-icon {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.star-rating {
+  gap: 6px;
+}
+
+/* Book summary text */
+.book-summary {
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 8px 0 10px;
+}
+
+/* Progress bar */
+.progress-wrap {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.progress-top {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.progress-pct {
+  font-size: 12px;
+}
+
+.progress-bar {
+  height: 8px;
+}
+
+/* Reading streak card */
+.streak-stat {
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.streak-stat-label {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.streak-stat-value {
+  font-size: 20px;
+}
+
+.streak-row {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+7. HABITS PAGE -- TIGHTEN UP
+––––––––––––––––––––––––––––– */
+.habit-title {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.habit-sub {
+  font-size: 12px;
+}
+
+.habit-target {
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.habit-actions {
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.habit-actions .btn {
+  padding: 8px 12px;
+  font-size: 12px;
+  min-width: 120px;
+}
+
+/* –––––––––––––––––––––––––––––
+8. MOOD PAGE -- TIGHTEN
+––––––––––––––––––––––––––––– */
+.mood-dropdown-trigger {
+  font-size: 14px;
+  padding: 10px 14px;
+}
+
+.mood-dropdown-option {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.mood-pill {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+9. BUTTONS -- SLIGHTLY SMALLER
+––––––––––––––––––––––––––––– */
+.btn {
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+.btn-prompt,
+.btn-summary {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+/* Header action buttons */
+.journal-header-actions {
+  gap: 6px;
+}
+
+/* Icon buttons -- consistent sizing */
+.checklist-icon-btn,
+.mood-icon-btn,
+.habits-icon-btn,
+.tags-icon-btn,
+.horoscope-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.checklist-icon-btn img,
+.mood-icon-btn img,
+.habits-icon-btn img,
+.tags-icon-btn img,
+.horoscope-icon-btn img {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.icon-btn img {
+  width: 16px;
+  height: 16px;
+}
+
+/* –––––––––––––––––––––––––––––
+10. MODAL -- SLIGHTLY TIGHTER
+––––––––––––––––––––––––––––– */
+.modal {
+  padding: 20px;
+  border-radius: 18px;
+}
+
+.modal-header h2 {
+  font-size: 20px;
+}
+
+.modal-body {
+  padding: 12px;
+}
+
+.form-label {
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+/* –––––––––––––––––––––––––––––
+11. BOTTOM NAV -- SLIGHTLY TIGHTER
+––––––––––––––––––––––––––––– */
+.bottom-nav {
+  padding: 10px 0 calc(10px + var(--tg-safe-bottom, env(safe-area-inset-bottom)));
+}
+
+.nav-item {
+  gap: 3px;
+  padding: 6px;
+}
+
+.nav-item-icon img {
+  width: 22px;
+  height: 22px;
+}
+
+.nav-item-label {
+  font-size: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+12. FAB -- SLIGHTLY SMALLER
+––––––––––––––––––––––––––––– */
+.fab {
+  width: 50px;
+  height: 50px;
+  font-size: 22px;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+}
+
+/* –––––––––––––––––––––––––––––
+13. JOURNAL -- TIGHTEN CARDS
+––––––––––––––––––––––––––––– */
+.journal-preview {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tag-pill,
+.tag-chip {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.tag-row {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Intention card */
+.intention-card {
+  padding: 16px;
+  margin: 0 12px 16px;
+  border-radius: 14px;
+}
+
+.intention-title {
+  font-size: 14px;
+}
+
+.intention-text {
+  font-size: 14px;
+  padding: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+14. CALENDAR -- TIGHTER
+––––––––––––––––––––––––––––– */
+.calendar-header {
+  padding: 12px 14px;
+}
+
+.calendar-month {
+  font-size: 20px;
+}
+
+.calendar-body {
+  padding: 12px;
+}
+
+.calendar-datebox-day {
+  font-size: 24px;
+}
+
+.calendar-event-title {
+  font-size: 14px;
+}
+
+.calendar-event-time {
+  font-size: 12px;
+}
+
+.calendar-event {
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+15. REMINDER CARDS -- TIGHTEN
+––––––––––––––––––––––––––––– */
+.card-time-text {
+  font-size: 14px;
+}
+
+.time-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.reminder-card-text,
+.card-text {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+/* –––––––––––––––––––––––––––––
+16. REMINDERS GREETING
+––––––––––––––––––––––––––––– */
+.reminders-greeting {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* –––––––––––––––––––––––––––––
+17. EMPTY STATE -- SCALE DOWN
+––––––––––––––––––––––––––––– */
+.empty-state {
+  padding: 40px 16px;
+}
+
+.empty-state-icon img {
+  width: 48px;
+  height: 48px;
+}
+
+.empty-state-text {
+  font-size: 14px;
+}
+
+/* –––––––––––––––––––––––––––––
+18. CHECKLIST -- TIGHTEN
+––––––––––––––––––––––––––––– */
+.checklist-checkbox {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-radius: 7px;
+}
+
+.checklist-text {
+  font-size: 14px;
+}
+
+.checklist-expand {
+  width: 38px;
+  height: 38px;
+}
+
+/* –––––––––––––––––––––––––––––
+END OF PATCH
+––––––––––––––––––––––––––––– */
 </style>
 </head>
 
