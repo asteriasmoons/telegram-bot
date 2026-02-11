@@ -955,8 +955,20 @@ body::after {
 
 .modal-body {
   flex: 1;
-  overflow-y: auto;
   min-height: 0;
+  /* scrolling */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* containment + spacing */
+  padding: 16px 16px 24px;
+  box-sizing: border-box;
+  /* prevents stretching from long text/symbol runs */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  /* ensures it never overflows viewport */
+  max-height: 70vh;
 }
 
 /* Prevent background scroll when modal is open */
