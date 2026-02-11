@@ -3532,6 +3532,30 @@ opacity: 1;
   text-rendering: auto;
   -webkit-font-smoothing: antialiased;
 }
+
+
+.reminder-card-text {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.reminder-text-symbol {
+  font-family:
+    "Apple Symbols",
+    "Segoe UI Symbol",
+    "Noto Sans Symbols 2",
+    "Noto Sans Symbols",
+    system-ui,
+    sans-serif;
+
+  display: inline-block;
+  line-height: 1;
+  transform: translateY(1px);
+}
 </style>
 </head>
 
@@ -4093,6 +4117,37 @@ function isToday(dateValue) {
   const e = endOfToday().getTime();
   const t = d.getTime();
   return t >= s && t <= e;
+}
+
+// SYMBOLS HELPER FOR DECOR
+function renderTextWithSymbolSpans(text) {
+  const s = String(text ?? "");
+
+  // Misc Symbols + Dingbats (covers ✦ ✧ ✿ ❀ etc.)
+  const symbolRe = /([\u2600-\u26FF\u2700-\u27BF])/g;
+
+  const lines = s.split("\n");
+
+  return lines.map((line, lineIdx) => {
+    const parts = line.split(symbolRe);
+
+    return (
+      <React.Fragment key={`line-${lineIdx}`}>
+        {parts.map((part, i) => {
+          // wrap only single-character symbol matches
+          if (part.length === 1 && /[\u2600-\u26FF\u2700-\u27BF]/.test(part)) {
+            return (
+              <span key={`sym-${lineIdx}-${i}`} className="reminder-text-symbol">
+                {part}
+              </span>
+            );
+          }
+          return <React.Fragment key={`txt-${lineIdx}-${i}`}>{part}</React.Fragment>;
+        })}
+        {lineIdx < lines.length - 1 ? <br /> : null}
+      </React.Fragment>
+    );
+  });
 }
 
 
@@ -8060,7 +8115,9 @@ function formatTime12h(hhmm) {
       </div>
     </div>
 
-    <div className="card-text">{reminder.text}</div>
+    <div className="reminder-card-text">
+  {renderTextWithSymbolSpans(reminder.text)}
+</div>
 
     {expanded && (
       <div className="card-actions" onClick={e => e.stopPropagation()}>
