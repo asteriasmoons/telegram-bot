@@ -2869,7 +2869,7 @@ background: rgba(255, 255, 255, 0.08);
 
 .mood-dropdown-option.selected {
 background: rgba(91, 141, 239, 0.20);
-color: var(–-accent);
+color: var(--accent);
 font-weight: 700;
 }
 
@@ -2886,8 +2886,8 @@ transition: all 0.15s;
 }
 
 .mood-dropdown-option.selected .mood-dropdown-check {
-background: var(–-accent);
-border-color: var(–-accent);
+background: var(--accent);
+border-color: var(--accent);
 }
 
 /* Selected pills (bubble style) */
@@ -2942,11 +2942,11 @@ opacity: 1;
 margin: 0 16px 16px;
 padding: 20px;
 border-radius: 16px;
-background: var(–-glass-surface);
-border: 1px solid var(–-glass-border);
-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
--webkit-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
-box-shadow: 0 14px 40px var(–-glass-shadow);
+background: var(--glass-surface);
+border: 1px solid var(--glass-border);
+backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+box-shadow: 0 14px 40px var(--glass-shadow);
 position: relative;
 overflow: hidden;
 animation: slideUp 0.3s;
@@ -3012,7 +3012,7 @@ text-align: center;
 margin-top: 8px;
 font-size: 14px;
 font-weight: 700;
-color: var(–-text-primary);
+color: var(--text-primary);
 }
 
 /* Mood log history cards */
@@ -3020,10 +3020,10 @@ color: var(–-text-primary);
 margin: 0 16px 12px;
 padding: 16px;
 border-radius: 14px;
-background: var(–-glass-surface);
-border: 1px solid var(–-glass-border);
-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
--webkit-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
+background: var(--glass-surface);
+border: 1px solid var(--glass-border);
+backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
 position: relative;
 overflow: hidden;
 }
@@ -3055,7 +3055,7 @@ z-index: 1;
 
 .mood-log-date {
 font-size: 13px;
-color: var(–-text-secondary);
+color: var(--text-secondary);
 display: flex;
 align-items: center;
 gap: 6px;
@@ -3085,7 +3085,7 @@ z-index: 1;
 .mood-log-delete {
 background: none;
 border: none;
-color: var(–-danger);
+color: var(--danger);
 cursor: pointer;
 padding: 4px;
 opacity: 0.7;
@@ -3869,6 +3869,109 @@ img, svg, video, canvas {
 /* Flex overflow insurance (prevents "push width" bugs) */
 .app-content * {
   min-width: 0;
+}
+
+/* =========================================
+   MOOD FIXES (your actual classes)
+   Also fixes the broken var(–-...) situation by overriding
+   ========================================= */
+
+/* Your file has var(–-accent) etc (bad dash). Override with correct vars. */
+.mood-dropdown-option.selected .mood-dropdown-check {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Mood result card uses broken var(–-glass-surface) in file */
+.mood-result-card {
+  background: var(--glass-surface) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 14px 40px var(--glass-shadow) !important;
+}
+
+/* Mood labels */
+.mood-bar-labels {
+  color: var(--text-secondary) !important;
+}
+
+/* Keep mood pills from causing width wobble */
+.mood-pills-row {
+  max-width: 100%;
+}
+
+.mood-pill {
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* =========================================
+   SETTINGS: contain cards + form rows (safe, non-destructive)
+   ========================================= */
+
+.settings-card, .qh-box, .card {
+  max-width: 100%;
+  overflow: hidden; /* prevents inner content pushing the card wider */
+}
+
+/* If your settings inputs are stretching wider than the card */
+.settings-card input,
+.settings-card textarea,
+.settings-card select,
+.qh-box input,
+.qh-box textarea,
+.qh-box select,
+.form-input {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Quiet Hours rows often push sideways because of time fields */
+.qh-times, .settings-row, .form-row {
+  display: flex;
+  gap: 12px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.qh-times > *, .settings-row > *, .form-row > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* =========================================
+   READING STATUS "PILLS" (actual class used)
+   ========================================= */
+
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 7px 12px;
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  line-height: 1;
+
+  /* glassy pill look */
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+
+  /* containment */
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.card-badge .badge-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  opacity: 0.95;
 }
 </style>
 </head>
