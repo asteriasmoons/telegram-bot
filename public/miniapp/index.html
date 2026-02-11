@@ -328,13 +328,20 @@ body::after {
 
 .app-content {
   flex: 1;
+  min-height: 0;                 /* critical for nested flex scrolling */
   overflow-y: auto;
+  overflow-x: hidden;            /* KEY: no sideways scroll */
   -webkit-overflow-scrolling: touch;
+
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
   padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
   padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
+
+  overscroll-behavior: contain;  /* reduces iOS rubber-band weirdness */
 }
-
-
 /* =========================================================
    BOTTOM NAV
    ========================================================= */
@@ -3797,6 +3804,18 @@ opacity: 1;
 .intention-textarea {
   box-sizing: border-box;
   display: block;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;    /* stops sideways page drift */
+}
+
+.app-shell {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;      /* app shell should not scroll/pan */
 }
 </style>
 </head>
