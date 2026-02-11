@@ -572,6 +572,27 @@ body::after {
   color: var(--text-primary);
   white-space: pre-line;
   word-break: break-word;
+
+  /* Improve symbol rendering */
+  font-family:
+    system-ui,
+    -apple-system,
+    "SF Pro Text",
+    "SF Pro Display",
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol",
+    "Apple Symbols",
+    "Noto Sans Symbols",
+    "Noto Sans Symbols 2",
+    sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .card-actions {
