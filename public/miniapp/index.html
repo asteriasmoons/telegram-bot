@@ -5183,6 +5183,28 @@ Targets your actual classes:
 
   box-shadow: 0 0 12px rgba(224, 25, 212, 0.4);
 }
+
+/* ===== Calendar title alignment fix ===== */
+
+.calendar-event-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+/* Your actual SVG class */
+.calendar-event-title .calendar-inline-svg {
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+  top: 1px; /* micro-adjust -- tweak 0px / 1px / 2px if needed */
+}
+
+/* Keep the reminder dot aligned */
+.calendar-event-title .event-reminder-dot {
+  align-self: center;
+}
 </style>
 </head>
 
