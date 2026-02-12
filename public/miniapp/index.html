@@ -11641,6 +11641,80 @@ const data = await apiCall(
 
       const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       const days = getDaysInMonth();
+      
+      // Symbol → SVG map (Calendar specific)
+const CALENDAR_SYMBOL_SVG_MAP = {
+  '♡': (
+    <img
+      className="calendar-inline-svg"
+      src="/icons/heart.svg"
+      alt="♡"
+      width="14"
+      height="14"
+    />
+  ),
+  '✦': (
+    <img
+      className="calendar-inline-svg"
+      src="/icons/sparkle-fill.svg"
+      alt="✦"
+      width="14"
+      height="14"
+    />
+  ),
+  // Add more symbols here as needed
+  '✧': (
+  <img
+    className="calendar-inline-svg"
+    src="/icons/sparkle-line.svg"
+    alt="✧"
+    width="14"
+    height="14"
+  />
+  ),
+  '☆': (
+  <img
+    className="calendar-inline-svg"
+    src="/icons/stars.svg"
+    alt="☆"
+    width="14"
+    height="14"
+  />
+  ),
+  '★': (
+  <img
+    className="calendar-inline-svg"
+    src="/icons/star.svg"
+    alt="★"
+    width="14"
+    height="14"
+  />
+  ),
+};
+
+// Render function
+function renderCalendarInlineSymbols(text) {
+  if (!text) return null;
+
+  const symbolRegex = new RegExp(
+    `(${Object.keys(CALENDAR_SYMBOL_SVG_MAP)
+      .map(s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|")})`,
+    "g"
+  );
+
+  return text.split(symbolRegex).map((part, index) => {
+    if (CALENDAR_SYMBOL_SVG_MAP[part]) {
+      return (
+        <span key={index} className="calendar-inline-wrapper">
+          {CALENDAR_SYMBOL_SVG_MAP[part]}
+        </span>
+      );
+    }
+
+    return <span key={index}>{part}</span>;
+  });
+}
 
       return (
         <div>
@@ -11725,8 +11799,12 @@ const data = await apiCall(
                                       </div>
                                     )}
                                     <div className="calendar-event-title">
-  {(event.title || event.text || event.name || "(untitled)")}
-  {hasReminder(event) && <span className="event-reminder-dot" />}
+  {renderCalendarInlineSymbols(
+    event.title || event.text || event.name || "(untitled)"
+  )}
+  {hasReminder(event) && (
+    <span className="event-reminder-dot" />
+  )}
 </div>
                                     {!event.allDay && (
                                       <div className="calendar-event-time">
