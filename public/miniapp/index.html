@@ -11960,6 +11960,17 @@ function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits
           >
             <img src="/icons/plus.svg" alt="" />
           </button>
+    
+    {/* MOOD ICON BUTTON */}
+        <button
+      type="button"
+       className="mood-icon-btn"
+       aria-label="Mood"
+       title="Mood"
+       onClick={() => goTo('mood')}
+     >
+      <img src="/icons/bfly.svg" alt="" />
+     </button>
 
           {/* HISTORY TOGGLE */}
           <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
