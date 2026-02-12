@@ -1177,37 +1177,6 @@ input[type="date"].form-input::-webkit-datetime-edit {
 }
 
 /* =========================================================
-   QUICK ACTIONS
-   ========================================================= */
-.quick-actions {
-  display: flex;
-  gap: 8px;
-  margin: 0 16px 24px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-.quick-action {
-  padding: 10px 20px;
-  border-radius: 20px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.quick-action:hover {
-  border-color: var(--accent);
-}
-
-.quick-action.active {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-/* =========================================================
    CALENDAR HEADER
    ========================================================= */
 .calendar-header {
@@ -4007,17 +3976,6 @@ body {
   font-size: 24px;
 }
 
-.quick-actions {
-  margin: 0 12px 18px;
-  gap: 6px;
-}
-
-.quick-action {
-  padding: 8px 16px;
-  font-size: 12px;
-  border-radius: 18px;
-}
-
 /* –––––––––––––––––––––––––––––
 2. UNIFIED BADGE SYSTEM
 One consistent badge style for ALL badges everywhere:
@@ -5178,6 +5136,52 @@ Targets your actual classes:
 
 .load-more-btn {
   min-width: 140px;
+}
+
+
+/* REMINDER FILTER PILLS */
+.quick-actions {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 6px 0;
+  scrollbar-width: none;
+}
+
+.quick-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-action {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  border: 1px solid rgba(255, 255, 255, 0.15);
+
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  font-weight: 500;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-action.active {
+  background: linear-gradient(
+    135deg,
+    rgba(224, 25, 212, 0.35),
+    rgba(0, 219, 255, 0.35)
+  );
+
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+
+  box-shadow: 0 0 12px rgba(224, 25, 212, 0.4);
 }
 </style>
 </head>
