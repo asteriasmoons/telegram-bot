@@ -5168,6 +5168,17 @@ Targets your actual classes:
   white-space: nowrap !important;
   line-height: 1.2 !important;
 }
+
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.load-more-btn {
+  min-width: 140px;
+}
 </style>
 </head>
 
@@ -11787,248 +11798,285 @@ const data = await apiCall(
       );
     }
 
-    // Reminders View
+// Reminders View
 function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits, goTo }) {
-      const [reminders, setReminders] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [showHistory, setShowHistory] = useState(false);
-      const [showModal, setShowModal] = useState(false);
-      const [editingReminder, setEditingReminder] = useState(null);
-      const [filter, setFilter] = useState('all');
-      const createReminderRef = useRef(null);
+  const [reminders, setReminders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingReminder, setEditingReminder] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const createReminderRef = useRef(null);
 
-useEffect(() => {
-  if (activeView === "reminders") {
-    loadReminders();
-  }
-}, [showHistory, activeView]);
+  // ── Pagination state ──
+  const [skip, setSkip] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 8;
 
-      const loadReminders = async () => {
-        try {
-          setLoading(true);
-          const data = await apiCall(`/reminders?includeHistory=${showHistory}`);
-          setReminders(data.reminders);
-        } catch (error) {
-          tg.showAlert('Failed to load reminders: ' + error.message);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const handleCreate = () => {
-        setEditingReminder(null);
-        setShowModal(true);
-      };
-
-      const handleEdit = (reminder) => {
-        setEditingReminder(reminder);
-        setShowModal(true);
-      };
-
-      const handleSave = async (data) => {
-        try {
-          if (editingReminder) {
-            await apiCall(`/reminders/${editingReminder._id}`, {
-              method: 'PUT',
-              body: JSON.stringify(data),
-            });
-            tg.showAlert('Reminder updated!');
-          } else {
-            await apiCall('/reminders', {
-              method: 'POST',
-              body: JSON.stringify(data),
-            });
-            tg.showAlert('Reminder created!');
-          }
-          setShowModal(false);
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to save: ' + error.message);
-        }
-      };
-
-      const handleSnooze = async (id, minutes, label = null) => {
-  try {
-    await apiCall(`/reminders/${id}/snooze`, {
-      method: 'POST',
-      body: JSON.stringify({ minutes }),
-    });
-
-    tg.showPopup({ message: label ? `Snoozed for ${label}` : `Snoozed for ${minutes} minutes` });
-    loadReminders();
-  } catch (error) {
-    tg.showAlert('Failed to snooze: ' + error.message);
-  }
-};
-
-      const handleDone = async (id) => {
-  try {
-    await apiCall(`/reminders/${id}/done`, {
-      method: 'POST',
-    });
-    tg.showPopup({ message: 'Marked as done!' });
-    
-    // Optimistically remove from local state for instant feedback
-    setReminders(prev => prev.filter(r => r._id !== id));
-    
-    // Then refresh from server to get accurate state
-    setTimeout(loadReminders, 400);
-  } catch (error) {
-    tg.showAlert('Failed to mark as done: ' + error.message);
-  }
-};
-
-      const handleDelete = async (id) => {
-        try {
-          await apiCall(`/reminders/${id}`, {
-            method: 'DELETE',
-          });
-          tg.showPopup({ message: 'Reminder deleted' });
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to delete: ' + error.message);
-        }
-      };
-
-      const filteredReminders = reminders.filter(r => {
-        if (filter === 'all') return true;
-        return r.schedule?.kind === filter;
-      });
-
-      return (
-        <div>
-          <div className="header">
-  <div>
-    <h1>Reminders</h1>
-    {(() => {
-      const name = (userDisplayName || "").trim();
-      return name ? <div className="reminders-greeting">Hello {name}</div> : null;
-    })()}
-  </div>
-
-  <div className="header-actions">
-    {/* CHECKLIST ICON BUTTON */}
-    <button
-      type="button"
-      className="checklist-icon-btn"
-      aria-label="Checklist"
-      title="Checklist"
-      onClick={() => goTo('checklist')}
-    >
-      <img src="/icons/check.svg" alt="" />
-    </button>
-
-    {/* HABITS ICON BUTTON */}
-    <button
-      type="button"
-      className="habits-icon-btn"
-      aria-label="Habits"
-      title="Habits"
-      onClick={onOpenHabits}
-    >
-      <img src="/icons/plus.svg" alt="" />
-    </button>
-    
-    {/* MOOD ICON BUTTON */}
-        <button
-      type="button"
-       className="mood-icon-btn"
-       aria-label="Mood"
-       title="Mood"
-       onClick={() => goTo('mood')}
-     >
-      <img src="/icons/bfly.svg" alt="" />
-     </button>
-
-    {/* HISTORY TOGGLE */}
-    <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
-      <span>History</span>
-      <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
-    </div>
-  </div>
-</div>
-
-
-          <div className="quick-actions">
-            <div
-              className={`quick-action ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              All
-            </div>
-            <div
-              className={`quick-action ${filter === 'once' ? 'active' : ''}`}
-              onClick={() => setFilter('once')}
-            >
-              Once
-            </div>
-            <div
-              className={`quick-action ${filter === 'daily' ? 'active' : ''}`}
-              onClick={() => setFilter('daily')}
-            >
-              Daily
-            </div>
-            <div
-              className={`quick-action ${filter === 'weekly' ? 'active' : ''}`}
-              onClick={() => setFilter('weekly')}
-            >
-              Weekly
-            </div>
-            <div
-              className={`quick-action ${filter === 'interval' ? 'active' : ''}`}
-              onClick={() => setFilter('interval')}
-            >
-              Interval
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="loading">
-              <div className="spinner" />
-              <div>Loading reminders...</div>
-            </div>
-          ) : filteredReminders.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">
-  <img src="/icons/journal.svg" alt="" />
-</div>
-              <div className="empty-state-text">
-                {filter === 'all'
-                  ? 'No reminders yet.\nTap the + button to create one!'
-                  : `No ${filter} reminders found.`}
-              </div>
-            </div>
-          ) : (
-            filteredReminders.map(reminder => (
-              <ReminderCard
-                key={reminder._id}
-                reminder={reminder}
-                onEdit={handleEdit}
-                onSnooze={handleSnooze}
-                onDone={handleDone}
-                onDelete={handleDelete}
-              />
-            ))
-          )}
-
-<button
-  ref={createReminderRef}
-  data-create-reminder="1"
-  onClick={handleCreate}
-  className="is-hidden"
-/>
-
-          {showModal && (
-  <ReminderModal
-    reminder={editingReminder}
-    onClose={() => setShowModal(false)}
-    onSave={handleSave}
-    userTimezone={userTimezone}
-  />
-)}
-        </div>
-      );
+  useEffect(() => {
+    if (activeView === "reminders") {
+      loadReminders();
     }
+  }, [showHistory, activeView, filter]);
+
+  const loadReminders = async (append = false) => {
+    try {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setSkip(0);
+      }
+
+      const currentSkip = append ? skip : 0;
+      const data = await apiCall(
+        `/reminders?includeHistory=${showHistory}&limit=${PAGE_SIZE}&skip=${currentSkip}&kind=${filter}`
+      );
+
+      if (append) {
+        setReminders(prev => [...prev, ...data.reminders]);
+      } else {
+        setReminders(data.reminders);
+      }
+
+      setTotal(data.total || 0);
+      setSkip(currentSkip + data.reminders.length);
+    } catch (error) {
+      tg.showAlert('Failed to load reminders: ' + error.message);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMore = () => {
+    loadReminders(true);
+  };
+
+  const handleCreate = () => {
+    setEditingReminder(null);
+    setShowModal(true);
+  };
+
+  const handleEdit = (reminder) => {
+    setEditingReminder(reminder);
+    setShowModal(true);
+  };
+
+  const handleSave = async (data) => {
+    try {
+      if (editingReminder) {
+        await apiCall(`/reminders/${editingReminder._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+        tg.showAlert('Reminder updated!');
+      } else {
+        await apiCall('/reminders', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        tg.showAlert('Reminder created!');
+      }
+      setShowModal(false);
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to save: ' + error.message);
+    }
+  };
+
+  const handleSnooze = async (id, minutes) => {
+    try {
+      await apiCall(`/reminders/${id}/snooze`, {
+        method: 'POST',
+        body: JSON.stringify({ minutes }),
+      });
+      tg.showPopup({ message: `Snoozed for ${minutes} minutes` });
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to snooze: ' + error.message);
+    }
+  };
+
+  const handleDone = async (id) => {
+    try {
+      await apiCall(`/reminders/${id}/done`, {
+        method: 'POST',
+      });
+      tg.showPopup({ message: 'Marked as done!' });
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to mark as done: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await apiCall(`/reminders/${id}`, {
+        method: 'DELETE',
+      });
+      tg.showPopup({ message: 'Reminder deleted' });
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to delete: ' + error.message);
+    }
+  };
+
+  // No more client-side filtering -- server handles it now
+  const filteredReminders = reminders;
+
+  return (
+    <div>
+      <div className="header">
+        <div>
+          <h1>Reminders</h1>
+
+          {(() => {
+            const name = (userDisplayName || "").trim();
+            return name ? <div className="reminders-greeting">Hello {name}</div> : null;
+          })()}
+        </div>
+
+        <div className="header-actions">
+          {/* CHECKLIST ICON BUTTON */}
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Checklist"
+            title="Checklist"
+            onClick={() => goTo('checklist')}
+          >
+            <img src="/icons/check.svg" alt="" />
+          </button>
+
+          {/* HABITS ICON BUTTON */}
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Habits"
+            title="Habits"
+            onClick={onOpenHabits}
+          >
+            <img src="/icons/plus.svg" alt="" />
+          </button>
+
+          {/* HISTORY TOGGLE */}
+          <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
+            <span>History</span>
+            <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
+          </div>
+        </div>
+      </div>
+
+      <div className="quick-actions">
+        <div
+          className={`quick-action ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          All
+        </div>
+        <div
+          className={`quick-action ${filter === 'once' ? 'active' : ''}`}
+          onClick={() => setFilter('once')}
+        >
+          Once
+        </div>
+        <div
+          className={`quick-action ${filter === 'daily' ? 'active' : ''}`}
+          onClick={() => setFilter('daily')}
+        >
+          Daily
+        </div>
+        <div
+          className={`quick-action ${filter === 'weekly' ? 'active' : ''}`}
+          onClick={() => setFilter('weekly')}
+        >
+          Weekly
+        </div>
+        <div
+          className={`quick-action ${filter === 'monthly' ? 'active' : ''}`}
+          onClick={() => setFilter('monthly')}
+        >
+          Monthly
+        </div>
+        <div
+          className={`quick-action ${filter === 'yearly' ? 'active' : ''}`}
+          onClick={() => setFilter('yearly')}
+        >
+          Yearly
+        </div>
+        <div
+          className={`quick-action ${filter === 'interval' ? 'active' : ''}`}
+          onClick={() => setFilter('interval')}
+        >
+          Interval
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading reminders...</div>
+        </div>
+      ) : filteredReminders.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <img src="/icons/journal.svg" alt="" />
+          </div>
+          <div className="empty-state-text">
+            {filter === 'all'
+              ? 'No reminders yet.\nTap the + button to create one!'
+              : `No ${filter} reminders.`}
+          </div>
+        </div>
+      ) : (
+        <>
+          {filteredReminders.map(r => (
+            <ReminderCard
+              key={r._id}
+              reminder={r}
+              onEdit={handleEdit}
+              onSnooze={handleSnooze}
+              onDone={handleDone}
+              onDelete={handleDelete}
+              userTimezone={userTimezone}
+            />
+          ))}
+
+          {/* Load More button */}
+          {filteredReminders.length < total && (
+            <div className="load-more-container">
+              <button
+                className="btn btn-secondary load-more-btn"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      <button
+        className="is-hidden"
+        ref={createReminderRef}
+        onClick={handleCreate}
+      />
+
+      {showModal && (
+        <ReminderModal
+          reminder={editingReminder}
+          onClose={() => setShowModal(false)}
+          onSave={handleSave}
+          userTimezone={userTimezone}
+        />
+      )}
+    </div>
+  );
+}
+
     
     // SETTINGS VIEW
 function SettingsView({ onBack }) {

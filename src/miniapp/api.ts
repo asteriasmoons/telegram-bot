@@ -128,10 +128,14 @@ router.use((req, res, next) => {
   next();
 });
 
-// GET /api/miniapp/reminders - Get all reminders for user
+// GET /api/miniapp/reminders - Get reminders for user (paginated, filterable by kind)
 router.get("/reminders", async (req, res) => {
   try {
-    const { includeHistory = "false" } = req.query;
+    const { includeHistory = "false", kind, limit: limitRaw, skip: skipRaw } = req.query;
+
+    // ── Pagination params ──
+    const limit = Math.min(Math.max(parseInt(limitRaw as string) || 8, 1), 100);
+    const skip  = Math.max(parseInt(skipRaw as string) || 0, 0);
 
     const query: any = { userId: req.userId };
 
@@ -163,50 +167,78 @@ router.get("/reminders", async (req, res) => {
       ];
     }
 
-    const reminders = await Reminder.find(query).lean();
+    // ── Server-side kind filter ──
+    // "all" or omitted = no extra filter
+    if (kind && kind !== "all") {
+      if (kind === "once") {
+        // "once" = no schedule, or schedule.kind === "once"
+        query.$and = [
+          ...(query.$and || []),
+          {
+            $or: [
+              { schedule: { $exists: false } },
+              { schedule: null },
+              { "schedule.kind": "once" },
+            ],
+          },
+        ];
+      } else {
+        // daily / weekly / monthly / yearly / interval
+        query["schedule.kind"] = kind;
+      }
+    }
+
+    // ── Get total for this filter BEFORE paginating ──
+    const total = await Reminder.countDocuments(query);
+
+    const reminders = await Reminder.find(query)
+      .sort({ nextRunAt: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
     // ✅ Pin DUE NOW (status="sent") at the top, then sort by nextRunAt
-const isDueNow = (r: any) => {
-  const unacked = r.acknowledgedAt == null;
-  const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
-  const firedToday = firedAt && firedAt.toDateString() === new Date().toDateString();
-  return r.status === "sent" && unacked && firedToday;
-};
+    const isDueNow = (r: any) => {
+      const unacked = r.acknowledgedAt == null;
+      const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
+      const firedToday = firedAt && firedAt.toDateString() === new Date().toDateString();
+      return r.status === "sent" && unacked && firedToday;
+    };
 
-const sortedReminders = reminders.sort((a: any, b: any) => {
-  const aDue = isDueNow(a) ? 0 : 1;
-  const bDue = isDueNow(b) ? 0 : 1;
-  if (aDue !== bDue) return aDue - bDue;
+    const sortedReminders = reminders.sort((a: any, b: any) => {
+      const aDue = isDueNow(a) ? 0 : 1;
+      const bDue = isDueNow(b) ? 0 : 1;
+      if (aDue !== bDue) return aDue - bDue;
 
-  const aTime = a.nextRunAt ? new Date(a.nextRunAt).getTime() : 0;
-  const bTime = b.nextRunAt ? new Date(b.nextRunAt).getTime() : 0;
-  return aTime - bTime;
-});
+      const aTime = a.nextRunAt ? new Date(a.nextRunAt).getTime() : 0;
+      const bTime = b.nextRunAt ? new Date(b.nextRunAt).getTime() : 0;
+      return aTime - bTime;
+    });
 
+    const processedReminders = sortedReminders.map((r: any) => {
+      const kind = r?.schedule?.kind || "once";
+      const isOnce = !r.schedule || kind === "once";
+      const now = new Date();
+      const today = now.toDateString();
 
-const processedReminders = sortedReminders.map((r: any) => {
-  const kind = r?.schedule?.kind || "once";
-  const isOnce = !r.schedule || kind === "once";
-  const now = new Date();
-  const today = now.toDateString();
+      if (r.status === "sent" && r.acknowledgedAt == null) {
+        const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
+        const firedToday = firedAt && firedAt.toDateString() === today;
 
-  if (r.status === "sent" && r.acknowledgedAt == null) {
-    const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
-    const firedToday = firedAt && firedAt.toDateString() === today;
+        if (firedToday) {
+          return { ...r, displayStatus: "sent" };
+        }
 
-    if (firedToday) {
-      return { ...r, displayStatus: "sent" };
-    }
+        // Fired but not today -- recurring shows as scheduled, once passes through
+        if (!isOnce) {
+          return { ...r, displayStatus: "scheduled" };
+        }
+      }
 
-    // Fired but not today -- recurring shows as scheduled, once passes through
-    if (!isOnce) {
-      return { ...r, displayStatus: "scheduled" };
-    }
-  }
+      return { ...r, displayStatus: r.status };
+    });
 
-  return { ...r, displayStatus: r.status };
-});
-    res.json({ reminders: processedReminders });
+    res.json({ reminders: processedReminders, total, limit, skip });
   } catch (error) {
     console.error("Error fetching reminders:", error);
     res.status(500).json({ error: "Failed to fetch reminders" });
