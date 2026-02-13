@@ -5907,73 +5907,7 @@ function isToday(dateValue) {
   return t >= s && t <= e;
 }
 
-// SYMBOLS HELPER FOR DECOR (FIXED)
-function stripVariationSelectors(str = "") {
-  // Removes FE0E/FE0F so ♥︎ becomes ♥ (and matches your map)
-  return String(str).replace(/[\uFE0E\uFE0F]/g, "");
-}
-
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function renderTextWithSymbolSpans(text) {
-  const s = stripVariationSelectors(text ?? "");
-  const lines = s.split("\n");
-
-  const keys = Object.keys(SYMBOL_SVG_MAP);
-
-  // If no mapped symbols, just do the "wrap symbol chars" behavior
-  if (!keys.length) {
-    return lines.map((line, lineIdx) => (
-      <React.Fragment key={`line-${lineIdx}`}>
-        {line}
-        {lineIdx < lines.length - 1 ? <br /> : null}
-      </React.Fragment>
-    ));
-  }
-
-  // Match EITHER a mapped token OR symbol-range characters
-  // IMPORTANT: This matches mapped tokens as full tokens (not single char class)
-  const tokenRe = new RegExp(
-    `(${keys.map(escapeRegex).join("|")}|[\\u2600-\\u26FF\\u2700-\\u27BF])`,
-    "g"
-  );
-
-  return lines.map((line, lineIdx) => {
-    const parts = line.split(tokenRe);
-
-    return (
-      <React.Fragment key={`line-${lineIdx}`}>
-        {parts.map((part, i) => {
-          // Replace mapped tokens
-          if (SYMBOL_SVG_MAP[part]) {
-            return (
-              <React.Fragment key={`svg-${lineIdx}-${i}`}>
-                {SYMBOL_SVG_MAP[part]}
-              </React.Fragment>
-            );
-          }
-
-          // Wrap symbol-range characters (unmapped)
-          if (part.length === 1 && /[\u2600-\u26FF\u2700-\u27BF]/.test(part)) {
-            return (
-              <span key={`sym-${lineIdx}-${i}`} className="reminder-text-symbol">
-                {part}
-              </span>
-            );
-          }
-
-          // Normal text
-          return <React.Fragment key={`txt-${lineIdx}-${i}`}>{part}</React.Fragment>;
-        })}
-        {lineIdx < lines.length - 1 ? <br /> : null}
-      </React.Fragment>
-    );
-  });
-}
-
-
+// SYMBOL MAPPER
 const SYMBOL_SVG_MAP = {
   '♡': (
     <img className="reminder-inline-svg" src="/icons/heart.svg" alt="♡" width="14" height="14" />
@@ -5994,6 +5928,66 @@ const SYMBOL_SVG_MAP = {
   <img className="reminder-inline-svg" src="/icons/heart-fill.svg" alt="♥︎" width="14" height="14" />
   ),
 };
+
+// SYMBOLS HELPER FOR DECOR (supports multi-codepoint symbols like ♥︎)
+function renderTextWithSymbolSpans(text) {
+  const s = String(text ?? "");
+  const lines = s.split("\n");
+
+  // Escape for regex literals
+  const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Sort longest-first so multi-char tokens (♥︎) match before shorter ones (♥)
+  const mappedKeys = Object.keys(SYMBOL_SVG_MAP).sort((a, b) => b.length - a.length);
+
+  // Build alternation regex for mapped symbols (captures the match)
+  // Example: (♥︎|✦|✧|★|☆|♡)
+  const mappedAlt = mappedKeys.length
+    ? `(${mappedKeys.map(escapeRegExp).join("|")})`
+    : null;
+
+  // Also wrap OTHER symbols (single-char ranges) in spans if not mapped
+  const otherSymbolRe = /([\u2600-\u26FF\u2700-\u27BF])/g;
+
+  return lines.map((line, lineIdx) => {
+    // Split by mapped symbols first (keeping matches)
+    const parts = mappedAlt ? line.split(new RegExp(mappedAlt, "g")) : [line];
+
+    return (
+      <React.Fragment key={`line-${lineIdx}`}>
+        {parts.map((part, i) => {
+          // Exact mapped match (works for ♥︎ and any multi-char key)
+          if (SYMBOL_SVG_MAP[part]) {
+            return (
+              <React.Fragment key={`svg-${lineIdx}-${i}`}>
+                {SYMBOL_SVG_MAP[part]}
+              </React.Fragment>
+            );
+          }
+
+          // For non-mapped chunks, wrap other symbol-range characters
+          const subParts = String(part).split(otherSymbolRe);
+
+          return (
+            <React.Fragment key={`txt-${lineIdx}-${i}`}>
+              {subParts.map((sp, j) => {
+                if (sp.length === 1 && otherSymbolRe.test(sp)) {
+                  return (
+                    <span key={`sym-${lineIdx}-${i}-${j}`} className="reminder-text-symbol">
+                      {sp}
+                    </span>
+                  );
+                }
+                return <React.Fragment key={`t-${lineIdx}-${i}-${j}`}>{sp}</React.Fragment>;
+              })}
+            </React.Fragment>
+          );
+        })}
+        {lineIdx < lines.length - 1 ? <br /> : null}
+      </React.Fragment>
+    );
+  });
+}
 
 
 // MOOD Multi-select dropdown component
