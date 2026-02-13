@@ -5138,32 +5138,103 @@ Targets your actual classes:
   min-width: 140px;
 }
 
-/* ===== REMINDERS TABS -- REMOVE GLOW + BACKGROUND SHADOW ===== */
+/* ==========================================================
+REMINDERS TABS -- restore pill row layout for renamed classes
+Fixes: vertical list, lost pill styling, spacing to first card
+========================================================== */
 
-.quick-actions {
+.reminder-quick-actions {
   background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
+  margin-bottom: 8px;
 }
 
 /* If there’s a pseudo-element creating haze */
-.quick-actions::before,
-.quick-actions::after {
+.reminder-quick-actions::before,
+.reminder-quick-actions::after {
   display: none !important;
   content: none !important;
 }
 
 /* Individual tab pills -- remove glow */
-.quick-action {
+.reminder-quick-action {
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
 /* Active tab -- keep highlight but remove glow */
-.quick-action.active {
+.reminder-quick-action.active {
   box-shadow: none !important;
+}
+
+/* The row container */
+.reminder-quick-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  width: 100% !important;
+  max-width: 100% !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+
+  padding: 8px 12px !important;
+  margin: 0 12px 10px !important; /* includes your "small gap" to first card */
+  background: transparent !important;
+  box-shadow: none !important;
+
+  /* important: prevents wrapping into a new "row" look */
+  white-space: nowrap !important;
+}
+
+/* Kill any haze pseudo-elements if something else added them */
+.reminder-quick-actions::before,
+.reminder-quick-actions::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Each tab "pill"
+   Works whether your items are <div>, <button>, <a>, etc. */
+.reminder-quick-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+
+  padding: 10px 16px !important;
+  border-radius: 999px !important;
+
+  /* Keep your glass pill look but remove glow */
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+
+  line-height: 1 !important;
+  text-align: center !important;
+}
+
+/* Active pill (still a pill, just "selected") */
+.reminder-quick-action.active {
+  background: rgba(168, 85, 247, 0.22) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  box-shadow: none !important;
+}
+
+/* Optional: hide the horizontal scrollbar line on iOS */
+.reminder-quick-actions::-webkit-scrollbar {
+  height: 0 !important;
 }
 
 /* ===== Calendar title alignment fix ===== */
@@ -12066,45 +12137,45 @@ function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits
         </div>
       </div>
 
-      <div className="quick-actions">
+      <div className="reminder-quick-actions">
         <div
-          className={`quick-action ${filter === 'all' ? 'active' : ''}`}
+          className={`reminder-quick-action ${filter === 'all' ? 'active' : ''}`}
           onClick={() => setFilter('all')}
         >
           All
         </div>
         <div
-          className={`quick-action ${filter === 'once' ? 'active' : ''}`}
+          className={`reminder-quick-action ${filter === 'once' ? 'active' : ''}`}
           onClick={() => setFilter('once')}
         >
           Once
         </div>
         <div
-          className={`quick-action ${filter === 'daily' ? 'active' : ''}`}
+          className={`reminder-quick-action ${filter === 'daily' ? 'active' : ''}`}
           onClick={() => setFilter('daily')}
         >
           Daily
         </div>
         <div
-          className={`quick-action ${filter === 'weekly' ? 'active' : ''}`}
+          className={`reminder-quick-action ${filter === 'weekly' ? 'active' : ''}`}
           onClick={() => setFilter('weekly')}
         >
           Weekly
         </div>
         <div
-          className={`quick-action ${filter === 'monthly' ? 'active' : ''}`}
+          className={`reminder-quick-action ${filter === 'monthly' ? 'active' : ''}`}
           onClick={() => setFilter('monthly')}
         >
           Monthly
         </div>
         <div
-          className={`quick-action ${filter === 'yearly' ? 'active' : ''}`}
+          className={`reminder-quick-action ${filter === 'yearly' ? 'active' : ''}`}
           onClick={() => setFilter('yearly')}
         >
           Yearly
         </div>
         <div
-          className={`quick-action ${filter === 'interval' ? 'active' : ''}`}
+          className={`reminder-quick-action ${filter === 'interval' ? 'active' : ''}`}
           onClick={() => setFilter('interval')}
         >
           Interval
