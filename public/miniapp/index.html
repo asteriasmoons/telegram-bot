@@ -5258,6 +5258,92 @@ Fixes: vertical list, lost pill styling, spacing to first card
 .calendar-event-title .event-reminder-dot {
   align-self: center;
 }
+
+/* REGULAR QUICK ACTIONS */
+.quick-actions {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  margin-bottom: 8px;
+}
+
+/* If there’s a pseudo-element creating haze */
+.quick-actions::before,
+.quick-actions::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Individual tab pills -- remove glow */
+.quick-action {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Active tab -- keep highlight but remove glow */
+.quick-action.active {
+  box-shadow: none !important;
+}
+
+/* The row container */
+.quick-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 8px 12px !important;
+  margin: 0 12px 10px !important; /* includes your "small gap" to first card */
+  background: transparent !important;
+  box-shadow: none !important;
+  /* important: prevents wrapping into a new "row" look */
+  white-space: nowrap !important;
+}
+
+/* Kill any haze pseudo-elements if something else added them */
+.quick-actions::before,
+.actions::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Each tab "pill"
+   Works whether your items are <div>, <button>, <a>, etc. */
+.quick-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  padding: 10px 16px !important;
+  border-radius: 999px !important;
+  /* Keep your glass pill look but remove glow */
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}
+
+/* Active pill (still a pill, just "selected") */
+.quick-action.active {
+  background: rgba(168, 85, 247, 0.22) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  box-shadow: none !important;
+}
+
+/* Optional: hide the horizontal scrollbar line on iOS */
+.quick-actions::-webkit-scrollbar {
+  height: 0 !important;
+}
 </style>
 </head>
 
