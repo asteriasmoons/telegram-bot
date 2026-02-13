@@ -5907,26 +5907,64 @@ function isToday(dateValue) {
   return t >= s && t <= e;
 }
 
-// SYMBOLS HELPER FOR DECOR
+// SYMBOLS HELPER FOR DECOR (FIXED)
+function stripVariationSelectors(str = "") {
+  // Removes FE0E/FE0F so ♥︎ becomes ♥ (and matches your map)
+  return String(str).replace(/[\uFE0E\uFE0F]/g, "");
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function renderTextWithSymbolSpans(text) {
-  const s = String(text ?? "");
+  const s = stripVariationSelectors(text ?? "");
   const lines = s.split("\n");
 
-  // Match both symbol ranges AND specific mapped characters
-  const allMapped = Object.keys(SYMBOL_SVG_MAP).join('');
-  const symbolRe = new RegExp(`([${allMapped}\\u2600-\\u26FF\\u2700-\\u27BF])`, 'g');
+  const keys = Object.keys(SYMBOL_SVG_MAP);
+
+  // If no mapped symbols, just do the "wrap symbol chars" behavior
+  if (!keys.length) {
+    return lines.map((line, lineIdx) => (
+      <React.Fragment key={`line-${lineIdx}`}>
+        {line}
+        {lineIdx < lines.length - 1 ? <br /> : null}
+      </React.Fragment>
+    ));
+  }
+
+  // Match EITHER a mapped token OR symbol-range characters
+  // IMPORTANT: This matches mapped tokens as full tokens (not single char class)
+  const tokenRe = new RegExp(
+    `(${keys.map(escapeRegex).join("|")}|[\\u2600-\\u26FF\\u2700-\\u27BF])`,
+    "g"
+  );
 
   return lines.map((line, lineIdx) => {
-    const parts = line.split(symbolRe);
+    const parts = line.split(tokenRe);
+
     return (
       <React.Fragment key={`line-${lineIdx}`}>
         {parts.map((part, i) => {
-          if (part.length === 1 && SYMBOL_SVG_MAP[part]) {
-            return <React.Fragment key={`svg-${lineIdx}-${i}`}>{SYMBOL_SVG_MAP[part]}</React.Fragment>;
+          // Replace mapped tokens
+          if (SYMBOL_SVG_MAP[part]) {
+            return (
+              <React.Fragment key={`svg-${lineIdx}-${i}`}>
+                {SYMBOL_SVG_MAP[part]}
+              </React.Fragment>
+            );
           }
+
+          // Wrap symbol-range characters (unmapped)
           if (part.length === 1 && /[\u2600-\u26FF\u2700-\u27BF]/.test(part)) {
-            return <span key={`sym-${lineIdx}-${i}`} className="reminder-text-symbol">{part}</span>;
+            return (
+              <span key={`sym-${lineIdx}-${i}`} className="reminder-text-symbol">
+                {part}
+              </span>
+            );
           }
+
+          // Normal text
           return <React.Fragment key={`txt-${lineIdx}-${i}`}>{part}</React.Fragment>;
         })}
         {lineIdx < lines.length - 1 ? <br /> : null}
