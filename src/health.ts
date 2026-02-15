@@ -24,6 +24,8 @@ import horoscopeRouter from "./miniapp/horoscope-api";
 
 import placesRouter from "./miniapp/places-api";
 
+import calRouter from "./miniapp/cal-api";
+
 
 type StartServerOpts = {
   bot: Telegraf<any>;
@@ -124,6 +126,7 @@ app.use("/api/miniapp/intentions", miniAppAuth, intentionsRouter);
 app.use("/api/miniapp/mood", miniAppAuth, moodRouter);
 app.use("/api/miniapp/horoscope", miniAppAuth, horoscopeRouter);
 app.use("/api/miniapp/places", miniAppAuth, placesRouter);
+app.use("/api/miniapp/cal", miniAppAuth, calRouter);     
 
 
 

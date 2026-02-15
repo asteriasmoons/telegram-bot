@@ -27,6 +27,8 @@ export type EventDoc = {
     location?: string;
   locationPlaceId?: string | null;
   locationCoords?: { lat: number; lng: number } | null;
+  googleEventId?: string | null;
+googleCalendarId?: string | null;
 
   // Existing one-time reminder link (keep for non-recurring)
   reminderId?: Types.ObjectId;
@@ -77,6 +79,8 @@ const EventSchema = new Schema<EventDoc>(
       type: new Schema({ lat: { type: Number }, lng: { type: Number } }, { _id: false }),
       default: null,
     },
+    googleEventId: { type: String, required: false, default: null },
+googleCalendarId: { type: String, required: false, default: null },
     reminderId: { type: Schema.Types.ObjectId, required: false, ref: "Reminder" },
 
     recurrence: { type: RecurrenceRuleSchema, required: false },

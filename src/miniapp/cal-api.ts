@@ -1,0 +1,165 @@
+import { Router } from "express";
+import { Event } from "../models/Event";
+import { UserSettings } from "../models/UserSettings";
+import { getGoogleAuthUrl, handleGoogleCallback, googleStatus, googleDisconnect } from "../integrations/google-calendar";
+import { DateTime } from "luxon";
+
+const router = Router();
+
+// GET /api/miniapp/cal/google/connect
+router.get("/google/connect", async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const url = getGoogleAuthUrl(userId);
+    return res.json({ url });
+  } catch (err: any) {
+    console.error("google connect error:", err.message);
+    return res.status(500).json({ error: "Failed to start Google connect" });
+  }
+});
+
+// GET /api/miniapp/cal/google/callback?code=...&state=...
+router.get("/google/callback", async (req, res) => {
+  try {
+    const code = String(req.query.code || "");
+    const state = String(req.query.state || "");
+
+    const userIdFromState = Number(state);
+    if (!code || !Number.isFinite(userIdFromState)) {
+      return res.status(400).send("Missing code/state");
+    }
+
+    await handleGoogleCallback(code, userIdFromState);
+
+    // This is a miniapp: easiest is to show a simple success page
+    return res
+      .status(200)
+      .send("Google Calendar connected. You can return to the mini app.");
+  } catch (err: any) {
+    console.error("google callback error:", err.message);
+    return res.status(500).send("Failed to connect Google Calendar");
+  }
+});
+
+// GET /api/miniapp/cal/google/status
+router.get("/google/status", async (req, res) => {
+  const userId = req.userId!;
+  const st = await googleStatus(userId);
+  return res.json(st);
+});
+
+// POST /api/miniapp/cal/google/disconnect
+router.post("/google/disconnect", async (req, res) => {
+  const userId = req.userId!;
+  await googleDisconnect(userId);
+  return res.json({ ok: true });
+});
+
+// GET /api/miniapp/cal/ical/:eventId  (iOS calendar button)
+router.get("/ical/:eventId", async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const event = await Event.findOne({ _id: req.params.eventId, userId }).lean();
+    if (!event) return res.status(404).send("Not found");
+
+    const settings = await UserSettings.findOne({ userId }).lean();
+    const tz = settings?.timezone || "America/Chicago";
+
+    const uid = `${String(event._id)}@lystaria`;
+    const dtstamp = DateTime.utc().toFormat("yyyyMMdd'T'HHmmss'Z'");
+
+    const title = String(event.title || "(untitled)").replace(/\r?\n/g, " ").trim();
+    const desc = String(event.description || "").trim();
+    const loc = String((event as any).location || "").trim();
+
+    const lines: string[] = [];
+    lines.push("BEGIN:VCALENDAR");
+    lines.push("VERSION:2.0");
+    lines.push("PRODID:-//Lystaria//Calendar//EN");
+    lines.push("CALSCALE:GREGORIAN");
+    lines.push("METHOD:PUBLISH");
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:${uid}`);
+    lines.push(`DTSTAMP:${dtstamp}`);
+
+    if (event.allDay) {
+      const startKey = DateTime.fromJSDate(new Date(event.startDate), { zone: tz }).toFormat("yyyyMMdd");
+      lines.push(`DTSTART;VALUE=DATE:${startKey}`);
+
+      // iCal all-day end is exclusive too
+      const endKey = event.endDate
+        ? DateTime.fromJSDate(new Date(event.endDate), { zone: tz }).plus({ days: 1 }).toFormat("yyyyMMdd")
+        : DateTime.fromJSDate(new Date(event.startDate), { zone: tz }).plus({ days: 1 }).toFormat("yyyyMMdd");
+
+      lines.push(`DTEND;VALUE=DATE:${endKey}`);
+    } else {
+      const startUtc = DateTime.fromJSDate(new Date(event.startDate), { zone: tz }).toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'");
+      const endUtc = event.endDate
+        ? DateTime.fromJSDate(new Date(event.endDate), { zone: tz }).toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'")
+        : startUtc;
+
+      lines.push(`DTSTART:${startUtc}`);
+      lines.push(`DTEND:${endUtc}`);
+    }
+
+    lines.push(`SUMMARY:${title}`);
+    if (desc) lines.push(`DESCRIPTION:${desc.replace(/\r?\n/g, "\\n")}`);
+    if (loc) lines.push(`LOCATION:${loc}`);
+
+    // Simple RRULE export (optional; works for your recurrence model)
+    if ((event as any).recurrence?.freq) {
+      const r = (event as any).recurrence;
+      const freq = String(r.freq).toUpperCase();
+      const interval = Math.max(1, Number(r.interval || 1));
+
+      const parts: string[] = [`FREQ=${freq}`, `INTERVAL=${interval}`];
+
+      if (freq === "WEEKLY" && Array.isArray(r.byWeekday) && r.byWeekday.length) {
+        const map = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+        const byday = r.byWeekday
+          .map((n: any) => Number(n))
+          .filter((n: number) => Number.isFinite(n) && n >= 0 && n <= 6)
+          .map((n: number) => map[n]);
+
+        if (byday.length) parts.push(`BYDAY=${byday.join(",")}`);
+      }
+
+      const end = r.end;
+      if (end?.kind === "count") {
+        const c = Number(end.count);
+        if (Number.isFinite(c) && c > 0) parts.push(`COUNT=${c}`);
+      } else if (end?.kind === "until" && end.until) {
+        const u = new Date(end.until);
+        if (!isNaN(u.getTime())) {
+          const until = DateTime.fromJSDate(u, { zone: "utc" }).toFormat("yyyyMMdd'T'HHmmss'Z'");
+          parts.push(`UNTIL=${until}`);
+        }
+      }
+
+      lines.push(`RRULE:${parts.join(";")}`);
+    }
+
+    lines.push("END:VEVENT");
+    lines.push("END:VCALENDAR");
+
+    const ics = lines.join("\r\n");
+
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="event-${String(event._id)}.ics"`);
+    return res.send(ics);
+  } catch (err: any) {
+    console.error("ical error:", err.message);
+    return res.status(500).send("Failed to create iCal");
+  }
+});
+
+export default router;
+
+// Express typing
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: number;
+    }
+  }
+}

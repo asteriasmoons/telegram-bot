@@ -11659,7 +11659,7 @@ const toggleWeekday = (idx) => {
       
       const openMeetingUrl = () => {
   const url = String(event.meetingUrl || "").trim();
-  if (!url) return;
+  if (!url) return; 
 
   // Prefer Telegram WebApp openLink if available
   if (typeof tg !== "undefined" && tg?.openLink) {
@@ -11667,6 +11667,20 @@ const toggleWeekday = (idx) => {
     return;
   }
 
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
+const addToIosCalendar = () => {
+  if (!event?._id) return;
+  const url = `/cal/ical/${event._id}`; // miniapp base path handled by apiCall host / proxy
+
+  // If you need full absolute URL, use your api base instead:
+  // const url = `${API_BASE}/api/miniapp/cal/ical/${event._id}`;
+
+  if (typeof tg !== "undefined" && tg?.openLink) {
+    tg.openLink(url);
+    return;
+  }
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
@@ -11705,6 +11719,17 @@ const toggleWeekday = (idx) => {
     </button>
     </div>
 )}
+
+<div className="event-preview-row">
+  <img src="/icons/calendar.svg" alt="" />
+  <button
+    type="button"
+    className="event-link-button"
+    onClick={addToIosCalendar}
+  >
+    Add to iOS Calendar
+  </button>
+</div>
 
 {event.location && (
   <div className="event-preview-row">
@@ -12437,6 +12462,14 @@ const [qhEnabled, setQhEnabled] = useState(false);
 const [qhStart, setQhStart] = useState("23:00");
 const [qhEnd, setQhEnd] = useState("08:00");
 
+// Google Calendar state
+const [gcalLoading, setGcalLoading] = useState(false);
+const [gcalConnected, setGcalConnected] = useState(false);
+const [gcalEmail, setGcalEmail] = useState("");
+const [gcalCalendars, setGcalCalendars] = useState([]);
+const [gcalCalendarId, setGcalCalendarId] = useState("");
+const [gcalError, setGcalError] = useState("");
+
   useEffect(() => {
     document.body.classList.remove("modal-open"); // safety
   }, []);
@@ -12450,6 +12483,10 @@ const data = await apiCall(`/settings`);
 if (data?.settings?.timezone) setTimezone(String(data.settings.timezone));
 if (data?.settings?.displayName !== undefined) {
   setDisplayName(String(data.settings.displayName || ""));
+}
+const connected = await loadGoogleStatus();
+if (connected) {
+  await loadGoogleCalendars();
 }
 
 const qh = data?.settings?.quietHours;
@@ -12465,6 +12502,89 @@ if (qh) {
       }
     })();
   }, []);
+  
+  const loadGoogleStatus = async () => {
+  try {
+    setGcalError("");
+    const data = await apiCall(`/cal/google/status`);
+    setGcalConnected(!!data?.connected);
+    setGcalEmail(String(data?.email || ""));
+    setGcalCalendarId(String(data?.selectedCalendarId || ""));
+    return !!data?.connected;
+  } catch (e) {
+    setGcalError(e?.message || "Failed to load Google Calendar status.");
+    setGcalConnected(false);
+    return false;
+  }
+};
+
+const loadGoogleCalendars = async () => {
+  try {
+    setGcalError("");
+    const data = await apiCall(`/cal/google/calendars`);
+    setGcalCalendars(Array.isArray(data?.calendars) ? data.calendars : []);
+  } catch (e) {
+    setGcalError(e?.message || "Failed to load calendars.");
+    setGcalCalendars([]);
+  }
+};
+
+const connectGoogle = async () => {
+  try {
+    setGcalError("");
+    setGcalLoading(true);
+
+    // backend should return: { url: "https://accounts.google.com/o/oauth2/..." }
+    const data = await apiCall(`/cal/google/auth`);
+    const url = data?.url;
+
+    if (!url) {
+      tg.showAlert("No auth URL returned from server.");
+      return;
+    }
+
+    // Open OAuth in Telegram's in-app browser
+    tg.openLink(url);
+  } catch (e) {
+    setGcalError(e?.message || "Failed to start Google auth.");
+  } finally {
+    setGcalLoading(false);
+  }
+};
+
+const disconnectGoogle = async () => {
+  try {
+    setGcalError("");
+    setGcalLoading(true);
+    await apiCall(`/cal/google/disconnect`, { method: "POST" });
+    setGcalConnected(false);
+    setGcalEmail("");
+    setGcalCalendars([]);
+    setGcalCalendarId("");
+    tg.showPopup({ message: "Disconnected" });
+  } catch (e) {
+    setGcalError(e?.message || "Failed to disconnect.");
+  } finally {
+    setGcalLoading(false);
+  }
+};
+
+const saveSelectedCalendar = async (calendarId) => {
+  try {
+    setGcalError("");
+    setGcalLoading(true);
+    await apiCall(`/cal/google/calendar`, {
+      method: "PUT",
+      body: JSON.stringify({ calendarId }),
+    });
+    setGcalCalendarId(calendarId);
+    tg.showPopup({ message: "Calendar selected" });
+  } catch (e) {
+    setGcalError(e?.message || "Failed to save selected calendar.");
+  } finally {
+    setGcalLoading(false);
+  }
+};
 
   const save = async () => {
     try {
@@ -12568,6 +12688,95 @@ return (
       {saving ? "Saving..." : "Save Display Name"}
     </button>
   </div>
+</div>
+
+
+{/* -------------------
+    GOOGLE CALENDAR SECTION
+   ------------------- */}
+<div style={{ marginTop: 18 }}>
+  <div className="settings-title">Google Calendar</div>
+
+  <div className="settings-help">
+    Connect your Google account to sync bot events into a calendar you choose.
+  </div>
+
+  {gcalError ? (
+    <div className="settings-help" style={{ color: "#ff6b6b" }}>
+      {gcalError}
+    </div>
+  ) : null}
+
+  {!gcalConnected ? (
+    <div className="settings-actions">
+      <button
+        className="btn btn-primary btn-sm"
+        type="button"
+        onClick={connectGoogle}
+        disabled={gcalLoading}
+      >
+        {gcalLoading ? "Working..." : "Connect Google Calendar"}
+      </button>
+    </div>
+  ) : (
+    <>
+      <div className="settings-help" style={{ marginTop: 8 }}>
+        Connected {gcalEmail ? `as ${gcalEmail}` : ""}.
+      </div>
+
+      <div className="settings-actions" style={{ gap: 10, flexWrap: "wrap" }}>
+        <button
+          className="btn btn-secondary btn-sm"
+          type="button"
+          onClick={async () => {
+            setGcalLoading(true);
+            try {
+              await loadGoogleCalendars();
+              tg.showPopup({ message: "Calendars refreshed" });
+            } finally {
+              setGcalLoading(false);
+            }
+          }}
+          disabled={gcalLoading}
+        >
+          Refresh Calendars
+        </button>
+
+        <button
+          className="btn btn-danger btn-sm"
+          type="button"
+          onClick={disconnectGoogle}
+          disabled={gcalLoading}
+        >
+          Disconnect
+        </button>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <div className="settings-title" style={{ fontSize: 14, opacity: 0.9 }}>
+          Choose Calendar
+        </div>
+
+        <select
+          className="form-input"
+          value={gcalCalendarId}
+          onChange={(e) => saveSelectedCalendar(e.target.value)}
+          disabled={gcalLoading}
+        >
+          <option value="">Select a calendar…</option>
+          {gcalCalendars.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.summary || c.name || c.id}
+            </option>
+          ))}
+        </select>
+
+        <div className="settings-help" style={{ marginTop: 8 }}>
+          New synced events will be created in the selected calendar.
+        </div>
+      </div>
+    </>
+  )}
 </div>
 
         {/* -------------------

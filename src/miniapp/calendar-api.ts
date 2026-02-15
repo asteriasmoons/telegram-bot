@@ -7,6 +7,7 @@ import { Reminder } from "../models/Reminder";
 import { DateTime } from "luxon";
 import { UserSettings } from "../models/UserSettings";
 import { Premium } from "../models/Premium"; // ✅ needed for Premium bypass
+import { googleUpsertEvent, googleDeleteEvent } from "../integrations/google-calendar";
 
 const router = Router();
 
@@ -771,6 +772,23 @@ const event = await Event.create({
   recurrence: recurrence || undefined
 });
 
+// --- GOOGLE SYNC (one-way) ---
+try {
+  const settings = await UserSettings.findOne({ userId: req.userId }).lean();
+  const tz = settings?.timezone || "America/Chicago";
+
+  const syncRes = await googleUpsertEvent({ userId: req.userId!, event, tz });
+
+  if (syncRes.synced && syncRes.googleEventId) {
+    await Event.updateOne(
+      { _id: event._id, userId: req.userId },
+      { $set: { googleEventId: syncRes.googleEventId, googleCalendarId: syncRes.googleCalendarId } }
+    );
+  }
+} catch (e: any) {
+  console.warn("Google sync (create) failed:", e.message);
+}
+
 
     // Handle optional reminder link
     if (reminder) {
@@ -861,6 +879,23 @@ const {
       _id: req.params.id,
       userId: req.userId
     }).lean();
+    
+    // --- GOOGLE SYNC (one-way) ---
+try {
+  const settings = await UserSettings.findOne({ userId: req.userId }).lean();
+  const tz = settings?.timezone || "America/Chicago";
+
+  const syncRes = await googleUpsertEvent({ userId: req.userId!, event, tz });
+
+  if (syncRes.synced && syncRes.googleEventId && String(event.googleEventId || "") !== String(syncRes.googleEventId)) {
+    await Event.updateOne(
+      { _id: event._id, userId: req.userId },
+      { $set: { googleEventId: syncRes.googleEventId, googleCalendarId: syncRes.googleCalendarId } }
+    );
+  }
+} catch (e: any) {
+  console.warn("Google sync (update) failed:", e.message);
+}
 
     if (!current) {
       return res.status(404).json({ error: "Event not found" });
@@ -997,6 +1032,17 @@ router.delete("/events/:id", async (req, res) => {
       _id: req.params.id,
       userId: req.userId
     }).lean();
+    
+    // --- GOOGLE SYNC (one-way) ---
+try {
+  await googleDeleteEvent({
+    userId: req.userId!,
+    googleEventId: (event as any).googleEventId,
+    googleCalendarId: (event as any).googleCalendarId,
+  });
+} catch (e: any) {
+  console.warn("Google sync (delete) failed:", e.message);
+}
 
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
