@@ -3,6 +3,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "googleapis": "^171.4.0",
     "jsonwebtoken": "^9.0.3",
     "luxon": "^3.5.0",
     "mongoose": "^9.1.4",
