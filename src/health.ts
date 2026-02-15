@@ -4,6 +4,9 @@ import path from "path";
 import crypto from "crypto";
 import type { Telegraf } from "telegraf";
 
+import { handleGoogleCallback } from "./integrations/google-calendar";
+import calRouter from "./miniapp/cal-api";
+
 import miniappApiRouter from "./miniapp/api";
 import calendarApiRouter from "./miniapp/calendar-api";
 import journalApiRouter from "./miniapp/journal-api";
@@ -23,8 +26,6 @@ import moodRouter from "./miniapp/mood-api";
 import horoscopeRouter from "./miniapp/horoscope-api";
 
 import placesRouter from "./miniapp/places-api";
-
-import calRouter from "./miniapp/cal-api";
 
 
 type StartServerOpts = {
@@ -115,6 +116,32 @@ app.post("/telegram", handler);
   // BUT we mount it behind miniAppAuth anyway so everything is consistent.
   // This is safe because api.ts auth will just re-check; if you want only one check,
   // we can remove auth from api.ts later.
+  
+  // ✅ Google OAuth callback MUST be public (Google cannot send Telegram init headers)
+app.get("/api/miniapp/cal/google/callback", async (req, res) => {
+  try {
+    const code = String(req.query.code || "");
+    const state = String(req.query.state || "");
+    const userIdFromState = Number(state);
+
+    if (!code || !Number.isFinite(userIdFromState)) {
+      return res.status(400).send("Missing code/state");
+    }
+
+    await handleGoogleCallback(code, userIdFromState);
+
+    return res
+      .status(200)
+      .send("Google Calendar connected. You can return to the mini app.");
+  } catch (err: any) {
+    console.error("google callback error:", err?.message || err);
+    return res.status(500).send("Failed to connect Google Calendar");
+  }
+});
+
+// ✅ Everything except the callback requires Telegram init data
+app.use("/api/miniapp/cal", miniAppAuth, calRouter);
+  
   app.use("/api/miniapp", miniAppAuth, miniappApiRouter);
 
   // Calendar and Journal routers rely on req.userId, so they MUST be behind miniAppAuth.
@@ -129,7 +156,6 @@ app.use("/api/miniapp/intentions", miniAppAuth, intentionsRouter);
 app.use("/api/miniapp/mood", miniAppAuth, moodRouter);
 app.use("/api/miniapp/horoscope", miniAppAuth, horoscopeRouter);
 app.use("/api/miniapp/places", miniAppAuth, placesRouter);
-app.use("/api/miniapp/cal", miniAppAuth, calRouter);     
 
 
 
