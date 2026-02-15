@@ -5995,6 +5995,46 @@ function renderTextWithSymbolSpans(text) {
   });
 }
 
+// ===== Habit Reminder Display Helpers =====
+
+function formatTimeToAmPm(hhmm) {
+  if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return hhmm;
+
+  const [h, m] = hhmm.split(":").map(Number);
+  const date = new Date();
+  date.setHours(h, m, 0, 0);
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatDayAndTime(hhmm) {
+  if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return hhmm;
+
+  const now = new Date();
+  const [h, m] = hhmm.split(":").map(Number);
+
+  const next = new Date();
+  next.setHours(h, m, 0, 0);
+
+  // If time already passed today, move to tomorrow
+  if (next <= now) {
+    next.setDate(next.getDate() + 1);
+  }
+
+  const day = next.toLocaleDateString([], { weekday: "long" });
+  const time = next.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return `${day} - ${time}`;
+}
+
 
 // MOOD Multi-select dropdown component
 function MoodMultiSelect({ label, options, selected, onChange, pillClass }) {
@@ -6559,20 +6599,24 @@ function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLo
   const scheduleKind = String(habit?.reminderSchedule?.kind || "off");
 
   const scheduleSummary =
-    scheduleKind === "off"
-      ? "Reminders: Off"
-      : scheduleKind === "times"
-        ? `Reminders: Times (${(habit?.reminderSchedule?.timesOfDay || []).join(", ") || "none"})`
-        : scheduleKind === "hourly"
-          ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyHours, 1)}h` +
+  scheduleKind === "off"
+    ? "Reminders: Off"
+    : scheduleKind === "times"
+      ? `Reminders: ${
+          (habit?.reminderSchedule?.timesOfDay || [])
+            .map(formatDayAndTime)
+            .join(", ") || "none"
+        }`
+      : scheduleKind === "hourly"
+        ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyHours, 1)}h` +
+          (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
+            ? ` (${formatTimeToAmPm(habit.reminderSchedule.windowStart)}–${formatTimeToAmPm(habit.reminderSchedule.windowEnd)})`
+            : "")
+        : scheduleKind === "every_x_minutes"
+          ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyMinutes, 1)}m` +
             (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
-              ? ` (${habit.reminderSchedule.windowStart}–${habit.reminderSchedule.windowEnd})`
+              ? ` (${formatTimeToAmPm(habit.reminderSchedule.windowStart)}–${formatTimeToAmPm(habit.reminderSchedule.windowEnd)})`
               : "")
-          : scheduleKind === "every_x_minutes"
-            ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyMinutes, 1)}m` +
-              (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
-                ? ` (${habit.reminderSchedule.windowStart}–${habit.reminderSchedule.windowEnd})`
-                : "")
             : `Reminders: ${scheduleKind}`;
 
   const cadenceLabel = String(habit?.cadence || "daily");
