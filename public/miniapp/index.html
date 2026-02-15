@@ -12503,11 +12503,36 @@ if (qh) {
     })();
   }, []);
   
+  // 🔄 refresh Google status when returning to the mini app
+useEffect(() => {
+  const onResume = () => {
+    if (!document.hidden) {
+      refreshGoogleUi();
+    }
+  };
+
+  document.addEventListener("visibilitychange", onResume);
+  window.addEventListener("focus", onResume);
+
+  return () => {
+    document.removeEventListener("visibilitychange", onResume);
+    window.removeEventListener("focus", onResume);
+  };
+}, []);
+  
   const loadGoogleStatus = async () => {
   try {
     setGcalError("");
     const data = await apiCall(`/cal/google/status`);
-    setGcalConnected(!!data?.connected);
+setGcalConnected((prev) => {
+  const next = !!data?.connected;
+
+  if (!prev && next) {
+    tg.showPopup({ message: "Google Calendar connected!" });
+  }
+
+  return next;
+});
     setGcalEmail(String(data?.email || ""));
     setGcalCalendarId(String(data?.selectedCalendarId || ""));
     return !!data?.connected;
@@ -12565,6 +12590,14 @@ const disconnectGoogle = async () => {
     setGcalError(e?.message || "Failed to disconnect.");
   } finally {
     setGcalLoading(false);
+  }
+};
+
+// refresh Google UI state after returning from OAuth
+const refreshGoogleUi = async () => {
+  const connected = await loadGoogleStatus();
+  if (connected) {
+    await loadGoogleCalendars();
   }
 };
 
