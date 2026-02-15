@@ -47,7 +47,10 @@ async function acquireLock(reminderId: any, instanceId: string, lockSeconds: num
     {
       _id: reminderId,
       status: "scheduled",
-      $or: [{ "lock.lockExpiresAt": { $exists: false } }, { "lock.lockExpiresAt": { $lte: lockedAt } }],
+      $or: [
+        { "lock.lockExpiresAt": { $exists: false } },
+        { "lock.lockExpiresAt": { $lte: lockedAt } },
+      ],
     },
     {
       $set: {
@@ -229,7 +232,6 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
 
   const tz = String(rem.timezone || "America/Chicago");
   const nowZ = DateTime.now().setZone(tz);
-  
 
   // -------------------------
   // interval: now + X minutes
@@ -245,7 +247,9 @@ function computeNextForRepeatLuxon(rem: any): Date | null {
   // -----------------------------------------
   const timeFromSchedule = parseTimeOfDay(sched.timeOfDay);
 
-const timeFromNext = rem.nextRunAt ? DateTime.fromJSDate(new Date(rem.nextRunAt), { zone: tz }) : null;
+  const timeFromNext = rem.nextRunAt
+    ? DateTime.fromJSDate(new Date(rem.nextRunAt), { zone: tz })
+    : null;
 
   const hour = timeFromSchedule?.hour ?? (timeFromNext?.isValid ? timeFromNext.hour : 9);
   const minute = timeFromSchedule?.minute ?? (timeFromNext?.isValid ? timeFromNext.minute : 0);
@@ -253,18 +257,18 @@ const timeFromNext = rem.nextRunAt ? DateTime.fromJSDate(new Date(rem.nextRunAt)
   // -------------------------
   // daily
   // -------------------------
-if (sched.kind === "daily") {
-  const step = Math.max(1, Number(sched.interval || 1));
+  if (sched.kind === "daily") {
+    const step = Math.max(1, Number(sched.interval || 1));
 
-  let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
+    let candidate = nowZ.set({ hour, minute, second: 0, millisecond: 0 });
 
-  // If it's already passed (or equal), move forward by N days until it's future
-  while (candidate <= nowZ) {
-    candidate = candidate.plus({ days: step });
+    // If it's already passed (or equal), move forward by N days until it's future
+    while (candidate <= nowZ) {
+      candidate = candidate.plus({ days: step });
+    }
+
+    return candidate.toJSDate();
   }
-
-  return candidate.toJSDate();
-}
 
   // -------------------------
   // weekly
@@ -286,11 +290,10 @@ if (sched.kind === "daily") {
       targetLuxonWeekdays.add(nowZ.weekday);
     }
 
-    // Search next 7 days for next valid day at HH:mm
-const stepWeeks = Math.max(1, Number(sched.interval || 1));
-const maxDays = 7 * stepWeeks;
+    const stepWeeks = Math.max(1, Number(sched.interval || 1));
+    const maxDays = 7 * stepWeeks;
 
-     for (let i = 0; i <= maxDays; i++) {  
+    for (let i = 0; i <= maxDays; i++) {
       const day = nowZ.plus({ days: i });
       if (!targetLuxonWeekdays.has(day.weekday)) continue;
 
@@ -299,7 +302,10 @@ const maxDays = 7 * stepWeeks;
     }
 
     // fallback
-    return nowZ.plus({ days: 7 }).set({ hour, minute, second: 0, millisecond: 0 }).toJSDate();
+    return nowZ
+      .plus({ days: 7 })
+      .set({ hour, minute, second: 0, millisecond: 0 })
+      .toJSDate();
   }
 
   // -------------------------
@@ -310,7 +316,8 @@ const maxDays = 7 * stepWeeks;
   if (sched.kind === "monthly") {
     const step = Math.max(1, Number(sched.interval || 1));
 
-const anchorDay = Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
+    const anchorDay =
+      Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
     const clampDay = (dt: DateTime, dayNum: number) => {
       if (!dt.isValid) return dt;
@@ -319,7 +326,7 @@ const anchorDay = Number(sched.dayOfMonth) || (timeFromNext?.isValid ? timeFromN
       return dt.set({ day: safeDay });
     };
 
-let candidate = clampDay(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), anchorDay);
+    let candidate = clampDay(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), anchorDay);
 
     while (candidate <= nowZ) {
       candidate = clampDay(candidate.plus({ months: step }), anchorDay);
@@ -336,8 +343,10 @@ let candidate = clampDay(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), 
   if (sched.kind === "yearly") {
     const step = Math.max(1, Number(sched.interval || 1));
 
-    const anchorMonth = Number(sched.anchorMonth) || (timeFromNext?.isValid ? timeFromNext.month : nowZ.month);
-    const anchorDay = Number(sched.anchorDay) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
+    const anchorMonth =
+      Number(sched.anchorMonth) || (timeFromNext?.isValid ? timeFromNext.month : nowZ.month);
+    const anchorDay =
+      Number(sched.anchorDay) || (timeFromNext?.isValid ? timeFromNext.day : nowZ.day);
 
     const clampDay = (dt: DateTime, dayNum: number) => {
       if (!dt.isValid) return dt;
@@ -346,7 +355,7 @@ let candidate = clampDay(nowZ.set({ hour, minute, second: 0, millisecond: 0 }), 
       return dt.set({ day: safeDay });
     };
 
-   let candidate = nowZ.set({
+    let candidate = nowZ.set({
       month: Math.min(Math.max(1, anchorMonth), 12),
       hour,
       minute,
@@ -418,9 +427,72 @@ function reminderActionKeyboard(reminderId: string) {
 }
 
 /**
+ * Custom error class so the scheduler tick can distinguish
+ * "user blocked the bot" from other send failures.
+ */
+class UserBlockedError extends Error {
+  chatId: number;
+  constructor(chatId: number) {
+    super(`User ${chatId} has blocked the bot`);
+    this.name = "UserBlockedError";
+    this.chatId = chatId;
+  }
+}
+
+/**
+ * Nuke all data for a user who blocked the bot.
+ * Add/remove model imports as needed for your project.
+ */
+export async function cleanupBlockedUser(userId: number | string) {
+  const uid = String(userId);
+  console.log(`[cleanup] Removing all data for blocked user ${uid}...`);
+
+  try {
+    // Dynamically grab whatever models are registered so we don’t need
+    // to import every single one. If a model isn’t registered yet it
+    // just won’t appear here -- no crash.
+    const modelNames = mongoose.modelNames();
+
+    const ops = modelNames.map((name) => {
+      const Model = mongoose.model(name);
+      // Try both userId and chatId fields -- covers all your schemas
+      return Model.deleteMany({
+        $or: [{ userId: uid }, { chatId: uid }, { userId: Number(uid) }, { chatId: Number(uid) }],
+      }).catch((err: any) => {
+        console.warn(`[cleanup] Could not clean ${name} for ${uid}:`, err.message);
+      });
+    });
+
+    const results = await Promise.allSettled(ops);
+
+    let totalDeleted = 0;
+    results.forEach((r, i) => {
+      if (
+        r.status === "fulfilled" &&
+        r.value &&
+        typeof r.value === "object" &&
+        "deletedCount" in r.value
+      ) {
+        const count = (r.value as any).deletedCount ?? 0;
+        if (count > 0) {
+          console.log(`[cleanup] Deleted ${count} docs from ${modelNames[i]}`);
+          totalDeleted += count;
+        }
+      }
+    });
+
+    console.log(`[cleanup] Done. Removed ${totalDeleted} total documents for user ${uid}`);
+  } catch (err: any) {
+    console.error(`[cleanup] Failed for user ${uid}:`, err.message);
+  }
+}
+
+/**
  * - SEND: important part for custom emojis + bold/italics/etc
  * - Telegram renders formatting ONLY if it has message entities.
  * - We store entities on the reminder document and replay them here.
+ *
+ * Throws UserBlockedError if the user has blocked the bot (403).
  */
 async function sendReminder(bot: Telegraf<any>, rem: any) {
   const text = String(rem.text ?? "");
@@ -438,11 +510,29 @@ async function sendReminder(bot: Telegraf<any>, rem: any) {
 
   try {
     await bot.telegram.sendMessage(rem.chatId, text, sendOpts);
-  } catch (err: any) {
-    console.error(`Failed to send reminder ${rem._id} to chat ${rem.chatId}:`, err.message);
-    throw err;
+    } catch (err: any) {
+  const status = err?.response?.error_code ?? err?.response?.statusCode ?? err?.code;
+  const description = err?.response?.description ?? "";
+
+  // Only treat as "blocked" if Telegram explicitly says so
+  if (
+    status === 403 &&
+    typeof description === "string" &&
+    description.toLowerCase().includes("bot was blocked by the user")
+  ) {
+    console.warn(
+      `[scheduler] User ${rem.chatId} blocked the bot. Triggering cleanup.`
+    );
+    throw new UserBlockedError(rem.chatId);
   }
-}
+
+  console.error(
+    `Failed to send reminder ${rem._id} to chat ${rem.chatId}:`,
+    err.message
+  );
+  throw err;
+    }
+  }
 
 // In-memory pending custom snooze: userId -> { reminderId, expiresAt }
 const pendingCustomSnooze = new Map<number, { reminderId: string; expiresAt: number }>();
@@ -500,7 +590,7 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
       const kind = rem.schedule?.kind || "once";
 
       // If repeating, advance to next occurrence and keep it scheduled
-            if (kind !== "once") {
+      if (kind !== "once") {
         const nextRunAt = rem.pendingNextRunAt
           ? new Date(rem.pendingNextRunAt)
           : computeNextRunAtWithTimes(rem, new Date());
@@ -514,7 +604,7 @@ function registerReminderActionHandlers(bot: Telegraf<any>) {
                 lastRunAt: new Date(),
                 nextRunAt,
               },
-$unset: { pendingNextRunAt: 1, acknowledgedAt: 1 },
+              $unset: { pendingNextRunAt: 1, acknowledgedAt: 1 },
             }
           );
 
@@ -579,12 +669,12 @@ $unset: { pendingNextRunAt: 1, acknowledgedAt: 1 },
       const newTime = new Date(Date.now() + minutes * 60 * 1000);
 
       await Reminder.updateOne(
-  { _id: id, userId },
-  {
-    $set: { nextRunAt: newTime, status: "scheduled" },
-    $unset: { acknowledgedAt: 1 }
-  }
-);
+        { _id: id, userId },
+        {
+          $set: { nextRunAt: newTime, status: "scheduled" },
+          $unset: { acknowledgedAt: 1 },
+        }
+      );
 
       const tz = String(rem.timezone || "America/Chicago");
       const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
@@ -600,17 +690,17 @@ $unset: { pendingNextRunAt: 1, acknowledgedAt: 1 },
 
     const pending = pendingCustomSnooze.get(userId);
     if (!pending) return;
-    
-      const reply = (ctx.message as any)?.reply_to_message;
-  if (!reply || !reply.from?.is_bot) {
-    return;
-  }
 
-  // Optional but recommended: ensure it's replying to *our* prompt
-  const repliedText = String(reply.text || "");
-  if (!repliedText.includes("Type a snooze duration")) {
-    return;
-  }
+    const reply = (ctx.message as any)?.reply_to_message;
+    if (!reply || !reply.from?.is_bot) {
+      return;
+    }
+
+    // Optional but recommended: ensure it's replying to *our* prompt
+    const repliedText = String(reply.text || "");
+    if (!repliedText.includes("Type a snooze duration")) {
+      return;
+    }
 
     // Expired pending prompt
     if (Date.now() > pending.expiresAt) {
@@ -636,7 +726,10 @@ $unset: { pendingNextRunAt: 1, acknowledgedAt: 1 },
 
     const newTime = new Date(Date.now() + minutes * 60 * 1000);
 
-    await Reminder.updateOne({ _id: pending.reminderId, userId }, { $set: { nextRunAt: newTime, status: "scheduled" } });
+    await Reminder.updateOne(
+      { _id: pending.reminderId, userId },
+      { $set: { nextRunAt: newTime, status: "scheduled" } }
+    );
 
     const tz = String(rem.timezone || "America/Chicago");
     const nextStr = DateTime.fromJSDate(newTime, { zone: tz }).toFormat("ccc, LLL d 'at' h:mm a");
@@ -647,6 +740,21 @@ $unset: { pendingNextRunAt: 1, acknowledgedAt: 1 },
 export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) {
   // register callback buttons handler (Done/Snooze)
   registerReminderActionHandlers(bot);
+
+  // Catch user blocks immediately via chat member status updates
+  bot.on("my_chat_member", async (ctx) => {
+    try {
+      const newStatus = (ctx as any).myChatMember?.new_chat_member?.status;
+      const chatId = (ctx as any).myChatMember?.chat?.id;
+
+      if (newStatus === "kicked" && chatId) {
+        console.log(`[my_chat_member] User ${chatId} blocked the bot. Cleaning up...`);
+        await cleanupBlockedUser(chatId);
+      }
+    } catch (err: any) {
+      console.error("[my_chat_member] Error handling block event:", err.message);
+    }
+  });
 
   const pollEveryMs = opts.pollEveryMs ?? opts.pollIntervalMs ?? 10_000;
 
@@ -686,28 +794,35 @@ export function startScheduler(bot: Telegraf<any>, opts: SchedulerOptions = {}) 
           // Prefer Luxon recurrence (timezone-accurate)
           const nextForRepeat = computeNextRunAtWithTimes(rem, now());
 
-                    if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
-  await Reminder.updateOne(
-    { _id: rem._id },
-    {
-      $set: {
-        pendingNextRunAt: nextForRepeat,
-        lastRunAt: now(),
-        status: "sent",
-      },
-      $unset: { acknowledgedAt: 1 },   // <-- ADD THIS
-    }
-  );
-} else {
-  await Reminder.updateOne(
-    { _id: rem._id },
-    {
-      $set: { lastRunAt: now(), status: "sent" },
-      $unset: { acknowledgedAt: 1 },   // <-- ADD THIS
-    }
-  );
-}
-        } catch (err) {
+          if (rem.schedule && rem.schedule.kind !== "once" && nextForRepeat) {
+            await Reminder.updateOne(
+              { _id: rem._id },
+              {
+                $set: {
+                  pendingNextRunAt: nextForRepeat,
+                  lastRunAt: now(),
+                  status: "sent",
+                },
+                $unset: { acknowledgedAt: 1 }, // <-- ADD THIS
+              }
+            );
+          } else {
+            await Reminder.updateOne(
+              { _id: rem._id },
+              {
+                $set: { lastRunAt: now(), status: "sent" },
+                $unset: { acknowledgedAt: 1 }, // <-- ADD THIS
+              }
+            );
+          }
+        } catch (err: any) {
+          // If the user blocked the bot, clean up ALL their data
+          if (err instanceof UserBlockedError) {
+            await cleanupBlockedUser(err.chatId);
+            // No need to reschedule -- their data is gone
+            continue;
+          }
+
           console.error("Scheduler send error:", err);
 
           // If send fails, push it out 5 minutes so it doesn't hammer.
