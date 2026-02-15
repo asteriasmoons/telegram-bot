@@ -439,25 +439,30 @@ class UserBlockedError extends Error {
   }
 }
 
-/**
- * Nuke all data for a user who blocked the bot.
- * Add/remove model imports as needed for your project.
- */
+// Nuke all data for a user who blocked the bot,
+// but KEEP their Premium doc intact.
 export async function cleanupBlockedUser(userId: number | string) {
   const uid = String(userId);
-  console.log(`[cleanup] Removing all data for blocked user ${uid}...`);
+  console.log(`[cleanup] Removing all data for blocked user ${uid} (keeping Premium)...`);
 
   try {
-    // Dynamically grab whatever models are registered so we don’t need
-    // to import every single one. If a model isn’t registered yet it
-    // just won’t appear here -- no crash.
     const modelNames = mongoose.modelNames();
 
-    const ops = modelNames.map((name) => {
+    // ✅ Skip Premium so entitlements remain if they come back
+    const namesToClean = modelNames.filter(
+      (name) => name !== "Premium" && name !== "premium"
+    );
+
+    const ops = namesToClean.map((name) => {
       const Model = mongoose.model(name);
-      // Try both userId and chatId fields -- covers all your schemas
+
       return Model.deleteMany({
-        $or: [{ userId: uid }, { chatId: uid }, { userId: Number(uid) }, { chatId: Number(uid) }],
+        $or: [
+          { userId: uid },
+          { chatId: uid },
+          { userId: Number(uid) },
+          { chatId: Number(uid) },
+        ],
       }).catch((err: any) => {
         console.warn(`[cleanup] Could not clean ${name} for ${uid}:`, err.message);
       });
@@ -475,7 +480,7 @@ export async function cleanupBlockedUser(userId: number | string) {
       ) {
         const count = (r.value as any).deletedCount ?? 0;
         if (count > 0) {
-          console.log(`[cleanup] Deleted ${count} docs from ${modelNames[i]}`);
+          console.log(`[cleanup] Deleted ${count} docs from ${namesToClean[i]}`);
           totalDeleted += count;
         }
       }
