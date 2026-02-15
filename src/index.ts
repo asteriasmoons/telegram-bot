@@ -6,6 +6,41 @@ import { startServer } from "./health";
 import { startScheduler, makeInstanceId } from "./scheduler";
 import { startHabitScheduler } from "./habitScheduler";
 
+async function backfillAcknowledgedAtForOldSentOnce() {
+  // Run only when explicitly enabled (so it never surprises you)
+  if (process.env.RUN_ACK_BACKFILL !== "true") return;
+
+  console.log("[MIGRATION] Backfilling acknowledgedAt for old sent once reminders...");
+
+  // Mark any already-sent one-time reminders as acknowledged so they don't show DUE NOW forever.
+  // We set acknowledgedAt to lastRunAt if present, otherwise updatedAt/createdAt.
+  const res = await mongoose.connection.collection("reminders").updateMany(
+    {
+      status: "sent",
+      acknowledgedAt: null,
+      $or: [
+        { schedule: { $exists: false } },
+        { schedule: null },
+        { "schedule.kind": "once" },
+      ],
+    },
+    [
+      {
+        $set: {
+          acknowledgedAt: {
+            $ifNull: ["$lastRunAt", { $ifNull: ["$updatedAt", "$createdAt"] }],
+          },
+        },
+      },
+    ] as any
+  );
+
+  console.log("[MIGRATION] Backfill complete:", {
+    matched: (res as any).matchedCount,
+    modified: (res as any).modifiedCount,
+  });
+}
+
 async function main() {
   const token = process.env.BOT_TOKEN;
   const mongoUri = process.env.MONGODB_URI;
@@ -25,6 +60,8 @@ async function main() {
   // Connect DB first
   await mongoose.connect(mongoUri);
   console.log("Connected to MongoDB");
+  
+  await backfillAcknowledgedAtForOldSentOnce();
 
   // Start HTTP server with Mini App support
   await startServer({ bot, webhookPath });
@@ -35,32 +72,47 @@ async function main() {
       ? `${webhookDomain.slice(0, -1)}${webhookPath}`
       : `${webhookDomain}${webhookPath}`;
 
-  // Check current webhook before setting
-  try {
-    const info = await bot.telegram.getWebhookInfo();
-    console.log("Current webhook info:", JSON.stringify(info, null, 2));
+// Check/set webhook (NON-FATAL on network issues)
+try {
+  const info = await bot.telegram.getWebhookInfo();
+  console.log("Current webhook info:", JSON.stringify(info, null, 2));
 
-    // Only set webhook if it's different
-    if (info.url !== webhookUrl) {
-      console.log("Setting webhook:", webhookUrl);
-      await bot.telegram.setWebhook(webhookUrl, {
-        allowed_updates: ["message", "channel_post", "callback_query"],
-      });
-      console.log("Webhook set successfully.");
-    } else {
-      console.log("Webhook already correctly configured, skipping setWebhook call.");
-    }
-  } catch (error: any) {
-    if (error.response?.error_code === 429) {
-      console.warn("Rate limited by Telegram. Webhook might already be set correctly. Continuing...");
-    } else {
-      throw error;
-    }
+  if (info.url !== webhookUrl) {
+    console.log("Setting webhook:", webhookUrl);
+    await bot.telegram.setWebhook(webhookUrl, {
+      allowed_updates: ["message", "channel_post", "callback_query"],
+    });
+    console.log("Webhook set successfully.");
+  } else {
+    console.log("Webhook already correctly configured, skipping setWebhook call.");
   }
+} catch (error: any) {
+  const code = error?.code;
+  const status = error?.response?.error_code;
+
+  // Telegram can be temporarily unreachable (ETIMEDOUT), or rate limit (429)
+  console.warn(
+    "Webhook check/set failed (continuing without crashing):",
+    { code, status, message: error?.message }
+  );
+
+  // If you want: only treat auth errors as fatal
+  if (status === 401 || status === 404) {
+    // 401 = bad token; 404 sometimes appears for invalid bot token formatting
+    throw error;
+  }
+}
 
   // Log identity
+try {
   const me = await bot.telegram.getMe();
   console.log(`Bot identity: @${me.username} ${me.id}`);
+} catch (error: any) {
+  console.warn(
+    "Failed to fetch bot identity (continuing):",
+    { code: error?.code, status: error?.response?.error_code, message: error?.message }
+  );
+}
 
   // Start DB scheduler loop (checks Mongo for due reminders)
   // Polls every 10 seconds, locks for 60 seconds per reminder

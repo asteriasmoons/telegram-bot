@@ -128,53 +128,123 @@ router.use((req, res, next) => {
   next();
 });
 
-// GET /api/miniapp/reminders - Get all reminders for user
+// GET /api/miniapp/reminders - Get reminders for user (paginated, filterable by kind)
 router.get("/reminders", async (req, res) => {
   try {
-    const { status = "scheduled", includeHistory = "false" } = req.query;
+    const { includeHistory = "false", kind, limit: limitRaw, skip: skipRaw } = req.query;
+
+    // ── Pagination params ──
+    const limit = Math.min(Math.max(parseInt(limitRaw as string) || 8, 1), 100);
+    const skip  = Math.max(parseInt(skipRaw as string) || 0, 0);
 
     const query: any = { userId: req.userId };
 
     if (includeHistory === "true") {
       query.status = { $in: ["scheduled", "sent"] };
     } else {
-      // For active reminders, include:
-      // 1. All "scheduled" reminders
-      // 2. "sent" reminders with recurring schedules that are due today or in the future
-            query.$or = [
+      // Active reminders:
+      // - scheduled
+      // - recurring sent (so they can show as scheduled in UI)
+      // - one-time sent BUT not acknowledged (so they stay as DUE NOW)
+      query.$or = [
         { status: "scheduled" },
+
         {
           status: "sent",
           schedule: { $exists: true, $ne: null },
           "schedule.kind": { $in: ["daily", "weekly", "monthly", "yearly", "interval"] },
-        }
+        },
+
+        {
+          status: "sent",
+          $or: [
+            { schedule: { $exists: false } },
+            { schedule: null },
+            { "schedule.kind": "once" },
+          ],
+          acknowledgedAt: null,
+        },
       ];
-    } 
+    }
+
+    // ── Server-side kind filter ──
+    // "all" or omitted = no extra filter
+    if (kind && kind !== "all") {
+      if (kind === "once") {
+        // "once" = no schedule, or schedule.kind === "once"
+        query.$and = [
+          ...(query.$and || []),
+          {
+            $or: [
+              { schedule: { $exists: false } },
+              { schedule: null },
+              { "schedule.kind": "once" },
+            ],
+          },
+        ];
+      } else {
+        // daily / weekly / monthly / yearly / interval
+        query["schedule.kind"] = kind;
+      }
+    }
+
+    // ── Get total for this filter BEFORE paginating ──
+    const total = await Reminder.countDocuments(query);
 
     const reminders = await Reminder.find(query)
       .sort({ nextRunAt: 1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
-    // For display purposes, treat recurring "sent" reminders as "scheduled" if they're due soon
-    const processedReminders = reminders.map(r => {
-      if (r.status === "sent" && r.schedule && r.schedule.kind !== "once") {
-        const nextRun = new Date(r.nextRunAt);
-        const now = new Date();
+    // ✅ Pin DUE NOW (status="sent") at the top, then sort by nextRunAt
+    const isDueNow = (r: any) => {
+      const unacked = r.acknowledgedAt == null;
+      const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
+      const firedToday = firedAt && firedAt.toDateString() === new Date().toDateString();
+      return r.status === "sent" && unacked && firedToday;
+    };
 
-        // If nextRunAt is today or future, show it as scheduled
-        if (nextRun >= now || nextRun.toDateString() === now.toDateString()) {
+    const sortedReminders = reminders.sort((a: any, b: any) => {
+      const aDue = isDueNow(a) ? 0 : 1;
+      const bDue = isDueNow(b) ? 0 : 1;
+      if (aDue !== bDue) return aDue - bDue;
+
+      const aTime = a.nextRunAt ? new Date(a.nextRunAt).getTime() : 0;
+      const bTime = b.nextRunAt ? new Date(b.nextRunAt).getTime() : 0;
+      return aTime - bTime;
+    });
+
+    const processedReminders = sortedReminders.map((r: any) => {
+      const kind = r?.schedule?.kind || "once";
+      const isOnce = !r.schedule || kind === "once";
+      const now = new Date();
+      const today = now.toDateString();
+
+      if (r.status === "sent" && r.acknowledgedAt == null) {
+        const firedAt = r.lastRunAt ? new Date(r.lastRunAt) : null;
+        const firedToday = firedAt && firedAt.toDateString() === today;
+
+        if (firedToday) {
+          return { ...r, displayStatus: "sent" };
+        }
+
+        // Fired but not today -- recurring shows as scheduled, once passes through
+        if (!isOnce) {
           return { ...r, displayStatus: "scheduled" };
         }
       }
+
       return { ...r, displayStatus: r.status };
     });
 
-    res.json({ reminders: processedReminders });
+    res.json({ reminders: processedReminders, total, limit, skip });
   } catch (error) {
     console.error("Error fetching reminders:", error);
     res.status(500).json({ error: "Failed to fetch reminders" });
   }
 });
+
 
 // GET /api/miniapp/reminders/:id - Get single reminder
 router.get("/reminders/:id", async (req, res) => {
@@ -405,10 +475,13 @@ router.post("/reminders/:id/snooze", async (req, res) => {
     const newTime = new Date(Date.now() + minutes * 60 * 1000);
 
     const reminder = await Reminder.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
-      { $set: { nextRunAt: newTime, status: "scheduled" } },
-      { new: true }
-    ).lean();
+  { _id: req.params.id, userId: req.userId },
+  {
+    $set: { nextRunAt: newTime, status: "scheduled" },
+    $unset: { acknowledgedAt: 1 }
+  },
+  { new: true }
+).lean();
 
     if (!reminder) {
       return res.status(404).json({ error: "Reminder not found" });
@@ -533,7 +606,7 @@ const tz = settings?.timezone || rem.timezone || "America/Chicago";
     if (kind === "once") {
       const updated = await Reminder.findOneAndUpdate(
         { _id: req.params.id, userId: req.userId },
-        { $set: { status: "sent", lastRunAt: now } },
+{ $set: { status: "sent", lastRunAt: now, acknowledgedAt: now } },
         { new: true }
       ).lean();
 
@@ -541,9 +614,13 @@ const tz = settings?.timezone || rem.timezone || "America/Chicago";
     }
 
         // Recurring reminders: advance nextRunAt and keep scheduled
+    // Use whichever is later (now vs nextRunAt) so we always skip
+    // past the current occurrence -- even if marked done early.
+    const currentRunAt = rem.nextRunAt ? new Date(rem.nextRunAt) : now;
+    const fromDate = new Date(Math.max(now.getTime(), currentRunAt.getTime()));
     const next = rem.pendingNextRunAt
       ? new Date(rem.pendingNextRunAt)
-      : computeNextRunAtWithTimes(rem, now);
+      : computeNextRunAtWithTimes(rem, fromDate);
 
     if (!next) {
       return res.status(500).json({ error: "Could not compute next run time" });

@@ -49,6 +49,7 @@ function buildEventReminderText(event: {
   title: string;
   description?: string;
   location?: string;
+  meetingUrl?: string;
 }) {
   const parts: string[] = [];
   parts.push(event.title);
@@ -58,7 +59,11 @@ function buildEventReminderText(event: {
   }
 
   if (event.location && event.location.trim()) {
-    parts.push(`📍 ${event.location.trim()}`);
+    parts.push(`${event.location.trim()}`);
+  }
+
+  if (event.meetingUrl && String(event.meetingUrl).trim()) {
+    parts.push(`${String(event.meetingUrl).trim()}`);
   }
 
   // IMPORTANT: join with blank line to keep formatting readable in mini app
@@ -305,7 +310,7 @@ async function upsertEventReminder(args: {
   userId: number;
   eventId: string;
   existingReminderId?: any;
-  eventDataForText: { title: string; description?: string; location?: string };
+  eventDataForText: { title: string; description?: string; location?: string; meetingUrl?: string };
   nextRunAt: Date | null;
   eventStart: Date;
   recurrence?: any;
@@ -710,17 +715,20 @@ router.get("/events/:id", async (req, res) => {
 router.post("/events", async (req, res) => {
   try {
   console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
-    const {
-      title,
-      description,
-      startDate,
-      endDate,
-      allDay,
-      color,
-      location,
-      reminder, // <-- NEW
-      recurrence
-    } = req.body as any;
+const {
+  title,
+  description,
+  startDate,
+  endDate,
+  allDay,
+  color,
+  meetingUrl,
+  location,
+  locationPlaceId,
+  locationCoords,
+  reminder,
+  recurrence
+} = req.body as any;
 
     if (!title || !startDate) {
       return res.status(400).json({ error: "title and startDate required" });
@@ -756,9 +764,13 @@ const event = await Event.create({
   endDate: end,
   allDay: allDay || false,
   color,
+  meetingUrl: meetingUrl ? String(meetingUrl).trim() : "",
   location,
+  locationPlaceId: locationPlaceId || null,
+  locationCoords: locationCoords || null,
   recurrence: recurrence || undefined
 });
+
 
     // Handle optional reminder link
     if (reminder) {
@@ -796,7 +808,7 @@ const { reminderId } = await upsertEventReminder({
   userId: req.userId!,
   eventId: String(event._id),
   existingReminderId: null,
-  eventDataForText: { title, description, location },
+eventDataForText: { title, description, meetingUrl, location },
   nextRunAt,
   eventStart: start,
   recurrence: recurrence || undefined
@@ -830,17 +842,20 @@ const { reminderId } = await upsertEventReminder({
 router.put("/events/:id", async (req, res) => {
   try {
   console.log("CALENDAR PAYLOAD:", JSON.stringify(req.body, null, 2));
-    const {
-      title,
-      description,
-      startDate,
-      endDate,
-      allDay,
-      color,
-      location,
-      reminder, // <-- NEW
-      recurrence
-    } = req.body as any;
+const {
+  title,
+  description,
+  startDate,
+  endDate,
+  allDay,
+  color,
+  meetingUrl,
+  location,
+  locationPlaceId,
+  locationCoords,
+  reminder,
+  recurrence
+} = req.body as any;
 
     const current = await Event.findOne({
       _id: req.params.id,
@@ -879,7 +894,10 @@ if (endDate !== undefined) {
 
 if (allDay !== undefined) $set.allDay = allDay;
 if (color !== undefined) $set.color = color;
+if (meetingUrl !== undefined) $set.meetingUrl = meetingUrl ? String(meetingUrl).trim() : "";
 if (location !== undefined) $set.location = location;
+if (locationPlaceId !== undefined) $set.locationPlaceId = locationPlaceId || null;
+if (locationCoords !== undefined) $set.locationCoords = locationCoords || null;
 
 // recurrence handling stays the same
 if (recurrence !== undefined) {
@@ -939,11 +957,12 @@ const { reminderId } = await upsertEventReminder({
   userId: req.userId!,
   eventId: String(event._id),
   existingReminderId: event.reminderId,
-  eventDataForText: {
-    title: event.title,
-    description: event.description,
-    location: event.location
-  },
+eventDataForText: {
+  title: event.title,
+  description: event.description,
+  location: event.location,
+  meetingUrl: (event as any).meetingUrl
+},
   nextRunAt,
   eventStart: start,
   recurrence: event.recurrence || undefined

@@ -23,7 +23,10 @@ export type EventDoc = {
   endDate?: Date;
   allDay: boolean;
   color?: string;
-  location?: string;
+  meetingUrl?: string;
+    location?: string;
+  locationPlaceId?: string | null;
+  locationCoords?: { lat: number; lng: number } | null;
 
   // Existing one-time reminder link (keep for non-recurring)
   reminderId?: Types.ObjectId;
@@ -63,8 +66,17 @@ const EventSchema = new Schema<EventDoc>(
     startDate: { type: Date, required: true, index: true },
     endDate: { type: Date, required: false },
     allDay: { type: Boolean, required: true, default: false },
-    color: { type: String, required: false },
+        color: { type: String, required: false },
+
+    // NEW: online meeting link (Zoom/Meet/etc.)
+    meetingUrl: { type: String, required: false },
+
     location: { type: String, required: false },
+    locationPlaceId: { type: String, default: null },
+    locationCoords: {
+      type: new Schema({ lat: { type: Number }, lng: { type: Number } }, { _id: false }),
+      default: null,
+    },
     reminderId: { type: Schema.Types.ObjectId, required: false, ref: "Reminder" },
 
     recurrence: { type: RecurrenceRuleSchema, required: false },

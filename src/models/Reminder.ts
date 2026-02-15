@@ -66,6 +66,9 @@ export type ReminderDoc = {
 
   // Scheduler field
   nextRunAt: Date;
+  
+    // For one-time reminders: keep visible as DUE NOW until user acknowledges
+  acknowledgedAt?: Date | null;
 
   // Pre-computed next run for recurring reminders (set on fire, consumed on Done)
   pendingNextRunAt?: Date;
@@ -141,6 +144,8 @@ const ReminderSchema = new Schema<ReminderDoc>(
     },
 
     nextRunAt: { type: Date, required: true, index: true },
+    
+    acknowledgedAt: { type: Date, default: null },
 
     pendingNextRunAt: { type: Date, required: false },
 

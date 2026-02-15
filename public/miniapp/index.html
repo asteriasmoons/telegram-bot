@@ -12,7 +12,9 @@
   <script src="https://unpkg.com/luxon@3/build/global/luxon.min.js"></script>
   
   <link href="https://fonts.googleapis.com/css2?family=Lily+Script+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&display=swap" rel="stylesheet">
   <style>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols&display=swap" rel="stylesheet">
 /* =========================================================
    RESET
    ========================================================= */
@@ -326,13 +328,20 @@ body::after {
 
 .app-content {
   flex: 1;
+  min-height: 0;                 /* critical for nested flex scrolling */
   overflow-y: auto;
+  overflow-x: hidden;            /* KEY: no sideways scroll */
   -webkit-overflow-scrolling: touch;
+
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
   padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
   padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
+
+  overscroll-behavior: contain;  /* reduces iOS rubber-band weirdness */
 }
-
-
 /* =========================================================
    BOTTOM NAV
    ========================================================= */
@@ -565,15 +574,6 @@ body::after {
   color: #eab308;
 }
 
-.card-text {
-  font-size: 15px;
-  line-height: 1.5;
-  margin-bottom: 16px;
-  color: var(--text-primary);
-  white-space: pre-line;
-  word-break: break-word;
-}
-
 .card-actions {
   display: flex;
   gap: 8px;
@@ -624,6 +624,12 @@ body::after {
 .badge-habit-paused {
   background: rgba(244, 67, 54, 0.12);
   color: #f44336;
+}
+
+.badge-completed {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .habit-target {
@@ -962,8 +968,20 @@ body::after {
 
 .modal-body {
   flex: 1;
-  overflow-y: auto;
   min-height: 0;
+  /* scrolling */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* containment + spacing */
+  padding: 16px 16px 24px;
+  box-sizing: border-box;
+  /* prevents stretching from long text/symbol runs */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  /* ensures it never overflows viewport */
+  max-height: 70vh;
 }
 
 /* Prevent background scroll when modal is open */
@@ -1162,37 +1180,6 @@ input[type="date"].form-input::-webkit-datetime-edit {
   font-size: 14px;
   opacity: 0.75;
   letter-spacing: 0.2px;
-}
-
-/* =========================================================
-   QUICK ACTIONS
-   ========================================================= */
-.quick-actions {
-  display: flex;
-  gap: 8px;
-  margin: 0 16px 24px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-.quick-action {
-  padding: 10px 20px;
-  border-radius: 20px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.quick-action:hover {
-  border-color: var(--accent);
-}
-
-.quick-action.active {
-  background: var(--accent);
-  border-color: var(--accent);
 }
 
 /* =========================================================
@@ -2857,7 +2844,7 @@ background: rgba(255, 255, 255, 0.08);
 
 .mood-dropdown-option.selected {
 background: rgba(91, 141, 239, 0.20);
-color: var(–-accent);
+color: var(--accent);
 font-weight: 700;
 }
 
@@ -2874,8 +2861,8 @@ transition: all 0.15s;
 }
 
 .mood-dropdown-option.selected .mood-dropdown-check {
-background: var(–-accent);
-border-color: var(–-accent);
+background: var(--accent);
+border-color: var(--accent);
 }
 
 /* Selected pills (bubble style) */
@@ -2930,11 +2917,11 @@ opacity: 1;
 margin: 0 16px 16px;
 padding: 20px;
 border-radius: 16px;
-background: var(–-glass-surface);
-border: 1px solid var(–-glass-border);
-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
--webkit-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
-box-shadow: 0 14px 40px var(–-glass-shadow);
+background: var(--glass-surface);
+border: 1px solid var(--glass-border);
+backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+box-shadow: 0 14px 40px var(--glass-shadow);
 position: relative;
 overflow: hidden;
 animation: slideUp 0.3s;
@@ -3000,7 +2987,7 @@ text-align: center;
 margin-top: 8px;
 font-size: 14px;
 font-weight: 700;
-color: var(–-text-primary);
+color: var(--text-primary);
 }
 
 /* Mood log history cards */
@@ -3008,10 +2995,10 @@ color: var(–-text-primary);
 margin: 0 16px 12px;
 padding: 16px;
 border-radius: 14px;
-background: var(–-glass-surface);
-border: 1px solid var(–-glass-border);
-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
--webkit-backdrop-filter: blur(var(–-glass-blur)) saturate(150%);
+background: var(--glass-surface);
+border: 1px solid var(--glass-border);
+backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
 position: relative;
 overflow: hidden;
 }
@@ -3043,7 +3030,7 @@ z-index: 1;
 
 .mood-log-date {
 font-size: 13px;
-color: var(–-text-secondary);
+color: var(--text-secondary);
 display: flex;
 align-items: center;
 gap: 6px;
@@ -3073,7 +3060,7 @@ z-index: 1;
 .mood-log-delete {
 background: none;
 border: none;
-color: var(–-danger);
+color: var(--danger);
 cursor: pointer;
 padding: 4px;
 opacity: 0.7;
@@ -3284,6 +3271,63 @@ opacity: 1;
   font-size: 15px;
 }
 
+/* ===============================
+   Event Link Button
+   =============================== */
+
+.event-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 8px 18px;
+  border-radius: 999px;
+
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+
+  color: var(--text-primary);
+  text-decoration: none;
+
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 6px 18px rgba(0,0,0,0.25);
+
+  transition: all 0.25s ease;
+}
+
+/* subtle purple/blue glow on hover */
+.event-link-button:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 125, 239, 0.25),
+    rgba(91, 141, 239, 0.25)
+  );
+
+  border-color: rgba(139, 125, 239, 0.55);
+
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 24px rgba(91, 141, 239, 0.25),
+    inset 0 1px 0 rgba(255,255,255,0.18);
+}
+
+/* active press effect */
+.event-link-button:active {
+  transform: translateY(0px);
+  box-shadow:
+    0 4px 14px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
 /* =========================================================
    REMINDER TIME-STATUS BADGES
    ========================================================= */
@@ -3303,6 +3347,2016 @@ opacity: 1;
   50%      { opacity: 0.65; }
 }
 
+/* =========================================================
+   PLACES AUTOCOMPLETE
+   ========================================================= */
+.places-autocomplete-wrap {
+  position: relative;
+}
+
+.places-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 3000;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 4px;
+  border-radius: 12px;
+  background: rgba(25, 25, 32, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.places-suggestion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.places-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.places-suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.places-suggestion-main {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.places-suggestion-secondary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.places-powered {
+  padding: 6px 14px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: right;
+  opacity: 0.7;
+}
+
+.places-loading-row {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.form-help {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.checkbox-row--spaced {
+  margin-top: 8px;
+}
+
+.event-preview-link {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.event-preview-link-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* ============== CUSTOM SNOOZE ============= */
+
+/* ============== CUSTOM SNOOZE ============= */
+
+/* IMPORTANT: absurdly high z-index to beat any fixed FAB/header */
+.csnooze-modal-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+
+  /* darker overlay */
+  background: rgba(0,0,0,0.70);
+
+  /* helps iOS/webview layering sometimes */
+  transform: translateZ(0);
+}
+
+/* Modal itself */
+.csnooze-modal{
+  width: min(420px, 100%);
+  border-radius: 18px;
+
+  /* more padding + safe area helps when keyboard pushes */
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+
+  /* darker "glass" */
+  background: rgba(18, 10, 38, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.55);
+
+  /* keep buttons reachable on small height (keyboard open) */
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+
+  /* make sure modal is above anything within overlay */
+  position: relative;
+  z-index: 2147483647;
+}
+
+.csnooze-modal-title{
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.csnooze-modal-row{
+  display: flex;
+  gap: 10px;
+}
+
+.csnooze-modal-input{
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  outline: none;
+
+  /* slightly darker input */
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: inherit;
+}
+
+.csnooze-modal-select{
+  width: 130px;
+  padding: 12px;
+  border-radius: 12px;
+  outline: none;
+
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: inherit;
+}
+
+.csnooze-modal-error{
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(255, 170, 190, 1);
+}
+
+/* Make actions stick to bottom when modal scrolls */
+.csnooze-modal-actions{
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* Hide FAB while Custom Snooze modal is open */
+.csnooze-open .fab,
+.csnooze-open .fab-button,
+.csnooze-open .floating-action-button {
+  display: none !important;
+}
+
+.csnooze-open {
+  overflow: hidden;
+}
+
+/* CARD TEXT CSS */
+.card-text {
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  white-space: pre-line;
+  word-break: break-word;
+
+  /*
+    Force iOS to prefer Apple’s symbol-capable fonts earlier.
+    This fixes "tiny / deformed" dingbat-style glyphs like ✦ ✻ ✧ etc.
+  */
+  font-family:
+    -apple-system,
+    system-ui,
+    "SF Pro Text",
+    "SF Pro Display",
+    "Apple Symbols",
+    "Segoe UI Symbol",
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    sans-serif;
+
+  /* iOS/Safari: stop any automatic text scaling surprises */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  
+  font-kerning: normal;
+  font-variant-ligatures: none;
+
+  /* Don’t let Safari get "clever" with symbol shaping */
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+.reminder-card-text {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.reminder-text-symbol {
+  font-family: 'Noto Sans Symbols 2', 'Noto Sans Symbols', sans-serif;
+  display: inline-block;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.reminder-inline-svg {
+  display: inline-block;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
+
+/* =========================
+   MODAL: SCROLL FIX (iOS-safe)
+   ========================= */
+
+/* ===== FULL MODAL RESET FIX ===== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  background: rgba(0,0,0,0.45);
+  z-index: 2000;
+}
+
+.modal {
+  width: min(500px, 92vw);
+  max-height: calc(100dvh - 32px); /* TRUE mobile viewport */
+  border-radius: 20px;
+  padding: 24px;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow-y: auto; /* THE MODAL scrolls */
+  overflow-x: hidden;
+
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-body {
+  flex: 0 0 auto; /* REMOVE flex stretching */
+  min-height: auto;
+  overflow: visible; /* body does NOT scroll */
+  padding: 0;
+}
+
+.modal-header,
+.modal-actions {
+  flex-shrink: 0;
+}
+
+/* ============================
+   MODAL OVERRIDES (PASTE LAST)
+   File: index.html
+   ============================ */
+
+/* Give the overlay some breathing room + safe-area padding */
+.modal-overlay {
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Make the modal a fixed-height container and prevent inner overflow spill */
+.modal {
+  width: min(500px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  height: auto;
+
+  display: flex;
+  flex-direction: column;
+
+  /* IMPORTANT: contain all children; scrolling happens in .modal-body */
+  overflow: hidden;
+}
+
+/* Keep header from shrinking weirdly */
+.modal-header {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/* The ONLY scrolling area */
+.modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+
+  padding: 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+
+/* Keep action buttons visible and not clipped */
+.modal-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 16px;
+  padding-top: 12px;
+  box-sizing: border-box;
+
+  /* If there isn't enough width, wrap instead of squishing */
+  flex-wrap: wrap;
+}
+
+/* Prevent any child from forcing overflow */
+.modal-body * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Textareas/inputs/selects should never overflow the modal */
+.modal-body input,
+.modal-body select,
+.modal-body textarea,
+.modal-body button {
+  max-width: 100%;
+}
+
+/* If you use the 2-col grid rows, force them to stack on small screens */
+@media (max-width: 420px) {
+  .modal .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Fix "Remove" button breaking into two lines */
+.modal .btn-danger,
+.modal button.btn-danger {
+  white-space: nowrap;
+}
+
+/* If your extra-times rows use .times-item, make them stack cleanly */
+.modal .times-item {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.modal .times-item button,
+.modal .times-item .btn {
+  align-self: flex-end;
+}
+
+/* =========================================
+   FIX: Intention textarea getting clipped
+   File: index.html (your main CSS)
+   Paste at the very bottom
+   ========================================= */
+
+.intention-card {
+  overflow: visible; /* stop clipping the textarea */
+}
+
+/* keep your glow overlay behind everything */
+.intention-card::before {
+  z-index: 0;
+}
+
+/* force all real content above the overlay */
+.intention-header,
+.intention-input-group,
+.intention-display {
+  position: relative;
+  z-index: 1;
+}
+
+/* make sure the textarea box model never overflows */
+.intention-textarea {
+  box-sizing: border-box;
+  display: block;
+}
+
+/* ==============================
+   HARD STOP: horizontal app drift
+   (keeps Telegram safe vars)
+   ============================== */
+
+/* Document never scrolls (prevents sideways panning) */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  touch-action: pan-y;
+  margin: 0;
+}
+
+/* App shell is the fixed viewport */
+.app-shell {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Only this scrolls vertically */
+.app-content {
+  flex: 1;
+  min-height: 0;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
+
+  touch-action: pan-y;
+
+  /* ✅ KEEP YOUR SAFE VARS (full-screen + safe areas) */
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+/* Stop any child from forcing horizontal overflow */
+.app-content,
+.app-content * {
+  max-width: 100%;
+}
+
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Flex overflow insurance (prevents "push width" bugs) */
+.app-content * {
+  min-width: 0;
+}
+
+/* =========================================
+   MOOD FIXES (your actual classes)
+   Also fixes the broken var(–-...) situation by overriding
+   ========================================= */
+
+/* Your file has var(–-accent) etc (bad dash). Override with correct vars. */
+.mood-dropdown-option.selected .mood-dropdown-check {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Mood result card uses broken var(–-glass-surface) in file */
+.mood-result-card {
+  background: var(--glass-surface) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 14px 40px var(--glass-shadow) !important;
+}
+
+/* Mood labels */
+.mood-bar-labels {
+  color: var(--text-secondary) !important;
+}
+
+/* Keep mood pills from causing width wobble */
+.mood-pills-row {
+  max-width: 100%;
+}
+
+.mood-pill {
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* =========================================
+   SETTINGS: contain cards + form rows (safe, non-destructive)
+   ========================================= */
+
+.settings-card, .qh-box, .card {
+  max-width: 100%;
+  overflow: hidden; /* prevents inner content pushing the card wider */
+}
+
+/* If your settings inputs are stretching wider than the card */
+.settings-card input,
+.settings-card textarea,
+.settings-card select,
+.qh-box input,
+.qh-box textarea,
+.qh-box select,
+.form-input {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Quiet Hours rows often push sideways because of time fields */
+.qh-times, .settings-row, .form-row {
+  display: flex;
+  gap: 12px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.qh-times > *, .settings-row > *, .form-row > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* =========================================
+   READING STATUS "PILLS" (actual class used)
+   ========================================= */
+
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 7px 12px;
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  line-height: 1;
+
+  /* glassy pill look */
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+
+  /* containment */
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.card-badge .badge-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  opacity: 0.95;
+}
+
+
+/* ==========================================================
+LYSTARIA -- MASTER FIX PATCH
+Paste this block at the VERY END of your <style> tag,
+AFTER every other rule. It overrides broken sizing,
+clipping, badge inconsistency, settings layout, and
+the overall "too large" feel.
+========================================================== */
+
+/* –––––––––––––––––––––––––––––
+1. GLOBAL SCALE-DOWN
+   Everything felt too large. Pull base font down slightly
+   and tighten card padding across the board.
+––––––––––––––––––––––––––––– */
+body {
+  font-size: 14px;
+}
+
+.card {
+  padding: 16px;
+  margin: 0 12px 10px;
+  border-radius: 14px;
+}
+
+.header {
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+
+.header h1 {
+  font-size: 24px;
+}
+
+/* –––––––––––––––––––––––––––––
+2. UNIFIED BADGE SYSTEM
+One consistent badge style for ALL badges everywhere:
+habits, reading, reminders, journal, etc.
+––––––––––––––––––––––––––––– */
+.card-badge,
+.badge-once,
+.badge-daily,
+.badge-weekly,
+.badge-monthly,
+.badge-interval,
+.badge-habit-daily,
+.badge-habit-weekly,
+.badge-habit-active,
+.badge-habit-paused,
+.badge-completed,
+.badge-due-now,
+.badge-upcoming {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+
+  padding: 4px 10px !important;
+  min-height: unset !important;
+  height: auto !important;
+
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+
+  /* Base glass look (overridden per-type below) */
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+}
+
+.card-badge .badge-icon {
+  width: 11px !important;
+  height: 11px !important;
+  flex: 0 0 11px !important;
+}
+
+/* Re-apply specific badge colors at this specificity */
+.badge-once {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #3b82f6 !important;
+}
+.badge-daily {
+  background: rgba(168, 85, 247, 0.18) !important;
+  color: #a855f7 !important;
+}
+.badge-weekly {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+}
+.badge-monthly {
+  background: rgba(236, 72, 153, 0.18) !important;
+  color: #ec4899 !important;
+}
+.badge-interval {
+  background: rgba(234, 179, 8, 0.22) !important;
+  color: #eab308 !important;
+}
+.badge-habit-daily {
+  background: rgba(91, 141, 239, 0.15) !important;
+  color: #5b8def !important;
+}
+.badge-habit-weekly {
+  background: rgba(233, 160, 72, 0.18) !important;
+  color: #e9a048 !important;
+}
+.badge-habit-active {
+  background: rgba(76, 175, 80, 0.15) !important;
+  color: #4caf50 !important;
+}
+.badge-habit-paused {
+  background: rgba(244, 67, 54, 0.12) !important;
+  color: #f44336 !important;
+}
+.badge-due-now {
+  background: rgba(255, 183, 37, 0.22) !important;
+  color: #ffb725 !important;
+}
+.badge-upcoming {
+  background: rgba(0, 219, 255, 0.18) !important;
+  color: #00dbff !important;
+}
+
+/* Completed badge -- same size system, just with icon */
+.card-badge.badge-completed {
+  padding: 4px 10px !important;
+  min-height: unset !important;
+  gap: 5px !important;
+  background: rgba(76, 175, 80, 0.15) !important;
+  color: #4caf50 !important;
+}
+
+/* Habits badge column -- stack them neatly */
+.habit-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* –––––––––––––––––––––––––––––
+3. TAGS PAGE -- FIX CLIPPING
+The tag items + counts were being cut off on the right.
+––––––––––––––––––––––––––––– */
+.tags-list {
+  padding: 0 14px 16px;
+}
+
+.tag-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.tag-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.tag-item-count {
+  font-size: 12px;
+  font-weight: 700;
+  flex: 0 0 auto;
+  padding-left: 8px;
+}
+
+.tags-search {
+  margin: 0 14px 14px;
+}
+
+/* –––––––––––––––––––––––––––––
+4. SETTINGS PAGE -- QUIET HOURS LAYOUT FIX
+The checkbox label was wrapping weirdly ("Enable\nQuiet\nHours")
+because the toggle container was too constrained.
+––––––––––––––––––––––––––––– */
+.qh-box {
+  padding: 14px;
+  border-radius: 12px;
+  margin-top: 14px;
+}
+
+.qh-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.qh-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap; /* KEY FIX: stop "Enable Quiet Hours" from wrapping */
+  flex: 1;
+  min-width: 0;
+}
+
+.qh-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+/* Settings card general tightening */
+.settings-card {
+  padding: 16px;
+  margin: 0 12px 12px;
+}
+
+.settings-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.settings-help {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.qh-title {
+  font-size: 13px;
+}
+
+.qh-sub {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+/* Quiet hours time inputs -- ensure they don’t overflow */
+.qh-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+5. APP CONTENT CONTAINMENT
+Prevent horizontal clipping and overflow on all views.
+––––––––––––––––––––––––––––– */
+.app-content {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Safety: nothing should exceed viewport */
+.view-container,
+.view-container > div {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Cards must never push past edges */
+.card,
+.intention-card,
+.mood-result-card,
+.mood-log-card,
+.horoscope-card,
+.horoscope-result-card,
+.event-share-card,
+.settings-card,
+.qh-box {
+  max-width: calc(100% - 24px);
+  margin-left: 12px;
+  margin-right: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* –––––––––––––––––––––––––––––
+6. READING PAGE -- SMOOTHER BADGES + TIGHTER CARDS
+––––––––––––––––––––––––––––– */
+/* Reading card header: title + badge on same row */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Book title */
+.card-header > div:first-child > div:first-child {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+/* Author row */
+.card-author {
+  font-size: 13px;
+  gap: 5px;
+}
+
+.card-author img {
+  width: 12px;
+  height: 12px;
+}
+
+/* Star rating -- slightly smaller */
+.star-icon {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.star-rating {
+  gap: 6px;
+}
+
+/* Book summary text */
+.book-summary {
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 8px 0 10px;
+}
+
+/* Progress bar */
+.progress-wrap {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.progress-top {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.progress-pct {
+  font-size: 12px;
+}
+
+.progress-bar {
+  height: 8px;
+}
+
+/* Reading streak card */
+.streak-stat {
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.streak-stat-label {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.streak-stat-value {
+  font-size: 20px;
+}
+
+.streak-row {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+7. HABITS PAGE -- TIGHTEN UP
+––––––––––––––––––––––––––––– */
+.habit-title {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.habit-sub {
+  font-size: 12px;
+}
+
+.habit-target {
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.habit-actions {
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.habit-actions .btn {
+  padding: 8px 12px;
+  font-size: 12px;
+  min-width: 120px;
+}
+
+/* –––––––––––––––––––––––––––––
+8. MOOD PAGE -- TIGHTEN
+––––––––––––––––––––––––––––– */
+.mood-dropdown-trigger {
+  font-size: 14px;
+  padding: 10px 14px;
+}
+
+.mood-dropdown-option {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.mood-pill {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+9. BUTTONS -- SLIGHTLY SMALLER
+––––––––––––––––––––––––––––– */
+.btn {
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+.btn-prompt,
+.btn-summary {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+/* Header action buttons */
+.journal-header-actions {
+  gap: 6px;
+}
+
+/* Icon buttons -- consistent sizing */
+.checklist-icon-btn,
+.mood-icon-btn,
+.habits-icon-btn,
+.tags-icon-btn,
+.horoscope-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.checklist-icon-btn img,
+.mood-icon-btn img,
+.habits-icon-btn img,
+.tags-icon-btn img,
+.horoscope-icon-btn img {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.icon-btn img {
+  width: 16px;
+  height: 16px;
+}
+
+/* –––––––––––––––––––––––––––––
+10. MODAL -- SLIGHTLY TIGHTER
+––––––––––––––––––––––––––––– */
+.modal {
+  padding: 20px;
+  border-radius: 18px;
+}
+
+.modal-header h2 {
+  font-size: 20px;
+}
+
+.modal-body {
+  padding: 12px;
+}
+
+.form-label {
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+/* –––––––––––––––––––––––––––––
+11. BOTTOM NAV -- SLIGHTLY TIGHTER
+––––––––––––––––––––––––––––– */
+.bottom-nav {
+  padding: 10px 0 calc(10px + var(--tg-safe-bottom, env(safe-area-inset-bottom)));
+}
+
+.nav-item {
+  gap: 3px;
+  padding: 6px;
+}
+
+.nav-item-icon img {
+  width: 22px;
+  height: 22px;
+}
+
+.nav-item-label {
+  font-size: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+12. FAB -- SLIGHTLY SMALLER
+––––––––––––––––––––––––––––– */
+.fab {
+  width: 50px;
+  height: 50px;
+  font-size: 22px;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+}
+
+/* –––––––––––––––––––––––––––––
+13. JOURNAL -- TIGHTEN CARDS
+––––––––––––––––––––––––––––– */
+.journal-preview {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tag-pill,
+.tag-chip {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.tag-row {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Intention card */
+.intention-card {
+  padding: 16px;
+  margin: 0 12px 16px;
+  border-radius: 14px;
+}
+
+.intention-title {
+  font-size: 14px;
+}
+
+.intention-text {
+  font-size: 14px;
+  padding: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+14. CALENDAR -- TIGHTER
+––––––––––––––––––––––––––––– */
+.calendar-header {
+  padding: 12px 14px;
+}
+
+.calendar-month {
+  font-size: 20px;
+}
+
+.calendar-body {
+  padding: 12px;
+}
+
+.calendar-datebox-day {
+  font-size: 24px;
+}
+
+.calendar-event-title {
+  font-size: 14px;
+}
+
+.calendar-event-time {
+  font-size: 12px;
+}
+
+.calendar-event {
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+/* –––––––––––––––––––––––––––––
+15. REMINDER CARDS -- TIGHTEN
+––––––––––––––––––––––––––––– */
+.card-time-text {
+  font-size: 14px;
+}
+
+.time-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.reminder-card-text,
+.card-text {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+/* –––––––––––––––––––––––––––––
+16. REMINDERS GREETING
+––––––––––––––––––––––––––––– */
+.reminders-greeting {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* –––––––––––––––––––––––––––––
+17. EMPTY STATE -- SCALE DOWN
+––––––––––––––––––––––––––––– */
+.empty-state {
+  padding: 40px 16px;
+}
+
+.empty-state-icon img {
+  width: 48px;
+  height: 48px;
+}
+
+.empty-state-text {
+  font-size: 14px;
+}
+
+/* –––––––––––––––––––––––––––––
+18. CHECKLIST -- TIGHTEN
+––––––––––––––––––––––––––––– */
+.checklist-checkbox {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-radius: 7px;
+}
+
+.checklist-text {
+  font-size: 14px;
+}
+
+.checklist-expand {
+  width: 38px;
+  height: 38px;
+}
+
+/* ============================================
+   LYSTARIA HOTFIX PATCH v2 -- Feb 11 2026
+   Fixes: mood clipping, reading tab centering,
+   modal containment + internal scroll
+   ============================================ */
+
+/* --- 1. MODAL CONTAINMENT + SCROLL --- */
+/* All modals: cap height, scroll inside */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+}
+
+.modal,
+.modal-content,
+.journal-modal,
+.edit-modal,
+.reminder-modal,
+.event-modal,
+.view-modal,
+.summary-modal,
+.recs-modal,
+.checklist-modal,
+.book-modal,
+.share-modal,
+.event-view-modal,
+.intention-modal,
+.tag-modal,
+.confirm-modal,
+.settings-modal,
+[class*="-modal"] {
+  max-height: 85vh !important;
+  max-width: calc(100vw - 32px) !important;
+  width: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Modal inner content shouldn't fight the scroll */
+.modal-body,
+.modal-inner,
+.modal > div {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* --- 2. MOOD PAGE CLIPPING FIX --- */
+.mood-container,
+.mood-section,
+.mood-log-form,
+.mood-content,
+[class*="mood"] {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
+
+.mood-log-form select,
+.mood-log-form textarea,
+.mood-log-form input,
+.mood-container select,
+.mood-container textarea,
+.mood-container input {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.mood-log-form .form-group,
+.mood-log-form label,
+.mood-container .form-group {
+  max-width: 100% !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* The "Log Mood" button and note textarea */
+.mood-log-form button,
+.mood-container button[type="submit"],
+.mood-container .btn-primary {
+  max-width: calc(100% - 24px) !important;
+  margin-left: 12px !important;
+  margin-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* --- 4. APP-WIDE OVERFLOW GUARD --- */
+html, body, #root, #app {
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+}
+
+.app-container,
+.page-content,
+.content-area,
+main,
+[class*="container"] {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* Don't double-pad things already inside containers */
+.card,
+[class*="card"] {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+/* –––––––––––––––––––––––––––––
+END OF PATCH
+––––––––––––––––––––––––––––– */
+
+/* ==========================================================
+LYSTARIA -- HARD STOP PATCH (MODALS + MOOD + READING TABS + BADGES)
+Paste this block at the VERY END of your <style> tag.
+========================================================== */
+
+/* ---------- 0) APP-WIDE: KILL HORIZONTAL SCROLL (keep safe vars) ---------- */
+html,
+body {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden !important;
+}
+
+#app,
+#root,
+.app-shell,
+.app-content,
+.view-container {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+/* If any child tries to exceed viewport, force containment */
+.view-container * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Keep your safe-area behavior, but prevent side bleed */
+.app-content {
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  overflow-x: hidden !important;
+}
+
+/* ---------- 1) MODALS: FIT TO SCREEN + SCROLL TO THE TRUE BOTTOM ---------- */
+/* Overlay fills viewport and centers modal, with safe padding */
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: calc(12px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) 12px
+    calc(12px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* The modal itself must NOT scroll; the BODY inside it scrolls */
+.modal,
+.modal-content,
+.journal-modal,
+.edit-modal,
+.reminder-modal,
+.event-modal,
+.view-modal,
+.summary-modal,
+.recs-modal,
+.checklist-modal,
+.book-modal,
+.share-modal,
+.event-view-modal,
+.intention-modal,
+.tag-modal,
+.confirm-modal,
+.settings-modal,
+[class*="-modal"] {
+  width: 100% !important;
+  max-width: 520px !important;
+
+  /* hard fit */
+  max-height: calc(
+    100dvh - (24px + var(--tg-safe-top, env(safe-area-inset-top, 0px)) + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))
+  ) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  /* IMPORTANT: modal container must clip; inner area scrolls */
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+
+  box-sizing: border-box !important;
+}
+
+/* Make sure flex children can actually shrink (iOS safari fix) */
+.modal > *,
+.modal-content > *,
+[class*="-modal"] > * {
+  min-height: 0 !important;
+}
+
+/* Header + actions must stay visible; body is the scroll region */
+.modal-header {
+  flex: 0 0 auto !important;
+}
+
+.modal-actions {
+  flex: 0 0 auto !important;
+}
+
+/* The scrolling region */
+.modal-body,
+.modal-inner,
+.modal-content-body,
+.modal .modal-body,
+[class*="-modal"] .modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  max-height: none !important;
+}
+
+/* If any nested wrapper was forcing overflow visible, kill it */
+.modal-body * ,
+.modal-inner * ,
+[class*="-modal"] .modal-body * {
+  overflow-x: hidden;
+}
+
+/* Prevent background scroll when modal open (safe + stable) */
+body.modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  inset: 0 !important;
+}
+
+/* ---------- 2) MOOD: TEXTAREA CUT-OFF / CONTAINMENT ---------- */
+.mood-container,
+.mood-section,
+.mood-log-form,
+.mood-content,
+[class*="mood"] {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Force all form controls to stay inside */
+.mood-container select,
+.mood-container textarea,
+.mood-container input,
+.mood-log-form select,
+.mood-log-form textarea,
+.mood-log-form input {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* The NOTE textarea specifically: make it tall enough and not clipped by parents */
+.mood-container textarea,
+.mood-log-form textarea {
+  min-height: 140px !important;
+  line-height: 1.45 !important;
+  resize: vertical !important;
+  overflow: auto !important;
+}
+
+/* If a parent card is clipping, allow the textarea to render fully */
+.mood-container .card,
+.mood-log-form .card,
+.mood-container [class*="card"],
+.mood-log-form [class*="card"] {
+  overflow: visible !important;
+}
+
+/* ---------- 5) FIX A SYNTAX LANDMINE (smart quotes / bad dash) ---------- */
+/* If you have this anywhere, this correct selector prevents a broken rule from being ignored */
+.qh-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+/* Also fix any accidental "en dash" in safe var usage by overriding bottom-nav safely */
+.bottom-nav {
+  padding-bottom: calc(10px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+}
+
+/* ==========================================================
+LYSTARIA -- HARD STOP PATCH (MODALS + READING TABS + HABIT BADGES)
+Paste this block at the VERY END of your <style> tag.
+========================================================== */
+
+/* ----------------------------------------------------------
+1) MODALS: SHORT + SCROLL INSIDE (header/actions stay visible)
+---------------------------------------------------------- */
+
+/* Overlay: start near top so modal never "centers tall" */
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2000 !important;
+
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: calc(16px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) !important;
+  padding-bottom: calc(16px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* The modal itself: capped height, NO outer scroll */
+.modal {
+  width: 100% !important;
+  max-width: 500px !important;
+
+  /* make it SHORT */
+  max-height: calc(100vh - 160px - var(--tg-safe-top, env(safe-area-inset-top, 0px)) - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  overflow: hidden !important; /* IMPORTANT: prevents the whole modal from scrolling */
+  box-sizing: border-box !important;
+}
+
+/* Header: fixed height area */
+.modal-header {
+  flex: 0 0 auto !important;
+  margin-bottom: 14px !important;
+}
+
+/* Body: the ONLY scrolling region */
+.modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+
+  padding: 12px 12px 16px !important;
+  box-sizing: border-box !important;
+}
+
+/* Actions/footer: pinned inside modal */
+.modal-actions {
+  flex: 0 0 auto !important;
+  margin-top: 12px !important;
+
+  position: sticky !important;
+  bottom: 0 !important;
+
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+
+  /* subtle fade/solid base so buttons always readable */
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0),
+    rgba(0,0,0,0.35) 35%,
+    rgba(0,0,0,0.55)
+  ) !important;
+
+  box-sizing: border-box !important;
+}
+
+/* Kill any "modal inner fights scroll" rules from other patches */
+.modal > div {
+  max-height: none !important;
+}
+
+/* ================================
+READING TABS -- GLASS PILL BUBBLES
+Targets your actual classes:
+.book-quick-actions / .book-quick-action
+================================ */
+
+/* container row */
+.book-quick-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  padding: 10px 12px !important;
+  margin: 0 12px 12px !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+
+  /* keep it from looking like a weird bar */
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* each pill */
+.book-quick-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 10px 16px !important;
+  border-radius: 999px !important;
+
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.2px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+
+  /* GLASS PILL LOOK */
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.30) !important;
+
+  -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+  backdrop-filter: blur(12px) saturate(150%) !important;
+
+  cursor: pointer !important;
+  user-select: none !important;
+
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+}
+
+/* pressed/hover feel */
+.book-quick-action:active {
+  transform: translateY(1px) !important;
+}
+
+/* active pill */
+.book-quick-action.active {
+  background: rgba(139, 125, 239, 0.18) !important;
+  border-color: rgba(139, 125, 239, 0.40) !important;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.35),
+    0 0 0 3px rgba(139, 125, 239, 0.12) !important;
+}
+
+/* ----------------------------------------------------------
+3) HABIT BADGES: stop shrinking/squishing, keep pill width
+---------------------------------------------------------- */
+
+.habit-badges {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: flex-start !important;
+
+  gap: 6px !important;
+  min-width: max-content !important;
+}
+
+.habit-badges .card-badge,
+.habit-badges .badge-once,
+.habit-badges .badge-daily,
+.habit-badges .badge-weekly,
+.habit-badges .badge-monthly,
+.habit-badges .badge-interval,
+.habit-badges .badge-habit-daily,
+.habit-badges .badge-habit-weekly,
+.habit-badges .badge-habit-active,
+.habit-badges .badge-habit-paused,
+.habit-badges .badge-completed,
+.habit-badges .badge-due-now,
+.habit-badges .badge-upcoming {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: max-content !important;
+
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+}
+
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.load-more-btn {
+  min-width: 140px;
+}
+
+/* ==========================================================
+REMINDERS TABS -- restore pill row layout for renamed classes
+Fixes: vertical list, lost pill styling, spacing to first card
+========================================================== */
+
+.reminder-quick-actions {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  margin-bottom: 8px;
+}
+
+/* If there’s a pseudo-element creating haze */
+.reminder-quick-actions::before,
+.reminder-quick-actions::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Individual tab pills -- remove glow */
+.reminder-quick-action {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Active tab -- keep highlight but remove glow */
+.reminder-quick-action.active {
+  box-shadow: none !important;
+}
+
+/* The row container */
+.reminder-quick-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  width: 100% !important;
+  max-width: 100% !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+
+  padding: 8px 12px !important;
+  margin: 0 12px 10px !important; /* includes your "small gap" to first card */
+  background: transparent !important;
+  box-shadow: none !important;
+
+  /* important: prevents wrapping into a new "row" look */
+  white-space: nowrap !important;
+}
+
+/* Kill any haze pseudo-elements if something else added them */
+.reminder-quick-actions::before,
+.reminder-quick-actions::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Each tab "pill"
+   Works whether your items are <div>, <button>, <a>, etc. */
+.reminder-quick-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+
+  padding: 10px 16px !important;
+  border-radius: 999px !important;
+
+  /* Keep your glass pill look but remove glow */
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+
+  line-height: 1 !important;
+  text-align: center !important;
+}
+
+/* Active pill (still a pill, just "selected") */
+.reminder-quick-action.active {
+  background: rgba(168, 85, 247, 0.22) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  box-shadow: none !important;
+}
+
+/* Optional: hide the horizontal scrollbar line on iOS */
+.reminder-quick-actions::-webkit-scrollbar {
+  height: 0 !important;
+}
+
+/* ===== Calendar title alignment fix ===== */
+
+.calendar-event-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+/* Your actual SVG class */
+.calendar-event-title .calendar-inline-svg {
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+  top: 1px; /* micro-adjust -- tweak 0px / 1px / 2px if needed */
+}
+
+/* Keep the reminder dot aligned */
+.calendar-event-title .event-reminder-dot {
+  align-self: center;
+}
+
+/* REGULAR QUICK ACTIONS */
+.quick-actions {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  margin-bottom: 8px;
+}
+
+/* If there’s a pseudo-element creating haze */
+.quick-actions::before,
+.quick-actions::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Individual tab pills -- remove glow */
+.quick-action {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Active tab -- keep highlight but remove glow */
+.quick-action.active {
+  box-shadow: none !important;
+}
+
+/* The row container */
+.quick-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 8px 12px !important;
+  margin: 0 12px 10px !important; /* includes your "small gap" to first card */
+  background: transparent !important;
+  box-shadow: none !important;
+  /* important: prevents wrapping into a new "row" look */
+  white-space: nowrap !important;
+}
+
+/* Kill any haze pseudo-elements if something else added them */
+.quick-actions::before,
+.actions::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Each tab "pill"
+   Works whether your items are <div>, <button>, <a>, etc. */
+.quick-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  padding: 10px 16px !important;
+  border-radius: 999px !important;
+  /* Keep your glass pill look but remove glow */
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}
+
+/* Active pill (still a pill, just "selected") */
+.quick-action.active {
+  background: rgba(168, 85, 247, 0.22) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  box-shadow: none !important;
+}
+
+/* Optional: hide the horizontal scrollbar line on iOS */
+.quick-actions::-webkit-scrollbar {
+  height: 0 !important;
+}
+
+/* HABIT COMPLETED BADGE */
+.card-badge.badge-completed {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
 </style>
 </head>
 
@@ -3864,6 +5918,128 @@ function isToday(dateValue) {
   const e = endOfToday().getTime();
   const t = d.getTime();
   return t >= s && t <= e;
+}
+
+// SYMBOL MAPPER
+const SYMBOL_SVG_MAP = {
+  '♡': (
+    <img className="reminder-inline-svg" src="/icons/heart.svg" alt="♡" width="14" height="14" />
+  ),
+  '☆': (
+  <img className="reminder-inline-svg" src="/icons/stars.svg" alt="☆" width="14" height="14" />
+  ),
+  '★': (
+  <img className="reminder-inline-svg" src="/icons/star.svg" alt="★" width="14" height="14" />
+  ),
+  '✦': (
+  <img className="reminder-inline-svg" src="/icons/sparkle-fill.svg" alt="✦" width="14" height="14" />
+  ),
+  '✧': (
+  <img className="reminder-inline-svg" src="/icons/sparkle-line.svg" alt="✧" width="14" height="14" />
+  ),
+  '♥︎': (
+  <img className="reminder-inline-svg" src="/icons/heart-fill.svg" alt="♥︎" width="14" height="14" />
+  ),
+};
+
+// SYMBOLS HELPER FOR DECOR (supports multi-codepoint symbols like ♥︎)
+function renderTextWithSymbolSpans(text) {
+  const s = String(text ?? "");
+  const lines = s.split("\n");
+
+  // Escape for regex literals
+  const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Sort longest-first so multi-char tokens (♥︎) match before shorter ones (♥)
+  const mappedKeys = Object.keys(SYMBOL_SVG_MAP).sort((a, b) => b.length - a.length);
+
+  // Build alternation regex for mapped symbols (captures the match)
+  // Example: (♥︎|✦|✧|★|☆|♡)
+  const mappedAlt = mappedKeys.length
+    ? `(${mappedKeys.map(escapeRegExp).join("|")})`
+    : null;
+
+  // Also wrap OTHER symbols (single-char ranges) in spans if not mapped
+  const otherSymbolRe = /([\u2600-\u26FF\u2700-\u27BF])/g;
+
+  return lines.map((line, lineIdx) => {
+    // Split by mapped symbols first (keeping matches)
+    const parts = mappedAlt ? line.split(new RegExp(mappedAlt, "g")) : [line];
+
+    return (
+      <React.Fragment key={`line-${lineIdx}`}>
+        {parts.map((part, i) => {
+          // Exact mapped match (works for ♥︎ and any multi-char key)
+          if (SYMBOL_SVG_MAP[part]) {
+            return (
+              <React.Fragment key={`svg-${lineIdx}-${i}`}>
+                {SYMBOL_SVG_MAP[part]}
+              </React.Fragment>
+            );
+          }
+
+          // For non-mapped chunks, wrap other symbol-range characters
+          const subParts = String(part).split(otherSymbolRe);
+
+          return (
+            <React.Fragment key={`txt-${lineIdx}-${i}`}>
+              {subParts.map((sp, j) => {
+                if (sp.length === 1 && otherSymbolRe.test(sp)) {
+                  return (
+                    <span key={`sym-${lineIdx}-${i}-${j}`} className="reminder-text-symbol">
+                      {sp}
+                    </span>
+                  );
+                }
+                return <React.Fragment key={`t-${lineIdx}-${i}-${j}`}>{sp}</React.Fragment>;
+              })}
+            </React.Fragment>
+          );
+        })}
+        {lineIdx < lines.length - 1 ? <br /> : null}
+      </React.Fragment>
+    );
+  });
+}
+
+// ===== Habit Reminder Display Helpers =====
+
+function formatTimeToAmPm(hhmm) {
+  if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return hhmm;
+
+  const [h, m] = hhmm.split(":").map(Number);
+  const date = new Date();
+  date.setHours(h, m, 0, 0);
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatDayAndTime(hhmm) {
+  if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return hhmm;
+
+  const now = new Date();
+  const [h, m] = hhmm.split(":").map(Number);
+
+  const next = new Date();
+  next.setHours(h, m, 0, 0);
+
+  // If time already passed today, move to tomorrow
+  if (next <= now) {
+    next.setDate(next.getDate() + 1);
+  }
+
+  const day = next.toLocaleDateString([], { weekday: "long" });
+  const time = next.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return `${day} - ${time}`;
 }
 
 
@@ -4430,20 +6606,24 @@ function HabitCard({ habit, onEdit, onDelete, onTogglePause, onOpenLog, onOpenLo
   const scheduleKind = String(habit?.reminderSchedule?.kind || "off");
 
   const scheduleSummary =
-    scheduleKind === "off"
-      ? "Reminders: Off"
-      : scheduleKind === "times"
-        ? `Reminders: Times (${(habit?.reminderSchedule?.timesOfDay || []).join(", ") || "none"})`
-        : scheduleKind === "hourly"
-          ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyHours, 1)}h` +
+  scheduleKind === "off"
+    ? "Reminders: Off"
+    : scheduleKind === "times"
+      ? `Reminders: ${
+          (habit?.reminderSchedule?.timesOfDay || [])
+            .map(formatDayAndTime)
+            .join(", ") || "none"
+        }`
+      : scheduleKind === "hourly"
+        ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyHours, 1)}h` +
+          (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
+            ? ` (${formatTimeToAmPm(habit.reminderSchedule.windowStart)}–${formatTimeToAmPm(habit.reminderSchedule.windowEnd)})`
+            : "")
+        : scheduleKind === "every_x_minutes"
+          ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyMinutes, 1)}m` +
             (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
-              ? ` (${habit.reminderSchedule.windowStart}–${habit.reminderSchedule.windowEnd})`
+              ? ` (${formatTimeToAmPm(habit.reminderSchedule.windowStart)}–${formatTimeToAmPm(habit.reminderSchedule.windowEnd)})`
               : "")
-          : scheduleKind === "every_x_minutes"
-            ? `Reminders: Every ${safeNum(habit?.reminderSchedule?.everyMinutes, 1)}m` +
-              (habit?.reminderSchedule?.windowStart && habit?.reminderSchedule?.windowEnd
-                ? ` (${habit.reminderSchedule.windowStart}–${habit.reminderSchedule.windowEnd})`
-                : "")
             : `Reminders: ${scheduleKind}`;
 
   const cadenceLabel = String(habit?.cadence || "daily");
@@ -6570,39 +8750,39 @@ const loadBooks = async () => {
   onCheckIn={handleCheckIn}
 />
 
-      <div className="quick-actions">
+      <div className="book-quick-actions">
         <div
-          className={`quick-action ${filter === "all" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "all" ? "active" : ""}`}
           onClick={() => setFilter("all")}
         >
           All
         </div>
         <div
-          className={`quick-action ${filter === "tbr" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "tbr" ? "active" : ""}`}
           onClick={() => setFilter("tbr")}
         >
           TBR
         </div>
         <div
-          className={`quick-action ${filter === "reading" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "reading" ? "active" : ""}`}
           onClick={() => setFilter("reading")}
         >
           Reading
         </div>
         <div
-          className={`quick-action ${filter === "finished" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "finished" ? "active" : ""}`}
           onClick={() => setFilter("finished")}
         >
           Finished
         </div>
         <div
-          className={`quick-action ${filter === "paused" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "paused" ? "active" : ""}`}
           onClick={() => setFilter("paused")}
         >
           Paused
         </div>
         <div
-          className={`quick-action ${filter === "dnf" ? "active" : ""}`}
+          className={`book-quick-action ${filter === "dnf" ? "active" : ""}`}
           onClick={() => setFilter("dnf")}
         >
           DNF
@@ -7655,6 +9835,72 @@ function PromptModal({ onClose, onGenerate, prompt, remaining, loading }) {
     // Reminder Card Component
     function ReminderCard({ reminder, onEdit, onSnooze, onDone, onDelete }) {
       const [expanded, setExpanded] = useState(false);
+      
+      const [customOpen, setCustomOpen] = useState(false);
+const [customValue, setCustomValue] = useState("");
+const [customUnit, setCustomUnit] = useState("minutes"); // "minutes" | "hours" | "days"
+const [customError, setCustomError] = useState("");
+
+
+function openCustomSnooze() {
+  document.body.classList.add("csnooze-open");
+  setCustomOpen(true);
+}
+
+function closeCustomSnooze() {
+  document.body.classList.remove("csnooze-open");
+  setCustomOpen(false);
+}
+
+function unitToMinutes(unit) {
+  if (unit === "hours") return 60;
+  if (unit === "days") return 1440;
+  return 1; // minutes
+}
+
+function unitLabel(unit, value) {
+  const v = Number(value);
+  if (unit === "hours") return `${v} hour${v === 1 ? "" : "s"}`;
+  if (unit === "days") return `${v} day${v === 1 ? "" : "s"}`;
+  return `${v} minute${v === 1 ? "" : "s"}`;
+}
+
+function submitCustomSnooze() {
+  const raw = String(customValue).trim();
+  if (!raw) {
+    setCustomError("Enter a number.");
+    return;
+  }
+
+  const n = Number(raw);
+
+  if (!Number.isFinite(n) || n <= 0) {
+    setCustomError("Must be a number greater than 0.");
+    return;
+  }
+
+  // Optional guardrails (tweak as you like)
+  if (n > 365 && customUnit === "days") {
+    setCustomError("Please keep it under 365 days.");
+    return;
+  }
+  if (n > 24 * 365 && customUnit === "hours") {
+    setCustomError("Please keep it under 8760 hours.");
+    return;
+  }
+  if (n > 60 * 24 * 365 && customUnit === "minutes") {
+    setCustomError("Please keep it under 525600 minutes.");
+    return;
+  }
+
+  const minutes = Math.round(n * unitToMinutes(customUnit));
+  const label = unitLabel(customUnit, Math.round(n));
+
+  // IMPORTANT: stopPropagation already handled by card-actions wrapper,
+  // but modal lives outside actions area, so keep the card from collapsing.
+  onSnooze(reminder._id, minutes, label);
+  closeCustomSnooze();
+}
 
       const getBadgeClass = () => {
         const kind = reminder.schedule?.kind || 'once';
@@ -7710,7 +9956,7 @@ function formatTime12h(hhmm) {
 }
 
       const getStatusBadge = () => {
-  const st = reminder.status;
+  const st = reminder.displayStatus || reminder.status;
   const nextRun = reminder.nextRunAt ? new Date(reminder.nextRunAt) : null;
   const now = new Date();
 
@@ -7719,11 +9965,9 @@ function formatTime12h(hhmm) {
   }
 
   if (st === "scheduled" && nextRun) {
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
+    const msUntil = nextRun.getTime() - now.getTime();
 
-    if (nextRun >= now && nextRun < todayEnd) {
+    if (msUntil > 0 && msUntil <= 24 * 60 * 60 * 1000) {
       return { label: "UPCOMING", className: "badge-upcoming" };
     }
   }
@@ -7734,67 +9978,130 @@ function formatTime12h(hhmm) {
       const statusBadge = getStatusBadge();
 
       return (
-        <div className="card" onClick={() => setExpanded(!expanded)}>
-<div className="card-header">
-  <div className="card-time-row">
-    <span className="card-time-icon">
-      <img src="/icons/alarm.svg" alt="" />
-    </span>
+  <div className="card" onClick={() => setExpanded(!expanded)}>
+    <div className="card-header">
+      <div className="card-time-row">
+        <span className="card-time-icon">
+          <img src="/icons/alarm.svg" alt="" />
+        </span>
 
-    <span className="card-time-text">{formatDateTime(reminder.nextRunAt)}</span>
+        <span className="card-time-text">{formatDateTime(reminder.nextRunAt)}</span>
 
-    {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
-      <div className="card-times-inline">
-        {getAllTimes().map((t) => (
-  <span key={t} className="time-chip">
-    {formatTime12h(t)}
-  </span>
-))}
+        {["daily", "weekly", "monthly", "yearly"].includes(reminder.schedule?.kind) && (
+          <div className="card-times-inline">
+            {getAllTimes().map((t) => (
+              <span key={t} className="time-chip">
+                {formatTime12h(t)}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
-    )}
-  </div>
 
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-    <span className={getBadgeClass()}>
-      {getBadgeLabel()}
-    </span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+        <span className={getBadgeClass()}>
+          {getBadgeLabel()}
+        </span>
 
-    {statusBadge && (
-      <span className={`card-badge ${statusBadge.className}`}>
-        {statusBadge.label}
-      </span>
-    )}
-  </div>
+        {statusBadge && (
+          <span className={`card-badge ${statusBadge.className}`}>
+            {statusBadge.label}
+          </span>
+        )}
+      </div>
+    </div>
+
+    <div className="reminder-card-text">
+  {renderTextWithSymbolSpans(reminder.text)}
 </div>
 
-          <div className="card-text">{reminder.text}</div>
+    {expanded && (
+      <div className="card-actions" onClick={e => e.stopPropagation()}>
+        <button className="btn btn-primary" onClick={() => onEdit(reminder)}>
+          <img src="/icons/pencil.svg" alt="" />
+          Edit
+        </button>
 
-          {expanded && (
-            <div className="card-actions" onClick={e => e.stopPropagation()}>
-              <button className="btn btn-primary" onClick={() => onEdit(reminder)}>
-  <img src="/icons/pencil.svg" alt="" />
-  Edit
-</button>
-              <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 15)}>
-  <img src="/icons/alarm.svg" alt="" />
-  15m
-</button>
-              <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 60)}>
-  <img src="/icons/alarm.svg" alt="" />
-  1h
-</button>
-              <button className="btn btn-success" onClick={() => onDone(reminder._id)}>
-  <img src="/icons/check.svg" alt="" />
-  Done
-</button>
-              <button className="btn btn-danger" onClick={() => onDelete(reminder._id)}>
-  <img src="/icons/trash.svg" alt="" />
-</button>
-            </div>
-          )}
+        <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 15)}>
+          <img src="/icons/alarm.svg" alt="" />
+          15m
+        </button>
+
+        <button className="btn btn-secondary" onClick={() => onSnooze(reminder._id, 60)}>
+          <img src="/icons/alarm.svg" alt="" />
+          1h
+        </button>
+
+        {/* ✅ ADD THIS BUTTON */}
+        <button className="btn btn-secondary" onClick={openCustomSnooze}>
+          <img src="/icons/alarm.svg" alt="" />
+          Custom
+        </button>
+
+        <button className="btn btn-primary" onClick={() => onDone(reminder._id)}>
+          <img src="/icons/check.svg" alt="" />
+          Done
+        </button>
+
+        <button className="btn btn-danger" onClick={() => onDelete(reminder._id)}>
+          <img src="/icons/trash.svg" alt="" />
+        </button>
+      </div>
+    )}
+
+    {/* ✅✅✅ THIS IS THE EXACT PLACE TO ADD #4 (RENDER THE MODAL) */}
+    {customOpen && (
+      <div className="csnooze-modal-overlay" onClick={closeCustomSnooze}>
+        <div className="csnooze-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="csnooze-modal-title">Custom Snooze</div>
+
+          <div className="csnooze-modal-row">
+            <input
+              className="csnooze-modal-input"
+              inputMode="numeric"
+              placeholder="Amount"
+              value={customValue}
+              onChange={(e) => {
+                setCustomValue(e.target.value);
+                setCustomError("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitCustomSnooze();
+                if (e.key === "Escape") closeCustomSnooze();
+              }}
+            />
+
+            <select
+              className="csnooze-modal-select"
+              value={customUnit}
+              onChange={(e) => {
+                setCustomUnit(e.target.value);
+                setCustomError("");
+              }}
+            >
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+          </div>
+
+          {customError && <div className="csnooze-modal-error">{customError}</div>}
+
+          <div className="csnooze-modal-actions">
+            <button className="btn btn-secondary" onClick={closeCustomSnooze} type="button">
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={submitCustomSnooze} type="button">
+              Snooze
+            </button>
+          </div>
         </div>
-      );
-    }
+      </div>
+    )}
+    {/* ✅✅✅ END MODAL */}
+  </div>
+ );
+}
     
     
    // Extra Reminder Times  
@@ -8376,6 +10683,178 @@ const fallbackDom = DateTime.fromISO(date, { zone }).day;
   );
 }
 
+// =========================
+// PLACES AUTOCOMPLETE COMPONENT
+// =========================
+function PlacesAutocomplete({ value, onChange, onPlaceSelect, enabled }) {
+  const [query, setQuery] = useState(value || "");
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [sessionToken] = useState(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now())
+  );
+    const [userLoc, setUserLoc] = useState(null);
+
+  useEffect(() => {
+    if (enabled && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {} // silent fail, backend uses default
+      );
+    }
+  }, [enabled]);
+  const debounceRef = useRef(null);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, []);
+
+  const fetchSuggestions = async (input) => {
+    if (!input || input.length < 2) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await apiCall("/places/autocomplete", {
+        method: "POST",
+                body: JSON.stringify({
+          input,
+          sessionToken,
+          ...(userLoc ? { lat: userLoc.lat, lng: userLoc.lng, radius: 50000 } : {}),
+        }),
+      });
+      const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      setSuggestions(list);
+      setShowDropdown(list.length > 0);
+    } catch (e) {
+      setSuggestions([]);
+      setShowDropdown(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    onChange(val);
+
+    if (!enabled) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 350);
+  };
+
+  const handleSelect = async (suggestion) => {
+    setShowDropdown(false);
+    setQuery(suggestion.text || suggestion.mainText || "");
+    onChange(suggestion.text || suggestion.mainText || "");
+
+    if (!suggestion.placeId) return;
+
+    try {
+      const data = await apiCall("/places/details", {
+        method: "POST",
+        body: JSON.stringify({ placeId: suggestion.placeId, sessionToken }),
+      });
+
+      if (data?.place) {
+        const displayStr = data.place.address || data.place.name || suggestion.text;
+        setQuery(displayStr);
+        onChange(displayStr);
+
+        if (onPlaceSelect) {
+          onPlaceSelect({
+            placeId: data.place.placeId,
+            name: data.place.name,
+            address: data.place.address,
+            lat: data.place.lat,
+            lng: data.place.lng,
+          });
+        }
+      }
+    } catch (e) {
+      // Silent fail on detail fetch; user still has the text
+    }
+  };
+
+  if (!enabled) {
+    return (
+      <input
+        type="text"
+        className="form-input"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          onChange(e.target.value);
+        }}
+        placeholder="Add location"
+      />
+    );
+  }
+
+  return (
+    <div className="places-autocomplete-wrap" ref={wrapRef}>
+      <input
+        type="text"
+        className="form-input"
+        value={query}
+        onChange={handleInput}
+        onFocus={() => {
+          if (suggestions.length > 0) setShowDropdown(true);
+        }}
+        placeholder="Search for a place..."
+        autoComplete="off"
+      />
+
+      {showDropdown && (
+        <div className="places-suggestions">
+          {loading && <div className="places-loading-row">Searching...</div>}
+
+          {suggestions.map((s, idx) => (
+            <div
+              key={s.placeId || idx}
+              className="places-suggestion-item"
+              onClick={() => handleSelect(s)}
+            >
+              <div className="places-suggestion-main">
+                {s.mainText || s.text}
+              </div>
+              {s.secondaryText && (
+                <div className="places-suggestion-secondary">
+                  {s.secondaryText}
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div className="places-powered">Powered by Google</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 // Event Modal
@@ -8386,12 +10865,19 @@ function EventModal({ event, selectedDate, userTimezone, onClose, onSave }) {
   const [time, setTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [allDay, setAllDay] = useState(event?.allDay || false);
+const [meetingUrl, setMeetingUrl] = useState(event?.meetingUrl || "");
   const [location, setLocation] = useState(event?.location || '');
   
   // EVENT SHARE STATE
   const [shareModalOpen, setShareModalOpen] = useState(false);
 const [shareToken, setShareToken] = useState("");
 const [shareLoading, setShareLoading] = useState(false);
+
+  // Places autocomplete state
+  const [placesEnabled, setPlacesEnabled] = useState(false);
+  const [locationPlaceId, setLocationPlaceId] = useState(event?.locationPlaceId || null);
+  const [locationCoords, setLocationCoords] = useState(event?.locationCoords || null);
+
 
   // Reminder UI state (default OFF)
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -8447,43 +10933,64 @@ const [shareLoading, setShareLoading] = useState(false);
     };
   }, []);
 
-  useEffect(() => {
-    // -----------------------------
-    // Base event fields
-    // -----------------------------
-    if (event) {
-      const d = new Date(event.startDate);
-setDate(dateInputValue(d, userTimezone));
-setTime(timeInputValue(d, userTimezone));
-      setAllDay(!!event.allDay);
-      setLocation(event.location || '');
-      setDescription(event.description || '');
-      setTitle(event.title || '');
+useEffect(() => {
+  // -----------------------------
+  // Base event fields
+  // -----------------------------
+  if (event) {
+    const d = new Date(event.startDate);
+    setDate(dateInputValue(d, userTimezone));
+    setTime(timeInputValue(d, userTimezone));
+    setAllDay(!!event.allDay);
 
-      if (event.endDate) {
-        const e = new Date(event.endDate);
-        setEndTime(e.toTimeString().slice(0, 5));
-      } else {
-        setEndTime('');
-      }
-    } else if (selectedDate) {
-setDate(dateInputValue(selectedDate, userTimezone));
-      setTime('09:00');
-      setEndTime('10:00');
-      setAllDay(false);
-      setLocation('');
-      setDescription('');
-      setTitle('');
+    // NEW: meeting url
+    setMeetingUrl(event.meetingUrl || '');
+
+    setLocation(event.location || '');
+    setLocationPlaceId(event.locationPlaceId || null);
+    setLocationCoords(event.locationCoords || null);
+    setPlacesEnabled(!!(event.locationPlaceId));
+    setDescription(event.description || '');
+    setTitle(event.title || '');
+
+    if (event.endDate) {
+      const e = new Date(event.endDate);
+      setEndTime(e.toTimeString().slice(0, 5));
     } else {
-      const now = new Date();
-      setDate(now.toISOString().split('T')[0]);
-      setTime('09:00');
-      setEndTime('10:00');
-      setAllDay(false);
-      setLocation('');
-      setDescription('');
-      setTitle('');
+      setEndTime('');
     }
+  } else if (selectedDate) {
+    setDate(dateInputValue(selectedDate, userTimezone));
+    setTime('09:00');
+    setEndTime('10:00');
+    setAllDay(false);
+
+    // NEW: meeting url
+    setMeetingUrl('');
+
+    setLocation('');
+    setLocationPlaceId(null);
+    setLocationCoords(null);
+    setPlacesEnabled(false);
+    setDescription('');
+    setTitle('');
+  } else {
+    const now = new Date();
+    setDate(now.toISOString().split('T')[0]);
+    setTime('09:00');
+    setEndTime('10:00');
+    setAllDay(false);
+
+    // NEW: meeting url
+    setMeetingUrl('');
+
+    setLocation('');
+    setLocationPlaceId(null);
+    setLocationCoords(null);
+    setPlacesEnabled(false);
+    setDescription('');
+    setTitle('');
+  }
 
     // -----------------------------
     // Reminder defaults + prefill
@@ -8571,7 +11078,7 @@ setRepeatInterval(intervalStr);
         }
       }
     }
-  }, [event, selectedDate]);
+}, [event, selectedDate]);
   
   useEffect(() => {
   if (
@@ -8695,16 +11202,22 @@ if (repeatEndKind === "count") {
       };
     }
 
-    await onSave({
-      title,
-      description,
-      startDate: startISO,
-endDate: endISO || undefined,
-      allDay,
-      location,
-      reminder: reminderPayload,
-      recurrence,
-    });
+await onSave({
+  title,
+  description,
+  startDate: startISO,
+  endDate: endISO || undefined,
+  allDay,
+
+  meetingUrl: meetingUrl ? String(meetingUrl).trim() : "",
+
+  location,
+  locationPlaceId: locationPlaceId || null,
+  locationCoords: locationCoords || null,
+
+  reminder: reminderPayload,
+  recurrence,
+});
   };
 
   const ReminderModeButton = ({ value, label }) => {
@@ -8859,16 +11372,61 @@ const toggleWeekday = (idx) => {
             </div>
           )}
 
-          <div className="form-group">
-            <label className="form-label">Location</label>
-            <input
-              type="text"
-              className="form-input"
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              placeholder="Add location"
-            />
-          </div>
+<div className="form-group">
+  <label className="form-label">URL</label>
+  <input
+    type="url"
+    className="form-input"
+    value={meetingUrl}
+    onChange={(e) => setMeetingUrl(e.target.value)}
+    placeholder="https://zoom.us/... or https://meet.google.com/..."
+    inputMode="url"
+    autoCapitalize="none"
+    autoCorrect="off"
+    spellCheck={false}
+  />
+  <div className="form-help">
+    Optional. Add a link for an online meeting.
+  </div>
+</div>
+
+<div className="form-group">
+  <label className="form-label">Location</label>
+  <PlacesAutocomplete
+    value={location}
+    onChange={(val) => {
+      setLocation(val);
+      if (!placesEnabled) {
+        setLocationPlaceId(null);
+        setLocationCoords(null);
+      }
+    }}
+    onPlaceSelect={(place) => {
+      setLocationPlaceId(place.placeId || null);
+      setLocationCoords(
+        place.lat != null && place.lng != null
+          ? { lat: place.lat, lng: place.lng }
+          : null
+      );
+    }}
+    enabled={placesEnabled}
+  />
+
+  <label className="checkbox-row checkbox-row--spaced">
+    <input
+      type="checkbox"
+      checked={placesEnabled}
+      onChange={(e) => {
+        setPlacesEnabled(e.target.checked);
+        if (!e.target.checked) {
+          setLocationPlaceId(null);
+          setLocationCoords(null);
+        }
+      }}
+    />
+    <span>Search Google Places</span>
+  </label>
+</div>
 
           {/* =============================
               Reminder section (existing)
@@ -9098,6 +11656,19 @@ const toggleWeekday = (idx) => {
         : formatEventTime(event);
 
       const hasRem = hasReminder(event);
+      
+      const openMeetingUrl = () => {
+  const url = String(event.meetingUrl || "").trim();
+  if (!url) return;
+
+  // Prefer Telegram WebApp openLink if available
+  if (typeof tg !== "undefined" && tg?.openLink) {
+    tg.openLink(url);
+    return;
+  }
+
+  window.open(url, "_blank", "noopener,noreferrer");
+};
 
       return (
         <div className="modal-overlay" onClick={onClose}>
@@ -9122,12 +11693,25 @@ const toggleWeekday = (idx) => {
                 </div>
               )}
 
-              {event.location && (
-                <div className="event-preview-row">
-                  <img src="/icons/location.svg" alt="" />
-                  <span>{event.location}</span>
-                </div>
-              )}
+              {event.meetingUrl && (
+  <div className="event-preview-row">
+    <img src="/icons/url.svg" alt="" />
+    <button
+      type="button"
+      className="event-link-button"
+      onClick={() => tg.openLink(event.meetingUrl)}
+    >
+      Join meeting
+    </button>
+    </div>
+)}
+
+{event.location && (
+  <div className="event-preview-row">
+    <img src="/icons/location.svg" alt="" />
+    <span>{event.location}</span>
+  </div>
+)}
 
               {hasRem && (
                 <div className="event-preview-row">
@@ -9310,6 +11894,80 @@ const data = await apiCall(
 
       const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       const days = getDaysInMonth();
+      
+      // Symbol → SVG map (Calendar specific)
+const CALENDAR_SYMBOL_SVG_MAP = {
+  '♡': (
+    <img
+      className="calendar-inline-svg"
+      src="/icons/heart.svg"
+      alt="♡"
+      width="14"
+      height="14"
+    />
+  ),
+  '✦': (
+    <img
+      className="calendar-inline-svg"
+      src="/icons/sparkle-fill.svg"
+      alt="✦"
+      width="14"
+      height="14"
+    />
+  ),
+  // Add more symbols here as needed
+  '✧': (
+  <img
+    className="calendar-inline-svg"
+    src="/icons/sparkle-line.svg"
+    alt="✧"
+    width="14"
+    height="14"
+  />
+  ),
+  '☆': (
+  <img
+    className="calendar-inline-svg"
+    src="/icons/stars.svg"
+    alt="☆"
+    width="14"
+    height="14"
+  />
+  ),
+  '★': (
+  <img
+    className="calendar-inline-svg"
+    src="/icons/star.svg"
+    alt="★"
+    width="14"
+    height="14"
+  />
+  ),
+};
+
+// Render function
+function renderCalendarInlineSymbols(text) {
+  if (!text) return null;
+
+  const symbolRegex = new RegExp(
+    `(${Object.keys(CALENDAR_SYMBOL_SVG_MAP)
+      .map(s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|")})`,
+    "g"
+  );
+
+  return text.split(symbolRegex).map((part, index) => {
+    if (CALENDAR_SYMBOL_SVG_MAP[part]) {
+      return (
+        <span key={index} className="calendar-inline-wrapper">
+          {CALENDAR_SYMBOL_SVG_MAP[part]}
+        </span>
+      );
+    }
+
+    return <span key={index}>{part}</span>;
+  });
+}
 
       return (
         <div>
@@ -9394,8 +12052,12 @@ const data = await apiCall(
                                       </div>
                                     )}
                                     <div className="calendar-event-title">
-  {(event.title || event.text || event.name || "(untitled)")}
-  {hasReminder(event) && <span className="event-reminder-dot" />}
+  {renderCalendarInlineSymbols(
+    event.title || event.text || event.name || "(untitled)"
+  )}
+  {hasReminder(event) && (
+    <span className="event-reminder-dot" />
+  )}
 </div>
                                     {!event.allDay && (
                                       <div className="calendar-event-time">
@@ -9471,141 +12133,168 @@ const data = await apiCall(
       );
     }
 
-    // Reminders View
+// Reminders View
 function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits, goTo }) {
-      const [reminders, setReminders] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [showHistory, setShowHistory] = useState(false);
-      const [showModal, setShowModal] = useState(false);
-      const [editingReminder, setEditingReminder] = useState(null);
-      const [filter, setFilter] = useState('all');
-      const createReminderRef = useRef(null);
+  const [reminders, setReminders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingReminder, setEditingReminder] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const createReminderRef = useRef(null);
 
-useEffect(() => {
-  if (activeView === "reminders") {
-    loadReminders();
-  }
-}, [showHistory, activeView]);
+  // ── Pagination state ──
+  const [skip, setSkip] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 8;
 
-      const loadReminders = async () => {
-        try {
-          setLoading(true);
-          const data = await apiCall(`/reminders?includeHistory=${showHistory}`);
-          setReminders(data.reminders);
-        } catch (error) {
-          tg.showAlert('Failed to load reminders: ' + error.message);
-        } finally {
-          setLoading(false);
-        }
-      };
+  useEffect(() => {
+    if (activeView === "reminders") {
+      loadReminders();
+    }
+  }, [showHistory, activeView, filter]);
 
-      const handleCreate = () => {
-        setEditingReminder(null);
-        setShowModal(true);
-      };
+  const loadReminders = async (append = false) => {
+    try {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setSkip(0);
+      }
 
-      const handleEdit = (reminder) => {
-        setEditingReminder(reminder);
-        setShowModal(true);
-      };
+      const currentSkip = append ? skip : 0;
+      const data = await apiCall(
+        `/reminders?includeHistory=${showHistory}&limit=${PAGE_SIZE}&skip=${currentSkip}&kind=${filter}`
+      );
 
-      const handleSave = async (data) => {
-        try {
-          if (editingReminder) {
-            await apiCall(`/reminders/${editingReminder._id}`, {
-              method: 'PUT',
-              body: JSON.stringify(data),
-            });
-            tg.showAlert('Reminder updated!');
-          } else {
-            await apiCall('/reminders', {
-              method: 'POST',
-              body: JSON.stringify(data),
-            });
-            tg.showAlert('Reminder created!');
-          }
-          setShowModal(false);
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to save: ' + error.message);
-        }
-      };
+      if (append) {
+        setReminders(prev => [...prev, ...data.reminders]);
+      } else {
+        setReminders(data.reminders);
+      }
 
-      const handleSnooze = async (id, minutes) => {
-        try {
-          await apiCall(`/reminders/${id}/snooze`, {
-            method: 'POST',
-            body: JSON.stringify({ minutes }),
-          });
-          tg.showPopup({ message: `Snoozed for ${minutes} minutes` });
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to snooze: ' + error.message);
-        }
-      };
+      setTotal(data.total || 0);
+      setSkip(currentSkip + data.reminders.length);
+    } catch (error) {
+      tg.showAlert('Failed to load reminders: ' + error.message);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
-      const handleDone = async (id) => {
-        try {
-          await apiCall(`/reminders/${id}/done`, {
-            method: 'POST',
-          });
-          tg.showPopup({ message: 'Marked as done!' });
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to mark as done: ' + error.message);
-        }
-      };
+  const loadMore = () => {
+    loadReminders(true);
+  };
 
-      const handleDelete = async (id) => {
-        try {
-          await apiCall(`/reminders/${id}`, {
-            method: 'DELETE',
-          });
-          tg.showPopup({ message: 'Reminder deleted' });
-          loadReminders();
-        } catch (error) {
-          tg.showAlert('Failed to delete: ' + error.message);
-        }
-      };
+  const handleCreate = () => {
+    setEditingReminder(null);
+    setShowModal(true);
+  };
 
-      const filteredReminders = reminders.filter(r => {
-        if (filter === 'all') return true;
-        return r.schedule?.kind === filter;
+  const handleEdit = (reminder) => {
+    setEditingReminder(reminder);
+    setShowModal(true);
+  };
+
+  const handleSave = async (data) => {
+    try {
+      if (editingReminder) {
+        await apiCall(`/reminders/${editingReminder._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+        tg.showAlert('Reminder updated!');
+      } else {
+        await apiCall('/reminders', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        tg.showAlert('Reminder created!');
+      }
+      setShowModal(false);
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to save: ' + error.message);
+    }
+  };
+
+  const handleSnooze = async (id, minutes) => {
+    try {
+      await apiCall(`/reminders/${id}/snooze`, {
+        method: 'POST',
+        body: JSON.stringify({ minutes }),
       });
+      tg.showPopup({ message: `Snoozed for ${minutes} minutes` });
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to snooze: ' + error.message);
+    }
+  };
 
-      return (
+  const handleDone = async (id) => {
+    try {
+      await apiCall(`/reminders/${id}/done`, {
+        method: 'POST',
+      });
+      tg.showPopup({ message: 'Marked as done!' });
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to mark as done: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await apiCall(`/reminders/${id}`, {
+        method: 'DELETE',
+      });
+      tg.showPopup({ message: 'Reminder deleted' });
+      loadReminders();
+    } catch (error) {
+      tg.showAlert('Failed to delete: ' + error.message);
+    }
+  };
+
+  // No more client-side filtering -- server handles it now
+  const filteredReminders = reminders;
+
+  return (
+    <div>
+      <div className="header">
         <div>
-          <div className="header">
-  <div>
-    <h1>Reminders</h1>
-    {(() => {
-      const name = (userDisplayName || "").trim();
-      return name ? <div className="reminders-greeting">Hello {name}</div> : null;
-    })()}
-  </div>
+          <h1>Reminders</h1>
 
-  <div className="header-actions">
-    {/* CHECKLIST ICON BUTTON */}
-    <button
-      type="button"
-      className="checklist-icon-btn"
-      aria-label="Checklist"
-      title="Checklist"
-      onClick={() => goTo('checklist')}
-    >
-      <img src="/icons/check.svg" alt="" />
-    </button>
+          {(() => {
+            const name = (userDisplayName || "").trim();
+            return name ? <div className="reminders-greeting">Hello {name}</div> : null;
+          })()}
+        </div>
 
-    {/* HABITS ICON BUTTON */}
-    <button
-      type="button"
-      className="habits-icon-btn"
-      aria-label="Habits"
-      title="Habits"
-      onClick={onOpenHabits}
-    >
-      <img src="/icons/plus.svg" alt="" />
-    </button>
+        <div className="header-actions">
+          {/* CHECKLIST ICON BUTTON */}
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Checklist"
+            title="Checklist"
+            onClick={() => goTo('checklist')}
+          >
+            <img src="/icons/check.svg" alt="" />
+          </button>
+
+          {/* HABITS ICON BUTTON */}
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Habits"
+            title="Habits"
+            onClick={onOpenHabits}
+          >
+            <img src="/icons/plus.svg" alt="" />
+          </button>
     
     {/* MOOD ICON BUTTON */}
         <button
@@ -9618,95 +12307,123 @@ useEffect(() => {
       <img src="/icons/bfly.svg" alt="" />
      </button>
 
-    {/* HISTORY TOGGLE */}
-    <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
-      <span>History</span>
-      <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
-    </div>
-  </div>
-</div>
-
-
-          <div className="quick-actions">
-            <div
-              className={`quick-action ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              All
-            </div>
-            <div
-              className={`quick-action ${filter === 'once' ? 'active' : ''}`}
-              onClick={() => setFilter('once')}
-            >
-              Once
-            </div>
-            <div
-              className={`quick-action ${filter === 'daily' ? 'active' : ''}`}
-              onClick={() => setFilter('daily')}
-            >
-              Daily
-            </div>
-            <div
-              className={`quick-action ${filter === 'weekly' ? 'active' : ''}`}
-              onClick={() => setFilter('weekly')}
-            >
-              Weekly
-            </div>
-            <div
-              className={`quick-action ${filter === 'interval' ? 'active' : ''}`}
-              onClick={() => setFilter('interval')}
-            >
-              Interval
-            </div>
+          {/* HISTORY TOGGLE */}
+          <div className="toggle" onClick={() => setShowHistory(!showHistory)}>
+            <span>History</span>
+            <div className={`toggle-switch ${showHistory ? 'active' : ''}`} />
           </div>
-
-          {loading ? (
-            <div className="loading">
-              <div className="spinner" />
-              <div>Loading reminders...</div>
-            </div>
-          ) : filteredReminders.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">
-  <img src="/icons/journal.svg" alt="" />
-</div>
-              <div className="empty-state-text">
-                {filter === 'all'
-                  ? 'No reminders yet.\nTap the + button to create one!'
-                  : `No ${filter} reminders found.`}
-              </div>
-            </div>
-          ) : (
-            filteredReminders.map(reminder => (
-              <ReminderCard
-                key={reminder._id}
-                reminder={reminder}
-                onEdit={handleEdit}
-                onSnooze={handleSnooze}
-                onDone={handleDone}
-                onDelete={handleDelete}
-              />
-            ))
-          )}
-
-<button
-  ref={createReminderRef}
-  data-create-reminder="1"
-  onClick={handleCreate}
-  className="is-hidden"
-/>
-
-          {showModal && (
-  <ReminderModal
-    reminder={editingReminder}
-    onClose={() => setShowModal(false)}
-    onSave={handleSave}
-    userTimezone={userTimezone}
-  />
-)}
         </div>
-      );
-    }
+      </div>
+
+      <div className="reminder-quick-actions">
+        <div
+          className={`reminder-quick-action ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          All
+        </div>
+        <div
+          className={`reminder-quick-action ${filter === 'once' ? 'active' : ''}`}
+          onClick={() => setFilter('once')}
+        >
+          Once
+        </div>
+        <div
+          className={`reminder-quick-action ${filter === 'daily' ? 'active' : ''}`}
+          onClick={() => setFilter('daily')}
+        >
+          Daily
+        </div>
+        <div
+          className={`reminder-quick-action ${filter === 'weekly' ? 'active' : ''}`}
+          onClick={() => setFilter('weekly')}
+        >
+          Weekly
+        </div>
+        <div
+          className={`reminder-quick-action ${filter === 'monthly' ? 'active' : ''}`}
+          onClick={() => setFilter('monthly')}
+        >
+          Monthly
+        </div>
+        <div
+          className={`reminder-quick-action ${filter === 'yearly' ? 'active' : ''}`}
+          onClick={() => setFilter('yearly')}
+        >
+          Yearly
+        </div>
+        <div
+          className={`reminder-quick-action ${filter === 'interval' ? 'active' : ''}`}
+          onClick={() => setFilter('interval')}
+        >
+          Interval
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">
+          <div className="spinner" />
+          <div>Loading reminders...</div>
+        </div>
+      ) : filteredReminders.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <img src="/icons/journal.svg" alt="" />
+          </div>
+          <div className="empty-state-text">
+            {filter === 'all'
+              ? 'No reminders yet.\nTap the + button to create one!'
+              : `No ${filter} reminders.`}
+          </div>
+        </div>
+      ) : (
+        <>
+          {filteredReminders.map(r => (
+            <ReminderCard
+              key={r._id}
+              reminder={r}
+              onEdit={handleEdit}
+              onSnooze={handleSnooze}
+              onDone={handleDone}
+              onDelete={handleDelete}
+              userTimezone={userTimezone}
+            />
+          ))}
+
+          {/* Load More button */}
+          {filteredReminders.length < total && (
+            <div className="load-more-container">
+              <button
+                className="btn btn-secondary load-more-btn"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      <button
+        className="is-hidden"
+        ref={createReminderRef}
+        data-create-reminder="1"
+        onClick={handleCreate}
+      />
+
+      {showModal && (
+        <ReminderModal
+          reminder={editingReminder}
+          onClose={() => setShowModal(false)}
+          onSave={handleSave}
+          userTimezone={userTimezone}
+        />
+      )}
+    </div>
+  );
+}
+
     
     // SETTINGS VIEW
 function SettingsView({ onBack }) {
