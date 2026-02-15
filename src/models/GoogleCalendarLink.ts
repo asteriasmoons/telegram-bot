@@ -8,6 +8,9 @@ export type GoogleCalendarLinkDoc = {
   accessToken?: string | null;     // optional cache
   expiryDate?: number | null;      // ms epoch
 
+  // user info (nice for UI)
+  email?: string | null;
+
   // which calendar to write into (default primary)
   calendarId: string;
 
@@ -23,8 +26,9 @@ const GoogleCalendarLinkSchema = new Schema<GoogleCalendarLinkDoc>(
     accessToken: { type: String, required: false, default: null },
     expiryDate: { type: Number, required: false, default: null },
 
+    email: { type: String, required: false, default: null },
+
     calendarId: { type: String, required: true, default: "primary" },
-  },
   { timestamps: true }
 );
 

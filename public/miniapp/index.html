@@ -12535,16 +12535,15 @@ const connectGoogle = async () => {
     setGcalLoading(true);
 
     // backend should return: { url: "https://accounts.google.com/o/oauth2/..." }
-    const data = await apiCall(`/cal/google/auth`);
-    const url = data?.url;
+const data = await apiCall(`/cal/google/connect`);
+    const url = String(data?.url || "");
 
-    if (!url) {
-      tg.showAlert("No auth URL returned from server.");
-      return;
-    }
+if (!/^https?:\/\//i.test(url)) {
+  tg.showAlert(`Bad auth URL from server:\n${url || "(empty)"}`);
+  return;
+}
 
-    // Open OAuth in Telegram's in-app browser
-    tg.openLink(url);
+tg.openLink(url);
   } catch (e) {
     setGcalError(e?.message || "Failed to start Google auth.");
   } finally {

@@ -1,12 +1,38 @@
 import { Router } from "express";
 import { Event } from "../models/Event";
 import { UserSettings } from "../models/UserSettings";
-import { getGoogleAuthUrl, handleGoogleCallback, googleStatus, googleDisconnect } from "../integrations/google-calendar";
+import {
+  getGoogleAuthUrl,
+  handleGoogleCallback,
+  googleStatus,
+  googleDisconnect,
+  googleListCalendars,
+  googleSetCalendar,
+} from "../integrations/google-calendar";
 import { DateTime } from "luxon";
 
 const router = Router();
 
-// GET /api/miniapp/cal/google/connect
+/**
+ * GOOGLE CONNECT
+ * Your frontend calls /cal/google/auth
+ * Your earlier backend used /google/connect
+ * We support BOTH so you don’t have to chase strings.
+ */
+
+// GET /api/miniapp/cal/google/auth  (alias)
+router.get("/google/auth", async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const url = getGoogleAuthUrl(userId);
+    return res.json({ url });
+  } catch (err: any) {
+    console.error("google auth error:", err.message);
+    return res.status(500).json({ error: "Failed to start Google auth" });
+  }
+});
+
+// GET /api/miniapp/cal/google/connect (same as auth)
 router.get("/google/connect", async (req, res) => {
   try {
     const userId = req.userId!;
@@ -31,10 +57,7 @@ router.get("/google/callback", async (req, res) => {
 
     await handleGoogleCallback(code, userIdFromState);
 
-    // This is a miniapp: easiest is to show a simple success page
-    return res
-      .status(200)
-      .send("Google Calendar connected. You can return to the mini app.");
+    return res.status(200).send("Google Calendar connected. You can return to the mini app.");
   } catch (err: any) {
     console.error("google callback error:", err.message);
     return res.status(500).send("Failed to connect Google Calendar");
@@ -43,19 +66,62 @@ router.get("/google/callback", async (req, res) => {
 
 // GET /api/miniapp/cal/google/status
 router.get("/google/status", async (req, res) => {
-  const userId = req.userId!;
-  const st = await googleStatus(userId);
-  return res.json(st);
+  try {
+    const userId = req.userId!;
+    const st = await googleStatus(userId);
+    return res.json(st);
+  } catch (err: any) {
+    console.error("google status error:", err.message);
+    return res.status(500).json({ error: "Failed to load status" });
+  }
+});
+
+// GET /api/miniapp/cal/google/calendars
+router.get("/google/calendars", async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const out = await googleListCalendars(userId);
+    return res.json(out);
+  } catch (err: any) {
+    console.error("google calendars error:", err.message);
+    return res.status(500).json({ error: "Failed to load calendars" });
+  }
+});
+
+// PUT /api/miniapp/cal/google/calendar  body: { calendarId }
+router.put("/google/calendar", async (req, res) => {
+  try {
+    const userId = req.userId!;
+    const calendarId = String(req.body?.calendarId || "");
+
+    if (!calendarId) {
+      return res.status(400).json({ error: "calendarId required" });
+    }
+
+    await googleSetCalendar(userId, calendarId);
+    return res.json({ ok: true, selectedCalendarId: calendarId });
+  } catch (err: any) {
+    console.error("google set calendar error:", err.message);
+    return res.status(500).json({ error: "Failed to save selected calendar" });
+  }
 });
 
 // POST /api/miniapp/cal/google/disconnect
 router.post("/google/disconnect", async (req, res) => {
-  const userId = req.userId!;
-  await googleDisconnect(userId);
-  return res.json({ ok: true });
+  try {
+    const userId = req.userId!;
+    await googleDisconnect(userId);
+    return res.json({ ok: true });
+  } catch (err: any) {
+    console.error("google disconnect error:", err.message);
+    return res.status(500).json({ error: "Failed to disconnect" });
+  }
 });
 
-// GET /api/miniapp/cal/ical/:eventId  (iOS calendar button)
+/**
+ * iOS calendar button (.ics download)
+ * GET /api/miniapp/cal/ical/:eventId
+ */
 router.get("/ical/:eventId", async (req, res) => {
   try {
     const userId = req.userId!;
@@ -82,20 +148,22 @@ router.get("/ical/:eventId", async (req, res) => {
     lines.push(`UID:${uid}`);
     lines.push(`DTSTAMP:${dtstamp}`);
 
-    if (event.allDay) {
-      const startKey = DateTime.fromJSDate(new Date(event.startDate), { zone: tz }).toFormat("yyyyMMdd");
+    if ((event as any).allDay) {
+      const startKey = DateTime.fromJSDate(new Date((event as any).startDate), { zone: tz }).toFormat("yyyyMMdd");
       lines.push(`DTSTART;VALUE=DATE:${startKey}`);
 
-      // iCal all-day end is exclusive too
-      const endKey = event.endDate
-        ? DateTime.fromJSDate(new Date(event.endDate), { zone: tz }).plus({ days: 1 }).toFormat("yyyyMMdd")
-        : DateTime.fromJSDate(new Date(event.startDate), { zone: tz }).plus({ days: 1 }).toFormat("yyyyMMdd");
+      const endKey = (event as any).endDate
+        ? DateTime.fromJSDate(new Date((event as any).endDate), { zone: tz }).plus({ days: 1 }).toFormat("yyyyMMdd")
+        : DateTime.fromJSDate(new Date((event as any).startDate), { zone: tz }).plus({ days: 1 }).toFormat("yyyyMMdd");
 
       lines.push(`DTEND;VALUE=DATE:${endKey}`);
     } else {
-      const startUtc = DateTime.fromJSDate(new Date(event.startDate), { zone: tz }).toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'");
-      const endUtc = event.endDate
-        ? DateTime.fromJSDate(new Date(event.endDate), { zone: tz }).toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'")
+      const startUtc = DateTime.fromJSDate(new Date((event as any).startDate), { zone: tz })
+        .toUTC()
+        .toFormat("yyyyMMdd'T'HHmmss'Z'");
+
+      const endUtc = (event as any).endDate
+        ? DateTime.fromJSDate(new Date((event as any).endDate), { zone: tz }).toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'")
         : startUtc;
 
       lines.push(`DTSTART:${startUtc}`);
@@ -106,7 +174,7 @@ router.get("/ical/:eventId", async (req, res) => {
     if (desc) lines.push(`DESCRIPTION:${desc.replace(/\r?\n/g, "\\n")}`);
     if (loc) lines.push(`LOCATION:${loc}`);
 
-    // Simple RRULE export (optional; works for your recurrence model)
+    // Optional RRULE export
     if ((event as any).recurrence?.freq) {
       const r = (event as any).recurrence;
       const freq = String(r.freq).toUpperCase();
@@ -145,7 +213,7 @@ router.get("/ical/:eventId", async (req, res) => {
     const ics = lines.join("\r\n");
 
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="event-${String(event._id)}.ics"`);
+    res.setHeader("Content-Disposition", `attachment; filename="event-${String((event as any)._id)}.ics"`);
     return res.send(ics);
   } catch (err: any) {
     console.error("ical error:", err.message);
