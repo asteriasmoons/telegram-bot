@@ -11672,7 +11672,7 @@ const toggleWeekday = (idx) => {
 
 const addToIosCalendar = () => {
   if (!event?._id) return;
-  const url = `/cal/ical/${event._id}`; // miniapp base path handled by apiCall host / proxy
+  const url = `/cal/cal/ical/${event._id}`; // miniapp base path handled by apiCall host / proxy
 
   // If you need full absolute URL, use your api base instead:
   // const url = `${API_BASE}/api/miniapp/cal/ical/${event._id}`;
@@ -12506,7 +12506,7 @@ if (qh) {
   const loadGoogleStatus = async () => {
   try {
     setGcalError("");
-    const data = await apiCall(`/cal/google/status`);
+    const data = await apiCall(`/cal/cal/google/status`);
     setGcalConnected(!!data?.connected);
     setGcalEmail(String(data?.email || ""));
     setGcalCalendarId(String(data?.selectedCalendarId || ""));
@@ -12521,7 +12521,7 @@ if (qh) {
 const loadGoogleCalendars = async () => {
   try {
     setGcalError("");
-    const data = await apiCall(`/cal/google/calendars`);
+    const data = await apiCall(`/cal/cal/google/calendars`);
     setGcalCalendars(Array.isArray(data?.calendars) ? data.calendars : []);
   } catch (e) {
     setGcalError(e?.message || "Failed to load calendars.");
@@ -12535,7 +12535,7 @@ const connectGoogle = async () => {
     setGcalLoading(true);
 
     // backend should return: { url: "https://accounts.google.com/o/oauth2/..." }
-    const data = await apiCall(`/cal/google/auth`);
+    const data = await apiCall(`/cal/cal/google/auth`);
     const url = data?.url;
 
     if (!url) {
@@ -12556,7 +12556,7 @@ const disconnectGoogle = async () => {
   try {
     setGcalError("");
     setGcalLoading(true);
-    await apiCall(`/cal/google/disconnect`, { method: "POST" });
+    await apiCall(`/cal/cal/google/disconnect`, { method: "POST" });
     setGcalConnected(false);
     setGcalEmail("");
     setGcalCalendars([]);
@@ -12573,7 +12573,7 @@ const saveSelectedCalendar = async (calendarId) => {
   try {
     setGcalError("");
     setGcalLoading(true);
-    await apiCall(`/cal/google/calendar`, {
+    await apiCall(`/cal/cal/google/calendar`, {
       method: "PUT",
       body: JSON.stringify({ calendarId }),
     });
