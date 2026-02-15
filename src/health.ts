@@ -82,6 +82,9 @@ export async function startServer({ bot, webhookPath }: StartServerOpts) {
   const app = express();
 
   app.use(express.json({ limit: "1mb" }));
+  
+  console.log("GOOGLE_REDIRECT_URI:", process.env.GOOGLE_REDIRECT_URI);
+
 
   // Health
   app.get("/health", (_req, res) => res.status(200).send("ok"));
