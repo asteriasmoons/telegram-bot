@@ -29,6 +29,7 @@ const GoogleCalendarLinkSchema = new Schema<GoogleCalendarLinkDoc>(
     email: { type: String, required: false, default: null },
 
     calendarId: { type: String, required: true, default: "primary" },
+  },
   { timestamps: true }
 );
 
