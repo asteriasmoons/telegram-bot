@@ -4964,6 +4964,38 @@ Fixes: vertical list, lost pill styling, spacing to first card
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
+
+/* ===== MODAL VS BOTTOM NAV + FAB (FIX CLIPPING) ===== */
+/* Your FAB is anchored above a 96px bottom nav zone. Reserve that space for modals too. */
+:root {
+  --bottom-nav-h: 96px;  /* matches .fab bottom calc(96px + safe-area) */
+  --modal-gutter: 24px;
+}
+
+/* Give the overlay real bottom room so the modal can scroll fully above nav/FAB */
+.modal-overlay.modal-overlay {
+  padding-bottom: calc(
+    var(--modal-gutter)
+    + env(safe-area-inset-bottom, 0px)
+    + var(--bottom-nav-h)
+  ) !important;
+}
+
+/* Reduce modal max-height by the bottom nav height so it never sits underneath it */
+.modal.modal {
+  max-height: calc(
+    var(--tg-viewport-height, 100dvh)
+    - (var(--modal-gutter) * 2)
+    - env(safe-area-inset-top, 0px)
+    - env(safe-area-inset-bottom, 0px)
+    - var(--bottom-nav-h)
+  ) !important;
+}
+
+/* (Optional but usually helps) If actions are at the bottom, keep them from kissing the edge */
+.modal.modal > .modal-actions {
+  padding-bottom: 8px !important;
+}
 </style>
 </head>
 
