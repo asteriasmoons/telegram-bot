@@ -5357,6 +5357,34 @@ Fixes: vertical list, lost pill styling, spacing to first card
   color: rgba(255, 255, 255, 0.9) !important;
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
+
+/* ------ CHECKLIST MODAL FIX ------- */
+/* Only affects the FAB-triggered modals */
+.checklist-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 18px;
+  padding-top: calc(18px + env(safe-area-inset-top));
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* The modal card itself inside those overlays */
+.checklist-modal-overlay .checklist-modal {
+  width: min(680px, 100%);
+  max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
 </style>
 </head>
 
@@ -7770,8 +7798,8 @@ const [text, setText] = useState(item && item.text ? item.text : '');
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+    <div className="checklist-modal-overlay" onClick={onClose}>
+      <div className="checklist-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{item ? 'Edit Item' : 'New Item'}</h2>
           <button className="modal-close" type="button" onClick={onClose}>×</button>
