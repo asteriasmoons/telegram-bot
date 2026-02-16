@@ -5105,6 +5105,108 @@ body.modal-open .app-content {
 body.modal-open {
   overflow: hidden !important;
 }
+
+/* =========================================================
+   MODAL CHECKBOX REFINEMENT (Custom Glass Toggle Style)
+   Paste at VERY END
+   ---------------------------------------------------------
+   DELETE elsewhere:
+   - Any .modal input[type="checkbox"] rules
+   - Any .checkbox-row / .form-checkbox-row spacing hacks
+   ========================================================= */
+
+/* Row alignment: checkbox + label should feel like one unit */
+.modal .checkbox-row,
+.modal .form-checkbox,
+.modal label:has(input[type="checkbox"]) {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  cursor: pointer !important;
+}
+
+/* Remove ugly default checkbox appearance */
+.modal input[type="checkbox"] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(6px) !important;
+
+  display: inline-grid !important;
+  place-content: center !important;
+
+  transition: all 160ms ease !important;
+  cursor: pointer !important;
+}
+
+/* Hover state */
+.modal input[type="checkbox"]:hover {
+  border-color: rgba(91, 141, 239, 0.55) !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Checked state */
+.modal input[type="checkbox"]:checked {
+  border-color: rgba(91, 141, 239, 0.85) !important;
+  background: linear-gradient(
+    135deg,
+    #e019d4 0%,
+    #8000fe 50%,
+    #00dbff 100%
+  ) !important;
+
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18) !important;
+}
+
+/* Checkmark */
+.modal input[type="checkbox"]::after {
+  content: "" !important;
+  width: 10px !important;
+  height: 10px !important;
+  transform: scale(0) rotate(45deg) !important;
+  transition: transform 140ms ease !important;
+
+  border-right: 2px solid white !important;
+  border-bottom: 2px solid white !important;
+}
+
+.modal input[type="checkbox"]:checked::after {
+  transform: scale(1) rotate(45deg) !important;
+}
+
+/* Label text beside checkbox */
+.modal input[type="checkbox"] + span,
+.modal input[type="checkbox"] + label,
+.modal .checkbox-label {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  letter-spacing: 0.2px !important;
+}
+
+/* Make the entire label clickable if wrapped */
+.modal label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  cursor: pointer !important;
+}
+
+/* Optional: slightly soften section labels like REMINDER / REPEAT */
+.modal .section-label {
+  font-size: 12px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+}
 </style>
 </head>
 
