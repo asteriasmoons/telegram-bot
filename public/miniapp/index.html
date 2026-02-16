@@ -4870,13 +4870,6 @@ video {
   max-height: none !important;
 }
 
-/* If any nested wrapper was forcing overflow visible, kill it */
-.modal-body * ,
-.modal-inner * ,
-[class*="-modal"] .modal-body * {
-  overflow-x: hidden;
-}
-
 /* Prevent background scroll when modal open (safe + stable) */
 body.modal-open {
   overflow: hidden !important;
@@ -5356,10 +5349,6 @@ Fixes: vertical list, lost pill styling, spacing to first card
   background: rgba(255, 255, 255, 0.12) !important;
   color: rgba(255, 255, 255, 0.9) !important;
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
-}
-
-.checklist-modal {
-  margin-bottom: env(safe-area-inset-bottom);
 }
 </style>
 </head>
@@ -7787,14 +7776,14 @@ const [text, setText] = useState(item && item.text ? item.text : '');
   };
 
   return (
-    <div className="checklist-modal-overlay" onClick={onClose}>
-      <div className="checklist-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="header">
           <h2>{item ? 'Edit Item' : 'New Item'}</h2>
           <button className="modal-close" type="button" onClick={onClose}>×</button>
         </div>
 
-        <div className="checklist-modal-body">
+        <div className="modal-body">
           <div className="form-group">
             <label className="form-label">Text</label>
             <textarea
@@ -7807,7 +7796,7 @@ const [text, setText] = useState(item && item.text ? item.text : '');
           </div>
         </div>
 
-        <div className="checklist-modal-actions">
+        <div className="modal-actions">
           <button className="btn btn-secondary" type="button" onClick={onClose}>
   Cancel
 </button>
