@@ -4996,6 +4996,111 @@ Fixes: vertical list, lost pill styling, spacing to first card
 .modal.modal > .modal-actions {
   padding-bottom: 8px !important;
 }
+
+/* =========================================================
+   NUCLEAR MODAL OVERRIDE: WIN AGAINST ALL APP PADDING/NAV/FAB
+   Paste at VERY BOTTOM of CSS
+   ========================================================= */
+
+/* -------- A) When any modal is present, hide UI that can cover it -------- */
+html:has(.modal-overlay),
+body:has(.modal-overlay) {
+  overflow: hidden !important;
+}
+
+/* Hide bottom nav + FAB + any floating buttons while modal is open */
+body:has(.modal-overlay) .bottom-nav,
+body:has(.modal-overlay) .fab,
+body:has(.modal-overlay) .fab-button,
+body:has(.modal-overlay) .floating-action-button,
+body:has(.modal-overlay) [class*="fab"],
+body:has(.modal-overlay) [class*="floating"] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* -------- B) Remove ALL bottom padding reserved for nav while modal is open -------- */
+/* This is the part you called out: it stomps your multiple .app / #root padding rules */
+body:has(.modal-overlay) #root,
+body:has(.modal-overlay) .app,
+body:has(.modal-overlay) .app-container,
+body:has(.modal-overlay) .app-content,
+body:has(.modal-overlay) .page,
+body:has(.modal-overlay) .content,
+body:has(.modal-overlay) main {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* If you use CSS vars for nav height anywhere, kill them during modal */
+body:has(.modal-overlay) {
+  --bottom-nav-h: 0px !important;
+  --nav-h: 0px !important;
+}
+
+/* -------- C) Hard-override the overlay + modal geometry -------- */
+/* Overlay: fixed, full screen, only safe-area padding */
+.modal-overlay.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999999 !important;
+
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  /* Safe-area aware padding only (NOT nav-aware) */
+  padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+  padding-right: 16px !important;
+  padding-left: 16px !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+
+  box-sizing: border-box !important;
+
+  /* Let overlay scroll if needed (NOT the page underneath) */
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+
+  /* background is whatever you already have; leaving as-is */
+}
+
+/* Modal: size against viewport; never rely on app padding */
+.modal.modal {
+  width: min(520px, 100%) !important;
+  margin: 0 !important;
+
+  /* Fit within overlay padding */
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+}
+
+/* Ensure header/actions don't collapse, body scrolls */
+.modal.modal > .modal-header {
+  flex: 0 0 auto !important;
+}
+.modal.modal > .modal-actions {
+  flex: 0 0 auto !important;
+}
+.modal.modal > .modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Safety: stop random container rules from messing with modal internals */
+.modal.modal * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 </style>
 </head>
 
