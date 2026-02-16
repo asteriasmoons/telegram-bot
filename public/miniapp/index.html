@@ -4877,6 +4877,151 @@ body.modal-open .floating-action-button {
 body.modal-open .app-content {
   overflow: hidden !important;
 }
+
+/* =========================================================
+   RESTORE MODAL LOOK (VISUAL ONLY -- DOES NOT CHANGE GEOMETRY)
+   Paste at VERY END of CSS
+   ========================================================= */
+
+/* --- Overlay tint (keep your existing if you like; this is safe) --- */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
+/* --- Modal glass look (visual only) --- */
+.modal {
+  /* Keep your blur/glass vibe */
+  background: rgba(18, 10, 38, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55) !important;
+  border-radius: 20px !important;
+
+  /* Important: DO NOT set position/overflow/flex sizing here.
+     Those belong in your "modal mechanics" block. */
+}
+
+/* --- Modal header spacing + divider --- */
+.modal-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+
+  padding-bottom: 14px !important;
+  margin-bottom: 14px !important;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.modal-header h2,
+.modal-header h3 {
+  margin: 0 !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+
+  /* keep your "pretty heading" vibe */
+  background: linear-gradient(135deg, #e019d4 0%, #8000fe 50%, #00dbff 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* --- Close button styling (the little X) --- */
+/* DELETE elsewhere: any .modal-close / .close-btn / .modal-header button rules */
+.modal-close,
+.modal-header button,
+.modal .close-btn {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  color: rgba(255, 255, 255, 0.85) !important;
+  cursor: pointer !important;
+}
+
+.modal-close:hover,
+.modal-header button:hover,
+.modal .close-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(91, 141, 239, 0.35) !important;
+}
+
+/* --- Modal body text --- */
+.modal-body {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+/* --- Form fields inside modals (visual only) --- */
+/* DELETE elsewhere: any .modal input/select/textarea blocks that set widths weirdly */
+.modal .form-input,
+.modal .form-textarea,
+.modal .form-select,
+.modal input,
+.modal textarea,
+.modal select {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+
+  border-radius: 12px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10) !important;
+}
+
+.modal .form-input:focus,
+.modal .form-textarea:focus,
+.modal .form-select:focus,
+.modal input:focus,
+.modal textarea:focus,
+.modal select:focus {
+  outline: none !important;
+  border-color: rgba(91, 141, 239, 0.60) !important;
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+}
+
+/* --- Modal actions row (buttons) --- */
+.modal-actions {
+  margin-top: 16px !important;
+  padding-top: 14px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+
+  display: flex !important;
+  gap: 10px !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+}
+
+/* Buttons inside modals should keep your existing .btn styling.
+   This just ensures they don’t shrink into weird pills. */
+.modal-actions .btn {
+  flex: 0 0 auto !important;
+  min-width: 120px !important;
+}
+
+/* --- iOS: prevent "weird default" button rendering in modals --- */
+.modal button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+/* When modal is open: stop underlying scroll */
+body.modal-open {
+  overflow: hidden !important;
+}
 </style>
 </head>
 
