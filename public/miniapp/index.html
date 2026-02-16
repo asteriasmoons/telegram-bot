@@ -305,37 +305,6 @@ body::after {
 }
 
 /* =========================================================
-   APP LAYOUT
-   ========================================================= */
-#root {
-  height: 100%;
-  min-height: 0;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
-}
-
-.app-shell {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.app-content {
-  flex: 1;
-  min-height: 0;                 /* critical for nested flex scrolling */
-  overflow-y: auto;
-  overflow-x: hidden;            /* KEY: no sideways scroll */
-  -webkit-overflow-scrolling: touch;
-
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-
-  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
-  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
-
-  overscroll-behavior: contain;  /* reduces iOS rubber-band weirdness */
-}
-/* =========================================================
    BOTTOM NAV
    ========================================================= */
 .bottom-nav {
@@ -984,12 +953,6 @@ body::after {
 .form-select:focus {
   outline: none;
   border-color: var(--accent);
-}
-
-.modal-actions .btn {
-  flex: 1;
-  justify-content: center;
-  padding: 12px;
 }
 
 /* ---- iOS time/date input normalization ---- */
@@ -3496,50 +3459,6 @@ opacity: 1;
   transform: translateY(-1px);
 }
 
-/* =========================
-   MODAL: SCROLL FIX (iOS-safe)
-   ========================= */
-
-/* ===== FULL MODAL RESET FIX ===== */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 16px;
-  background: rgba(0,0,0,0.45);
-  z-index: 2000;
-}
-
-.modal {
-  width: min(500px, 92vw);
-  max-height: calc(100dvh - 32px); /* TRUE mobile viewport */
-  border-radius: 20px;
-  padding: 24px;
-
-  display: flex;
-  flex-direction: column;
-
-  overflow-y: auto; /* THE MODAL scrolls */
-  overflow-x: hidden;
-
-  -webkit-overflow-scrolling: touch;
-}
-
-.modal-body {
-  flex: 0 0 auto; /* REMOVE flex stretching */
-  min-height: auto;
-  overflow: visible; /* body does NOT scroll */
-  padding: 0;
-}
-
-.modal-header,
-.modal-actions {
-  flex-shrink: 0;
-}
-
 /* =========================================
    FIX: Intention textarea getting clipped
    File: index.html (your main CSS)
@@ -3567,71 +3486,6 @@ opacity: 1;
 .intention-textarea {
   box-sizing: border-box;
   display: block;
-}
-
-/* ==============================
-   HARD STOP: horizontal app drift
-   (keeps Telegram safe vars)
-   ============================== */
-
-/* Document never scrolls (prevents sideways panning) */
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden !important;
-  overscroll-behavior: none;
-  touch-action: pan-y;
-  margin: 0;
-}
-
-/* App shell is the fixed viewport */
-.app-shell {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden !important;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Only this scrolls vertically */
-.app-content {
-  flex: 1;
-  min-height: 0;
-
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-  overscroll-behavior-x: none;
-
-  touch-action: pan-y;
-
-  /* ✅ KEEP YOUR SAFE VARS (full-screen + safe areas) */
-  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
-  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
-}
-
-/* Stop any child from forcing horizontal overflow */
-.app-content,
-.app-content * {
-  max-width: 100%;
-}
-
-img, svg, video, canvas {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Flex overflow insurance (prevents "push width" bugs) */
-.app-content * {
-  min-width: 0;
 }
 
 /* =========================================
@@ -3736,7 +3590,6 @@ img, svg, video, canvas {
   flex: 0 0 auto;
   opacity: 0.95;
 }
-
 
 /* ==========================================================
 LYSTARIA -- MASTER FIX PATCH
@@ -3994,23 +3847,6 @@ because the toggle container was too constrained.
   margin-bottom: 10px;
 }
 
-/* –––––––––––––––––––––––––––––
-5. APP CONTENT CONTAINMENT
-Prevent horizontal clipping and overflow on all views.
-––––––––––––––––––––––––––––– */
-.app-content {
-  padding-left: 0;
-  padding-right: 0;
-}
-
-/* Safety: nothing should exceed viewport */
-.view-container,
-.view-container > div {
-  max-width: 100%;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-
 /* Cards must never push past edges */
 .card,
 .intention-card,
@@ -4213,20 +4049,8 @@ Prevent horizontal clipping and overflow on all views.
 }
 
 /* –––––––––––––––––––––––––––––
-10. MODAL -- SLIGHTLY TIGHTER
+FORMS FORMS FORMS
 ––––––––––––––––––––––––––––– */
-.modal {
-  padding: 20px;
-  border-radius: 18px;
-}
-
-.modal-header h2 {
-  font-size: 20px;
-}
-
-.modal-body {
-  padding: 12px;
-}
 
 .form-label {
   font-size: 11px;
@@ -4446,76 +4270,11 @@ Prevent horizontal clipping and overflow on all views.
   box-sizing: border-box !important;
 }
 
-/* --- 4. APP-WIDE OVERFLOW GUARD --- */
-html, body, #root, #app {
-  max-width: 100vw !important;
-  overflow-x: hidden !important;
-}
-
-.app-container,
-.page-content,
-.content-area,
-main,
-[class*="container"] {
-  max-width: 100% !important;
-  overflow-x: hidden !important;
-  box-sizing: border-box !important;
-  padding-left: 12px !important;
-  padding-right: 12px !important;
-}
-
 /* Don't double-pad things already inside containers */
 .card,
 [class*="card"] {
   max-width: 100% !important;
   box-sizing: border-box !important;
-}
-/* –––––––––––––––––––––––––––––
-END OF PATCH
-––––––––––––––––––––––––––––– */
-
-/* ==========================================================
-LYSTARIA -- HARD STOP PATCH (MODALS + MOOD + READING TABS + BADGES)
-Paste this block at the VERY END of your <style> tag.
-========================================================== */
-
-/* ---------- 0) APP-WIDE: KILL HORIZONTAL SCROLL (keep safe vars) ---------- */
-html,
-body {
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden !important;
-}
-
-#app,
-#root,
-.app-shell,
-.app-content,
-.view-container {
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden !important;
-  box-sizing: border-box;
-}
-
-img,
-svg,
-canvas,
-video {
-  max-width: 100%;
-}
-
-/* If any child tries to exceed viewport, force containment */
-.view-container * {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Keep your safe-area behavior, but prevent side bleed */
-.app-content {
-  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
-  padding-bottom: calc(96px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)));
-  overflow-x: hidden !important;
 }
 
 /* ---------- 2) MOOD: TEXTAREA CUT-OFF / CONTAINMENT ---------- */
@@ -4899,207 +4658,224 @@ Fixes: vertical list, lost pill styling, spacing to first card
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
 
-/* === FINAL MODAL OVERRIDE === */
-/* Doubled selectors beat every single-class rule above */
+/* =========================================================
+   CANONICAL LAYOUT + MODALS (KEEP THIS)
+   Paste at the VERY END of your CSS so it wins.
+   After pasting, DELETE all earlier duplicates listed below.
+   ========================================================= */
 
-.modal-overlay.modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
-  z-index: 2000 !important;
-  padding: calc(24px + env(safe-area-inset-top, 0px)) 16px
-           calc(24px + env(safe-area-inset-bottom, 0px)) !important;
-  box-sizing: border-box !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-}
+/* ---------------------------------------------------------
+   DELETE ELSEWHERE (search and remove ALL earlier versions):
+   - html, body { overflow: hidden ... } duplicates
+   - .app-shell { height:100%; } OR { height:100vh; } OR { position:fixed; inset:0; ... } duplicates
+   - .app-content { overflow-y:auto; padding-bottom:... } duplicates
+   - #root { padding-bottom: ... } duplicates (keep only one strategy)
+   - .modal-overlay { ... } duplicates
+   - .modal-overlay.modal-overlay { ... } duplicates
+   - .modal { ... } duplicates
+   - .modal.modal { ... } duplicates
+   - Any "FULL MODAL RESET FIX" / "FINAL MODAL OVERRIDE" / "NUCLEAR MODAL OVERRIDE" blocks
+   - Any block using :has(.modal-overlay) for hiding nav/fab (remove it)
+   --------------------------------------------------------- */
 
-.modal.modal {
-  width: 90% !important;
-  max-width: 500px !important;
-  max-height: calc(
-    100dvh - 48px
-    - env(safe-area-inset-top, 0px)
-    - env(safe-area-inset-bottom, 0px)
-  ) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  position: relative !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
-  flex-shrink: 0 !important;
-}
-
-.modal.modal > * { min-height: 0 !important; }
-
-.modal.modal > .modal-header { flex: 0 0 auto !important; }
-
-.modal.modal > .modal-body {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior: contain !important;
-  max-height: none !important;
-}
-
-.modal.modal > .modal-actions {
-  flex: 0 0 auto !important;
-  position: static !important;
-}
-
-/* KEY: simple modals without .modal-body scroll the whole modal */
-.modal.modal:not(:has(.modal-body)) {
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-/* Protect modal internals from your [class*="container"] wildcard */
-.modal.modal [class*="container"] {
-  overflow-x: visible !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}
-
-/* ===== MODAL VS BOTTOM NAV + FAB (FIX CLIPPING) ===== */
-/* Your FAB is anchored above a 96px bottom nav zone. Reserve that space for modals too. */
+/* =========================================================
+   0) Viewport variables (keyboard-safe)
+   You already set --vvh in JS using visualViewport.height.
+   We use it everywhere instead of 100vh/100dvh.
+   ========================================================= */
 :root {
-  --bottom-nav-h: 96px;  /* matches .fab bottom calc(96px + safe-area) */
-  --modal-gutter: 24px;
-}
-
-/* Give the overlay real bottom room so the modal can scroll fully above nav/FAB */
-.modal-overlay.modal-overlay {
-  padding-bottom: calc(
-    var(--modal-gutter)
-    + env(safe-area-inset-bottom, 0px)
-    + var(--bottom-nav-h)
-  ) !important;
-}
-
-/* Reduce modal max-height by the bottom nav height so it never sits underneath it */
-.modal.modal {
-  max-height: calc(
-    var(--tg-viewport-height, 100dvh)
-    - (var(--modal-gutter) * 2)
-    - env(safe-area-inset-top, 0px)
-    - env(safe-area-inset-bottom, 0px)
-    - var(--bottom-nav-h)
-  ) !important;
-}
-
-/* (Optional but usually helps) If actions are at the bottom, keep them from kissing the edge */
-.modal.modal > .modal-actions {
-  padding-bottom: 8px !important;
+  --vvh: 100vh;                 /* fallback */
+  --bottom-nav-h: 96px;         /* your nav design height */
+  --modal-gutter: 16px;         /* modal padding from edges */
 }
 
 /* =========================================================
-   NUCLEAR MODAL OVERRIDE: WIN AGAINST ALL APP PADDING/NAV/FAB
-   Paste at VERY BOTTOM of CSS
+   1) Page + root sizing
+   The document itself should not scroll; app-content scrolls.
+   ========================================================= */
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;             /* the page doesn't scroll */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Root should NOT be responsible for nav padding.
+   Let .app-content handle space for bottom nav. */
+#root {
+  height: 100%;
+  min-height: 0;
+  padding-bottom: 0 !important; /* DELETE any other #root padding rules elsewhere */
+}
+
+/* =========================================================
+   2) App shell (fixed viewport, keyboard-safe height)
+   ========================================================= */
+.app-shell {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: var(--vvh);           /* <-- critical: keyboard-safe */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;             /* only .app-content scrolls */
+  min-height: 0;
+}
+
+/* =========================================================
+   3) Scroll container (the only scrolling area)
+   Reserves space for bottom nav + safe bottom.
+   ========================================================= */
+.app-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+
+  /* Safe areas */
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(
+    var(--bottom-nav-h)
+    + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))
+  );
+
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Prevent children from forcing horizontal overflow */
+.app-content,
+.app-content * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.app-content * {
+  min-width: 0; /* important for flex children / ellipsis */
+}
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* =========================================================
+   4) Bottom nav + FAB layering
+   Keep them on top normally…
+   ========================================================= */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+}
+
+/* If your FAB uses .fab, keep it above content */
+.fab {
+  z-index: 1001;
+}
+
+/* =========================================================
+   5) Modal system (ONE system, predictable)
+   Strategy:
+   - overlay scrolls if needed
+   - modal is centered-ish and never taller than viewport
+   - modal-body scrolls; header/actions stay visible
    ========================================================= */
 
-/* -------- A) When any modal is present, hide UI that can cover it -------- */
-html:has(.modal-overlay),
-body:has(.modal-overlay) {
+/* Overlay covers the viewport. It can scroll if modal is tall. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000; /* above nav/fab */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding:
+    calc(var(--modal-gutter) + var(--tg-safe-top, env(safe-area-inset-top, 0px)))
+    var(--modal-gutter)
+    calc(var(--modal-gutter) + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))
+    var(--modal-gutter);
+
+  background: rgba(0,0,0,0.55);
+
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+
+  /* Keyboard-safe height */
+  height: var(--vvh);
+  box-sizing: border-box;
+}
+
+/* The modal itself never exceeds the available height.
+   IMPORTANT: do NOT use 100vh/100dvh here. */
+.modal {
+  width: min(520px, 100%);
+  max-height: calc(
+    var(--vvh)
+    - (var(--modal-gutter) * 2)
+    - var(--tg-safe-top, env(safe-area-inset-top, 0px))
+    - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))
+  );
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* body scrolls, not the whole modal */
+  flex-shrink: 0;
+
+  box-sizing: border-box;
+  border-radius: 20px;
+}
+
+/* Header and footer do not scroll */
+.modal-header,
+.modal-actions {
+  flex: 0 0 auto;
+}
+
+/* Body is the scroll container */
+.modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Safety: avoid internal rules breaking layout */
+.modal * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   6) Modal-open mode (no :has(), no guessing)
+   You should toggle this class on <body> when opening/closing modals.
+   This prevents nav/fab covering the modal and stops background scroll.
+   ========================================================= */
+body.modal-open {
   overflow: hidden !important;
 }
 
-/* Hide bottom nav + FAB + any floating buttons while modal is open */
-body:has(.modal-overlay) .bottom-nav,
-body:has(.modal-overlay) .fab,
-body:has(.modal-overlay) .fab-button,
-body:has(.modal-overlay) .floating-action-button,
-body:has(.modal-overlay) [class*="fab"],
-body:has(.modal-overlay) [class*="floating"] {
+/* Hide nav/fab while a modal is open */
+body.modal-open .bottom-nav,
+body.modal-open .fab,
+body.modal-open .fab-button,
+body.modal-open .floating-action-button {
   display: none !important;
   pointer-events: none !important;
 }
 
-/* -------- B) Remove ALL bottom padding reserved for nav while modal is open -------- */
-/* This is the part you called out: it stomps your multiple .app / #root padding rules */
-body:has(.modal-overlay) #root,
-body:has(.modal-overlay) .app,
-body:has(.modal-overlay) .app-container,
-body:has(.modal-overlay) .app-content,
-body:has(.modal-overlay) .page,
-body:has(.modal-overlay) .content,
-body:has(.modal-overlay) main {
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* If you use CSS vars for nav height anywhere, kill them during modal */
-body:has(.modal-overlay) {
-  --bottom-nav-h: 0px !important;
-  --nav-h: 0px !important;
-}
-
-/* -------- C) Hard-override the overlay + modal geometry -------- */
-/* Overlay: fixed, full screen, only safe-area padding */
-.modal-overlay.modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 999999 !important;
-
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
-
-  /* Safe-area aware padding only (NOT nav-aware) */
-  padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
-  padding-right: 16px !important;
-  padding-left: 16px !important;
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
-
-  box-sizing: border-box !important;
-
-  /* Let overlay scroll if needed (NOT the page underneath) */
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-
-  /* background is whatever you already have; leaving as-is */
-}
-
-/* Modal: size against viewport; never rely on app padding */
-.modal.modal {
-  width: min(520px, 100%) !important;
-  margin: 0 !important;
-
-  /* Fit within overlay padding */
-  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
-
-  display: flex !important;
-  flex-direction: column !important;
-
-  box-sizing: border-box !important;
+/* Optional: stop app-content from "rubber banding" behind overlay */
+body.modal-open .app-content {
   overflow: hidden !important;
-  flex-shrink: 0 !important;
-}
-
-/* Ensure header/actions don't collapse, body scrolls */
-.modal.modal > .modal-header {
-  flex: 0 0 auto !important;
-}
-.modal.modal > .modal-actions {
-  flex: 0 0 auto !important;
-}
-.modal.modal > .modal-body {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-/* Safety: stop random container rules from messing with modal internals */
-.modal.modal * {
-  max-width: 100% !important;
-  box-sizing: border-box !important;
 }
 </style>
 </head>
