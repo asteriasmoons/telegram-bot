@@ -4899,121 +4899,70 @@ Fixes: vertical list, lost pill styling, spacing to first card
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
 
-/* =========================================================
-   MODAL -- SINGLE SOURCE OF TRUTH
-   ========================================================= */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  z-index: 2000;
+/* === FINAL MODAL OVERRIDE === */
+/* Doubled selectors beat every single-class rule above */
+
+.modal-overlay.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  z-index: 2000 !important;
   padding: calc(24px + env(safe-area-inset-top, 0px)) 16px
-           calc(24px + env(safe-area-inset-bottom, 0px));
-  box-sizing: border-box;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  animation: fadeIn 0.2s;
+           calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
-.modal {
-  border-radius: 20px;
-  padding: 24px;
-  width: 90%;
-  max-width: 500px;
+.modal.modal {
+  width: 90% !important;
+  max-width: 500px !important;
   max-height: calc(
     100dvh - 48px
     - env(safe-area-inset-top, 0px)
     - env(safe-area-inset-bottom, 0px)
-  );
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-sizing: border-box;
-  animation: slideUp 0.3s;
-  flex-shrink: 0;
+  ) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
 }
 
-.modal > * {
-  min-height: 0;
+.modal.modal > * { min-height: 0 !important; }
+
+.modal.modal > .modal-header { flex: 0 0 auto !important; }
+
+.modal.modal > .modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  max-height: none !important;
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  flex: 0 0 auto;
+.modal.modal > .modal-actions {
+  flex: 0 0 auto !important;
+  position: static !important;
 }
 
-.modal-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  padding: 16px 16px 24px;
-  box-sizing: border-box;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  /* NO max-height -- parent constrains this */
+/* KEY: simple modals without .modal-body scroll the whole modal */
+.modal.modal:not(:has(.modal-body)) {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  flex: 0 0 auto;
-}
-
-/* Modals without .modal-body: let the whole thing scroll */
-.modal:not(:has(.modal-body)) {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-body.modal-open {
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
-  inset: 0;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.modal-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+/* Protect modal internals from your [class*="container"] wildcard */
+.modal.modal [class*="container"] {
+  overflow-x: visible !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 </style>
 </head>
