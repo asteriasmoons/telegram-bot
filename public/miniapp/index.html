@@ -4879,18 +4879,26 @@ body.modal-open .app-content {
 }
 
 /* =========================================================
-   RESTORE MODAL LOOK (VISUAL ONLY -- DOES NOT CHANGE GEOMETRY)
-   Paste at VERY END of CSS
+   MODAL SYSTEM (Aesthetic + Padding Fix + Input/Actions)
+   Paste at VERY END of your CSS
+   ---------------------------------------------------------
+   DELETE elsewhere (search & remove duplicates):
+   - .modal-overlay
+   - .modal (any block that sets padding/background/border/radius/shadow)
+   - .modal-header / .modal-body / .modal-actions
+   - .modal-close / .close-btn / .modal-header button
+   - .modal input / textarea / select / .form-input / .form-textarea / .form-select
+   - body.modal-open
    ========================================================= */
 
-/* --- Overlay tint (keep your existing if you like; this is safe) --- */
+/* --- Overlay tint --- */
 .modal-overlay {
   background: rgba(0, 0, 0, 0.55) !important;
 }
 
-/* --- Modal glass look (visual only) --- */
+/* --- Modal glass look + padding (core container) --- */
 .modal {
-  /* Keep your blur/glass vibe */
+  /* Visual glass */
   background: rgba(18, 10, 38, 0.82) !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
 
@@ -4900,19 +4908,44 @@ body.modal-open .app-content {
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55) !important;
   border-radius: 20px !important;
 
-  /* Important: DO NOT set position/overflow/flex sizing here.
-     Those belong in your "modal mechanics" block. */
+  /* THE FIX: breathing room so content doesn’t hug edges */
+  padding: 20px !important;
+
+  /* Extra polish */
+  position: relative !important;
+  overflow: hidden !important;
 }
 
-/* --- Modal header spacing + divider --- */
+/* Soft "top glow" layer (subtle aesthetic) */
+.modal::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  background:
+    radial-gradient(900px 260px at 20% 0%,
+      rgba(224, 25, 212, 0.18),
+      rgba(128, 0, 254, 0.10),
+      rgba(0, 219, 255, 0.06),
+      transparent 60%) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure modal content sits above the glow */
+.modal > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* --- Header: spacing + divider + gradient heading --- */
 .modal-header {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 12px !important;
 
-  padding-bottom: 14px !important;
-  margin-bottom: 14px !important;
+  padding: 0 !important;
+  margin: 0 0 14px 0 !important;
 
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
@@ -4922,26 +4955,25 @@ body.modal-open .app-content {
   margin: 0 !important;
   font-size: 22px !important;
   font-weight: 800 !important;
+  letter-spacing: 0.2px !important;
 
-  /* keep your "pretty heading" vibe */
   background: linear-gradient(135deg, #e019d4 0%, #8000fe 50%, #00dbff 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
 }
 
-/* --- Close button styling (the little X) --- */
-/* DELETE elsewhere: any .modal-close / .close-btn / .modal-header button rules */
+/* --- Close button (X) --- */
 .modal-close,
 .modal-header button,
 .modal .close-btn {
   -webkit-appearance: none !important;
   appearance: none !important;
 
-  width: 36px !important;
-  height: 36px !important;
+  width: 38px !important;
+  height: 38px !important;
   padding: 0 !important;
 
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   background: rgba(255, 255, 255, 0.08) !important;
 
@@ -4949,8 +4981,11 @@ body.modal-open .app-content {
   align-items: center !important;
   justify-content: center !important;
 
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
   cursor: pointer !important;
+
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease !important;
+  margin-left: auto !important;
 }
 
 .modal-close:hover,
@@ -4958,106 +4993,35 @@ body.modal-open .app-content {
 .modal .close-btn:hover {
   background: rgba(255, 255, 255, 0.12) !important;
   border-color: rgba(91, 141, 239, 0.35) !important;
+  transform: translateY(-1px) !important;
 }
 
-/* --- Modal body text --- */
+.modal-close:active,
+.modal-header button:active,
+.modal .close-btn:active {
+  transform: translateY(0px) !important;
+}
+
+/* --- Body: keep text readable + prevent edge-hugging --- */
 .modal-body {
   color: rgba(255, 255, 255, 0.92) !important;
-}
-
-/* --- Form fields inside modals (visual only) --- */
-/* DELETE elsewhere: any .modal input/select/textarea blocks that set widths weirdly */
-.modal .form-input,
-.modal .form-textarea,
-.modal .form-select,
-.modal input,
-.modal textarea,
-.modal select {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  color: rgba(255, 255, 255, 0.95) !important;
-
-  border-radius: 12px !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10) !important;
-}
-
-.modal .form-input:focus,
-.modal .form-textarea:focus,
-.modal .form-select:focus,
-.modal input:focus,
-.modal textarea:focus,
-.modal select:focus {
-  outline: none !important;
-  border-color: rgba(91, 141, 239, 0.60) !important;
-  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18), inset 0 1px 0 rgba(255,255,255,0.12) !important;
-  background: rgba(255, 255, 255, 0.09) !important;
-}
-
-/* --- Modal actions row (buttons) --- */
-.modal-actions {
-  margin-top: 16px !important;
-  padding-top: 14px !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-
-  display: flex !important;
-  gap: 10px !important;
-  justify-content: flex-start !important;
-  flex-wrap: wrap !important;
-}
-
-/* Buttons inside modals should keep your existing .btn styling.
-   This just ensures they don’t shrink into weird pills. */
-.modal-actions .btn {
-  flex: 0 0 auto !important;
-  min-width: 120px !important;
-}
-
-/* --- iOS: prevent "weird default" button rendering in modals --- */
-.modal button {
-  -webkit-appearance: none !important;
-  appearance: none !important;
-}
-
-/* When modal is open: stop underlying scroll */
-body.modal-open {
-  overflow: hidden !important;
-}
-
-/* =========================================================
-   MODAL PADDING FIX (Stop content hugging edges)
-   Paste at VERY END
-   ========================================================= */
-
-/* 1) Give the modal a real outer padding */
-.modal {
-  padding: 20px !important; /* outer breathing room */
-}
-
-/* 2) Remove "double dividers" feeling: header/body/actions get clean spacing */
-.modal-header {
-  padding: 0 !important;
-  margin: 0 0 14px 0 !important;
-}
-
-.modal-actions {
-  padding: 14px 0 0 0 !important;
-  margin: 14px 0 0 0 !important;
-}
-
-/* 3) Body should NOT be edge-to-edge */
-.modal-body {
   padding: 0 !important;
   margin: 0 !important;
 }
 
-/* 4) Universal: any direct child inside modal-body gets side inset
-      (this catches your forms, rows, groups, etc.) */
+/* Keep inner blocks aligned and contained */
 .modal-body > * {
   margin-left: 0 !important;
   margin-right: 0 !important;
+  max-width: 100% !important;
 }
 
-/* 5) Form spacing: keep inputs away from the walls */
+/* If anything inside uses weird full-bleed tricks, contain it */
+.modal * {
+  max-width: 100% !important;
+}
+
+/* --- Form layout helpers inside modals --- */
 .modal .form-group,
 .modal .form-row,
 .modal .times-list,
@@ -5070,35 +5034,76 @@ body.modal-open {
   margin-right: 0 !important;
 }
 
-/* 6) Inputs/selects/textarea should fill available space BUT respect padding */
-.modal input,
-.modal textarea,
-.modal select,
+/* --- Inputs/selects/textarea: visual + sizing --- */
 .modal .form-input,
 .modal .form-textarea,
-.modal .form-select {
+.modal .form-select,
+.modal input,
+.modal textarea,
+.modal select {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+
+  background: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+
+  border-radius: 12px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease !important;
 }
 
-/* 7) If your modal content uses a "full width card" look anywhere, contain it */
-.modal .card,
-.modal [class*="card"] {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+/* Placeholder polish */
+.modal input::placeholder,
+.modal textarea::placeholder {
+  color: rgba(255, 255, 255, 0.48) !important;
 }
 
-/* 8) If something inside is using negative margins to go full-bleed, kill it */
-.modal * {
-  max-width: 100% !important;
+/* Focus state */
+.modal .form-input:focus,
+.modal .form-textarea:focus,
+.modal .form-select:focus,
+.modal input:focus,
+.modal textarea:focus,
+.modal select:focus {
+  outline: none !important;
+  border-color: rgba(91, 141, 239, 0.60) !important;
+  box-shadow:
+    0 0 0 3px rgba(91, 141, 239, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
 }
 
-/* Optional: make the close button not touch the edge */
-.modal-close,
-.modal-header button,
-.modal .close-btn {
-  margin-left: auto !important;
+/* --- Actions row (buttons area) --- */
+.modal-actions {
+  margin: 14px 0 0 0 !important;
+  padding: 14px 0 0 0 !important;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+
+  display: flex !important;
+  gap: 10px !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+}
+
+/* Don’t let modal buttons collapse into tiny pills */
+.modal-actions .btn {
+  flex: 0 0 auto !important;
+  min-width: 120px !important;
+}
+
+/* iOS / Safari: prevent default button rendering quirks */
+.modal button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+/* When modal is open: stop underlying scroll */
+body.modal-open {
+  overflow: hidden !important;
 }
 </style>
 </head>
