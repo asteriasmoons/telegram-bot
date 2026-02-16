@@ -5022,6 +5022,84 @@ body.modal-open .app-content {
 body.modal-open {
   overflow: hidden !important;
 }
+
+/* =========================================================
+   MODAL PADDING FIX (Stop content hugging edges)
+   Paste at VERY END
+   ========================================================= */
+
+/* 1) Give the modal a real outer padding */
+.modal {
+  padding: 20px !important; /* outer breathing room */
+}
+
+/* 2) Remove "double dividers" feeling: header/body/actions get clean spacing */
+.modal-header {
+  padding: 0 !important;
+  margin: 0 0 14px 0 !important;
+}
+
+.modal-actions {
+  padding: 14px 0 0 0 !important;
+  margin: 14px 0 0 0 !important;
+}
+
+/* 3) Body should NOT be edge-to-edge */
+.modal-body {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* 4) Universal: any direct child inside modal-body gets side inset
+      (this catches your forms, rows, groups, etc.) */
+.modal-body > * {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 5) Form spacing: keep inputs away from the walls */
+.modal .form-group,
+.modal .form-row,
+.modal .times-list,
+.modal .logs-list,
+.modal .mood-select-group,
+.modal .places-autocomplete-wrap {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 6) Inputs/selects/textarea should fill available space BUT respect padding */
+.modal input,
+.modal textarea,
+.modal select,
+.modal .form-input,
+.modal .form-textarea,
+.modal .form-select {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 7) If your modal content uses a "full width card" look anywhere, contain it */
+.modal .card,
+.modal [class*="card"] {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 8) If something inside is using negative margins to go full-bleed, kill it */
+.modal * {
+  max-width: 100% !important;
+}
+
+/* Optional: make the close button not touch the edge */
+.modal-close,
+.modal-header button,
+.modal .close-btn {
+  margin-left: auto !important;
+}
 </style>
 </head>
 
