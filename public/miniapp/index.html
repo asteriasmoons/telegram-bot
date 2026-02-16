@@ -4839,97 +4839,6 @@ video {
   padding-bottom: calc(10px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
 }
 
-/* ==========================================================
-LYSTARIA -- HARD STOP PATCH (MODALS + READING TABS + HABIT BADGES)
-Paste this block at the VERY END of your <style> tag.
-========================================================== */
-
-/* ----------------------------------------------------------
-1) MODALS: SHORT + SCROLL INSIDE (header/actions stay visible)
----------------------------------------------------------- */
-
-/* Overlay: start near top so modal never "centers tall" */
-.modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 2000 !important;
-
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
-
-  padding-left: 16px !important;
-  padding-right: 16px !important;
-  padding-top: calc(16px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) !important;
-  padding-bottom: calc(16px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
-
-  box-sizing: border-box !important;
-  overflow: hidden !important;
-}
-
-/* The modal itself: capped height, NO outer scroll */
-.modal {
-  width: 100% !important;
-  max-width: 500px !important;
-
-  /* make it SHORT */
-  max-height: calc(100vh - 160px - var(--tg-safe-top, env(safe-area-inset-top, 0px)) - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
-
-  display: flex !important;
-  flex-direction: column !important;
-
-  overflow: hidden !important; /* IMPORTANT: prevents the whole modal from scrolling */
-  box-sizing: border-box !important;
-}
-
-/* Header: fixed height area */
-.modal-header {
-  flex: 0 0 auto !important;
-  margin-bottom: 14px !important;
-}
-
-/* Body: the ONLY scrolling region */
-.modal-body {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-
-  -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior: contain !important;
-
-  padding: 12px 12px 16px !important;
-  box-sizing: border-box !important;
-}
-
-/* Actions/footer: pinned inside modal */
-.modal-actions {
-  flex: 0 0 auto !important;
-  margin-top: 12px !important;
-
-  position: sticky !important;
-  bottom: 0 !important;
-
-  padding-top: 12px !important;
-  padding-bottom: 12px !important;
-
-  /* subtle fade/solid base so buttons always readable */
-  background: linear-gradient(
-    to bottom,
-    rgba(0,0,0,0),
-    rgba(0,0,0,0.35) 35%,
-    rgba(0,0,0,0.55)
-  ) !important;
-
-  box-sizing: border-box !important;
-}
-
-/* Kill any "modal inner fights scroll" rules from other patches */
-.modal > div {
-  max-height: none !important;
-}
-
 /* ================================
 READING TABS -- GLASS PILL BUBBLES
 Targets your actual classes:
@@ -5256,6 +5165,84 @@ Fixes: vertical list, lost pill styling, spacing to first card
   background: rgba(255, 255, 255, 0.12) !important;
   color: rgba(255, 255, 255, 0.9) !important;
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+/* ── MODALS: SINGLE SOURCE OF TRUTH ── */
+
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2000 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: calc(24px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) 16px
+            calc(24px + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;          /* overlay scrolls if modal is tall */
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Every modal type */
+.modal,
+.modal-content,
+[class$="-modal"] {
+  width: 100% !important;
+  max-width: 500px !important;
+  max-height: calc(
+    100dvh - 48px
+    - var(--tg-safe-top, env(safe-area-inset-top, 0px))
+    - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))
+  ) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+/* Flex children must be allowed to shrink */
+.modal > *,
+.modal-content > *,
+[class$="-modal"] > * {
+  min-height: 0 !important;
+}
+
+/* Header: pinned top */
+.modal-header {
+  flex: 0 0 auto !important;
+}
+
+/* Body: sole scroll region */
+.modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  /* NO max-height here -- the parent constrains it */
+}
+
+/* Actions: pinned bottom */
+.modal-actions {
+  flex: 0 0 auto !important;
+  padding: 12px 0 !important;
+}
+
+/* Background scroll lock */
+body.modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  inset: 0 !important;
+}
+
+/* Modals without .modal-body structure: allow the whole modal to scroll */
+.modal:not(:has(.modal-body)),
+[class$="-modal"]:not(:has(.modal-body)) {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 </style>
 </head>
