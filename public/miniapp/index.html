@@ -12470,6 +12470,8 @@ const [gcalCalendars, setGcalCalendars] = useState([]);
 const [gcalCalendarId, setGcalCalendarId] = useState("");
 const [gcalError, setGcalError] = useState("");
 
+const prevGcalConnectedRef = useRef(null); // null = "not loaded yet"
+
   useEffect(() => {
     document.body.classList.remove("modal-open"); // safety
   }, []);
@@ -12503,7 +12505,8 @@ if (qh) {
     })();
   }, []);
   
-  // 🔄 refresh Google status when returning to the mini app
+  
+  // 🔄 GOOGLE CONNECTED MSG
 useEffect(() => {
   const onResume = () => {
     if (!document.hidden) {
@@ -12524,21 +12527,28 @@ useEffect(() => {
   try {
     setGcalError("");
     const data = await apiCall(`/cal/google/status`);
-setGcalConnected((prev) => {
-  const next = !!data?.connected;
 
-  if (!prev && next) {
-    tg.showPopup({ message: "Google Calendar connected!" });
-  }
+    const nextConnected = !!data?.connected;
 
-  return next;
-});
+    // ✅ Only show popup if we have a REAL previous value (not first load)
+    if (prevGcalConnectedRef.current !== null) {
+      const prevConnected = prevGcalConnectedRef.current;
+      if (!prevConnected && nextConnected) {
+        tg.showPopup({ message: "Google Calendar connected!" });
+      }
+    }
+
+    // ✅ Update state + update "previous"
+    setGcalConnected(nextConnected);
+    prevGcalConnectedRef.current = nextConnected;
+
     setGcalEmail(String(data?.email || ""));
     setGcalCalendarId(String(data?.selectedCalendarId || ""));
-    return !!data?.connected;
+    return nextConnected;
   } catch (e) {
     setGcalError(e?.message || "Failed to load Google Calendar status.");
     setGcalConnected(false);
+    prevGcalConnectedRef.current = false;
     return false;
   }
 };
