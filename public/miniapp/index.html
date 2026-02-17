@@ -4795,13 +4795,10 @@ img, svg, video, canvas {
     var(--modal-gutter)
     calc(var(--modal-gutter) + var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))
     var(--modal-gutter);
-
   background: rgba(0,0,0,0.55);
-
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-
   /* Keyboard-safe height */
   height: var(--vvh);
   box-sizing: border-box;
@@ -4817,12 +4814,10 @@ img, svg, video, canvas {
     - var(--tg-safe-top, env(safe-area-inset-top, 0px))
     - var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))
   );
-
   display: flex;
   flex-direction: column;
   overflow: hidden; /* body scrolls, not the whole modal */
   flex-shrink: 0;
-
   box-sizing: border-box;
   border-radius: 20px;
 }
@@ -4895,16 +4890,12 @@ body.modal-open .app-content {
   /* Visual glass */
   background: rgba(18, 10, 38, 0.82) !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
-
   -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
   backdrop-filter: blur(18px) saturate(150%) !important;
-
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55) !important;
   border-radius: 20px !important;
-
   /* THE FIX: breathing room so content doesn’t hug edges */
   padding: 20px !important;
-
   /* Extra polish */
   position: relative !important;
   overflow: hidden !important;
