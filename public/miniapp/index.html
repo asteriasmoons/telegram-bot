@@ -5147,14 +5147,15 @@ body.modal-open {
   transform: scale(1) rotate(45deg) !important;
 }
 
-/* Label text beside checkbox */
+/* Label text beside checkbox (match the small muted label style) */
 .modal input[type="checkbox"] + span,
-.modal input[type="checkbox"] + label,
-.modal .checkbox-label {
-  font-size: 15px !important;
-  font-weight: 500 !important;
-  color: rgba(255, 255, 255, 0.82) !important;
-  letter-spacing: 0.2px !important;
+.modal .checkbox-label,
+.modal label:has(input[type="checkbox"]) {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
 }
 
 /* Make the entire label clickable if wrapped */
