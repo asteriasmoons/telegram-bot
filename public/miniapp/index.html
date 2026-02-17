@@ -5173,6 +5173,54 @@ body.modal-open {
   text-transform: uppercase !important;
   color: rgba(255, 255, 255, 0.45) !important;
 }
+
+
+/* =========================================================
+   PULL TO REFRESH (app-content)
+   ========================================================= */
+
+.ptr {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+  transition: height 180ms ease, opacity 180ms ease;
+}
+
+.ptr-inner {
+  width: calc(100% - 28px);
+  max-width: 520px;
+  margin: 10px 0 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(18, 10, 38, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ptr-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #e019d4 0%, #8000fe 50%, #00dbff 100%);
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.15);
+  flex: 0 0 auto;
+}
+
+.ptr-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+  letter-spacing: 0.2px;
+}
 </style>
 </head>
 
@@ -6181,7 +6229,7 @@ function MoodTodayCard({ log, onDelete }) {
 }
 
 // Main Mood View
-function MoodView({ activeView, userDisplayName, onBack }) {
+function MoodView({ activeView, userDisplayName, onBack, refreshTick }) {
 const [moods, setMoods] = useState([]);
 const [activities, setActivities] = useState([]);
 const [note, setNote] = useState("");
@@ -6205,7 +6253,7 @@ useEffect(() => {
 if (activeView === "mood") {
 loadLogs();
 }
-}, [activeView]);
+}, [activeView, refreshTick]);
 
 const loadLogs = async () => {
 try {
@@ -7319,7 +7367,7 @@ function HabitLogEditModal({ habit, log, onClose, onSaved }) {
 
 
 // Habits View
-function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
+function HabitsView({ activeView, userTimezone, userDisplayName, onBack, refreshTick }) {
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -7364,7 +7412,7 @@ function HabitsView({ activeView, userTimezone, userDisplayName, onBack }) {
 
   useEffect(() => {
     if (activeView === "habits") loadHabits();
-  }, [activeView, includePaused, cadenceFilter]);
+  }, [activeView, includePaused, cadenceFilter, refreshTick]);
 
   const createHabit = () => {
     setEditingHabit(null);
@@ -7629,7 +7677,7 @@ const [text, setText] = useState(item && item.text ? item.text : '');
 }
 
 // Checklist View
-function ChecklistView({ activeView, userDisplayName, onBack }) {
+function ChecklistView({ activeView, userDisplayName, onBack, refreshTick }) {
 const [items, setItems] = useState([]);
 const [loading, setLoading] = useState(true);
 const [showModal, setShowModal] = useState(false);
@@ -7640,7 +7688,7 @@ const [filter, setFilter] = useState('active');
     if (activeView === 'checklist') {
       loadItems();
     }
-  }, [activeView]);
+  }, [activeView, refreshTick]);
 
   const loadItems = async () => {
     try {
@@ -8361,7 +8409,7 @@ function RecsModal({ genre, recs, loading, error, onClose, onSelectGenre }) {
 
 
 // Reading View
-function ReadingView({ activeView }) {
+function ReadingView({ activeView, refreshTick }) {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -8421,7 +8469,7 @@ const loadRecs = React.useCallback(async (genre) => {
     loadBooks();
     loadStreak();
   }
-}, [activeView, filter]);
+}, [activeView, filter, refreshTick]);
 
 
 const loadStreak = async () => {
@@ -8837,7 +8885,7 @@ function JournalModal({ entry, onClose, onSave, onDelete }) {
 }
 
 // TAGS VIEW 
-function JournalTagsView({ onBack, onPickTag }) {
+function JournalTagsView({ onBack, onPickTag, refreshTick }) {
   const [loading, setLoading] = useState(true);
   const [tags, setTags] = useState([]);
   const [query, setQuery] = useState("");
@@ -8855,7 +8903,7 @@ function JournalTagsView({ onBack, onPickTag }) {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [refreshTick]);
 
   const filtered = tags.filter((t) => {
     const name = String(t?.name || "");
@@ -9093,7 +9141,7 @@ useEffect(() => {
 }
 
 // HOROSCOPE VIEW
-function HoroscopeView({ onBack, activeView }) {
+function HoroscopeView({ onBack, activeView, refreshTick }) {
   const ZODIAC = [
   "aries","taurus","gemini","cancer","leo","virgo", "libra","scorpio","sagittarius","capricorn","aquarius","pisces"
   ];
@@ -9108,7 +9156,7 @@ function HoroscopeView({ onBack, activeView }) {
       setResult(null);
       setLoading(false);
     }
-  }, [activeView]);
+  }, [activeView, refreshTick]);
 
   const fetchHoroscope = async () => {
     try {
@@ -9215,7 +9263,7 @@ function HoroscopeView({ onBack, activeView }) {
 
 
 // Journals View
-function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect, onOpenHoroscope }) {
+function JournalsView({ activeView, tagFilter, onOpenTags, onClearTag, onTagSelect, onOpenHoroscope, refreshTick }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -9237,7 +9285,7 @@ useEffect(() => {
   if (activeView === "journal") {
     loadFirstPage();
   }
-}, [activeView, tagFilter]);
+}, [activeView, tagFilter, refreshTick]);
 
 const loadFirstPage = async () => {
   try {
@@ -11619,7 +11667,7 @@ const addToIosCalendar = () => {
 
 
     // Calendar View - Day List Style
-function CalendarView({ onOpenSettings, userTimezone, onOpenEventShare }) {
+function CalendarView({ onOpenSettings, userTimezone, onOpenEventShare, refreshTick }) {
       const [currentMonth, setCurrentMonth] = useState(new Date());
       const [events, setEvents] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -11631,7 +11679,7 @@ function CalendarView({ onOpenSettings, userTimezone, onOpenEventShare }) {
 
       useEffect(() => {
         loadEvents();
-      }, [currentMonth]);
+      }, [currentMonth, refreshTick]);
 
       const loadEvents = async () => {
         try {
@@ -11984,7 +12032,7 @@ function renderCalendarInlineSymbols(text) {
     }
 
 // Reminders View
-function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits, goTo }) {
+function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits, goTo, refreshTick }) {
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
@@ -12003,7 +12051,7 @@ function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits
     if (activeView === "reminders") {
       loadReminders();
     }
-  }, [showHistory, activeView, filter]);
+  }, [showHistory, activeView, filter, refreshTick]);
 
   const loadReminders = async (append = false) => {
     try {
@@ -12276,7 +12324,7 @@ function RemindersView({ activeView, userTimezone, userDisplayName, onOpenHabits
 
     
     // SETTINGS VIEW
-function SettingsView({ onBack }) {
+function SettingsView({ onBack, refreshTick }) {
   const [loading, setLoading] = useState(true);
   const [timezone, setTimezone] = useState("America/Chicago");
   const [displayName, setDisplayName] = useState("");
@@ -12328,7 +12376,7 @@ if (qh) {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [refreshTick]);
   
   
   // 🔄 GOOGLE CONNECTED MSG
@@ -12708,7 +12756,7 @@ return (
 }
 
 // Event Share View
-function EventShareView({ onBack }) {
+function EventShareView({ onBack, refreshTick }) {
   const [token, setToken] = useState("");
   const [event, setEvent] = useState(null);
 
@@ -12771,7 +12819,7 @@ function EventShareView({ onBack }) {
       loadJoined();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, refreshTick]);
 
   const join = async () => {
     const code = token.trim();
@@ -13130,8 +13178,129 @@ function ShareCodeModal({ onClose, token }) {
   );
 }
 
+// PULL TO REFRESH
+function PullToRefresh({ containerRef, onRefresh }) {
+  const [pull, setPull] = React.useState(0);
+  const [state, setState] = React.useState("idle"); // idle | pulling | ready | refreshing
+  const startYRef = React.useRef(0);
+  const pullingRef = React.useRef(false);
+
+  const THRESHOLD = 72;     // how far you must pull to trigger refresh
+  const MAX_PULL = 120;     // visual max
+
+  React.useEffect(() => {
+    const el = containerRef?.current;
+    if (!el) return;
+
+    const canStart = () => {
+      // Only when at top, and no modal open
+      if (document.body.classList.contains("modal-open")) return false;
+      return el.scrollTop <= 0;
+    };
+
+    const onTouchStart = (e) => {
+      if (!canStart()) return;
+      pullingRef.current = true;
+      startYRef.current = e.touches[0].clientY;
+      setState("pulling");
+      setPull(0);
+    };
+
+    const onTouchMove = (e) => {
+      if (!pullingRef.current) return;
+
+      // If user scrolled a bit, cancel
+      if (!canStart()) {
+        pullingRef.current = false;
+        setState("idle");
+        setPull(0);
+        return;
+      }
+
+      const y = e.touches[0].clientY;
+      const dy = y - startYRef.current;
+
+      // only downward pulls
+      if (dy <= 0) {
+        setPull(0);
+        setState("pulling");
+        return;
+      }
+
+      // Resist (feels nicer)
+      const resisted = Math.min(MAX_PULL, dy * 0.55);
+      setPull(resisted);
+
+      if (resisted >= THRESHOLD) setState("ready");
+      else setState("pulling");
+
+      // Prevent rubber-band page scroll
+      e.preventDefault();
+    };
+
+    const onTouchEnd = async () => {
+      if (!pullingRef.current) return;
+      pullingRef.current = false;
+
+      if (state === "ready") {
+        setState("refreshing");
+        setPull(THRESHOLD);
+
+        try {
+          await Promise.resolve(onRefresh?.());
+        } finally {
+          // small settle animation
+          setTimeout(() => {
+            setPull(0);
+            setState("idle");
+          }, 260);
+        }
+      } else {
+        setPull(0);
+        setState("idle");
+      }
+    };
+
+    // Important: passive:false so preventDefault works on iOS
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [containerRef, onRefresh, state]);
+
+  return (
+    <div
+      className={`ptr ${state}`}
+      style={{
+        height: pull,
+        opacity: pull > 2 ? 1 : 0,
+      }}
+      aria-hidden="true"
+    >
+      <div className="ptr-inner">
+        <div className="ptr-dot" />
+        <div className="ptr-text">
+          {state === "refreshing"
+            ? "Refreshing…"
+            : state === "ready"
+            ? "Release to refresh"
+            : "Pull to refresh"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
     // Main App Component
 function App() {
+  const appContentRef = useRef(null);
   // --------------------
   // VIEW STATE
   // --------------------
@@ -13148,6 +13317,15 @@ function App() {
   // DISPLAY NAME STATE
   // ---------------------
   const [userDisplayName, setUserDisplayName] = useState("");
+  
+    // Pull-to-refresh tick (root refresh signal)
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const triggerRefresh = React.useCallback(() => {
+    // If a modal is open, ignore pull refresh
+    if (document.body.classList.contains("modal-open")) return;
+    setRefreshTick((t) => t + 1);
+  }, []);
 
 
   // --------------------
@@ -13239,7 +13417,12 @@ else if (activeView === 'calendar') {
 
 return (
   <div className="app-shell">
-    <div className="app-content">
+    <div className="app-content" ref={appContentRef}>
+    
+    <PullToRefresh
+  containerRef={appContentRef}
+  onRefresh={triggerRefresh}
+/>
       <div
         className={`view-container ${activeView === 'reminders' ? 'active' : ''}`}
         data-view="reminders"
@@ -13250,6 +13433,7 @@ return (
   userDisplayName={userDisplayName}
   onOpenHabits={openHabitsFromReminders}
   goTo={goTo}
+  refreshTick={refreshTick}
 />
 
       </div>
@@ -13263,6 +13447,7 @@ return (
     userTimezone={userTimezone}
     userDisplayName={userDisplayName}
     onBack={goBack}
+    refreshTick={refreshTick}
   />
 </div>
 
@@ -13274,6 +13459,7 @@ return (
        activeView={activeView}
        userDisplayName={userDisplayName}
        onBack={goBack}
+       refreshTick={refreshTick}
      />
    </div>
 
@@ -13285,6 +13471,7 @@ return (
     activeView={activeView}
     userDisplayName={userDisplayName}
     onBack={goBack}
+    refreshTick={refreshTick}
   />
 </div>
 
@@ -13296,6 +13483,7 @@ return (
   onOpenSettings={() => goTo("settings")}
   onOpenEventShare={() => goTo("event_share")}
   userTimezone={userTimezone}
+  refreshTick={refreshTick}
 />
       </div>
       
@@ -13303,7 +13491,10 @@ return (
   className={`view-container ${activeView === 'event_share' ? 'active' : ''}`}
   data-view="event_share"
 >
-  <EventShareView onBack={goBack} />
+  <EventShareView
+  onBack={goBack}
+  refreshTick={refreshTick}
+  />
 </div>
 
       <div
@@ -13317,6 +13508,7 @@ return (
   onClearTag={() => setJournalTagFilter("")}
   onTagSelect={openJournalTag}
   onOpenHoroscope={openHoroscope}
+  refreshTick={refreshTick}
 />
       </div>
       
@@ -13330,6 +13522,7 @@ return (
       setJournalTagFilter(tag);
       goTo("journal");
     }}
+    refreshTick={refreshTick}
   />
 </div>
 
@@ -13337,21 +13530,31 @@ return (
   className={`view-container ${activeView === 'horoscope' ? 'active' : ''}`}
   data-view="horoscope"
 >
-  <HoroscopeView onBack={goBack} activeView={activeView} />
+  <HoroscopeView
+  onBack={goBack}
+  activeView={activeView}
+  refreshTick={refreshTick}
+  />
 </div>
       
       <div
   className={`view-container ${activeView === 'reading' ? 'active' : ''}`}
   data-view="reading"
 >
-  <ReadingView activeView={activeView} />
+  <ReadingView
+  activeView={activeView}
+  refreshTick={refreshTick}
+  />
 </div>
 
 <div
   className={`view-container ${activeView === 'settings' ? 'active' : ''}`}
   data-view="settings"
 >
-  <SettingsView onBack={goBack} />
+  <SettingsView
+  onBack={goBack}
+  refreshTick={refreshTick}
+  />
 </div>
     </div>
 
