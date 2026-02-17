@@ -694,12 +694,6 @@ body::after {
   margin-top: 8px;
 }
 
-.modal-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 14px 0;
-}
-
 /* -------- Reading Progress -------- */
 .progress-wrap {
   margin-top: 14px;
@@ -6825,8 +6819,6 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
             />
           </div>
 
-          <div className="modal-divider" />
-
           <div className="form-group">
             <label className="form-label">Status</label>
             <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -6907,8 +6899,6 @@ function HabitEditorModal({ initialHabit, userTimezone, onClose, onSaved }) {
             <label className="form-label">Timezone</label>
             <input className="form-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
           </div>
-
-          <div className="modal-divider" />
 
           <div className="form-group">
             <label className="form-label">Reminder Schedule Kind</label>
