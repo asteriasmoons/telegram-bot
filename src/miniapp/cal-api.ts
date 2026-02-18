@@ -222,10 +222,12 @@ router.get("/ical/:eventId", async (req, res) => {
   }
 });
 
-// POST BACKFILL
-router.post("/api/miniapp/cal/google/backfill", requireMiniAppAuth, async (req, res) => {
+// POST /api/miniapp/cal/google/backfill
+router.post("/google/backfill", async (req, res) => {
   try {
-    const userId = req.user.id; // however you store it
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ ok: false, message: "Unauthorized" });
+
     const tz = String(req.body?.tz || "America/Chicago");
 
     const result = await googleBackfillAllEvents({
@@ -237,7 +239,7 @@ router.post("/api/miniapp/cal/google/backfill", requireMiniAppAuth, async (req, 
       },
       saveGoogleIds: async (eventId, googleEventId, googleCalendarId) => {
         await Event.updateOne(
-          { _id: eventId },
+          { _id: eventId, userId },
           { $set: { googleEventId, googleCalendarId } }
         );
       },
