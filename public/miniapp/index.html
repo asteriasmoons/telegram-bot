@@ -12501,6 +12501,36 @@ const saveSelectedCalendar = async (calendarId) => {
   }
 };
 
+const backfillGoogleEvents = async () => {
+  tg.showConfirm("Backfill all existing events to Google Calendar?", async (ok) => {
+    if (!ok) return;
+
+    try {
+      setGcalError("");
+      setGcalLoading(true);
+
+      const res = await apiCall(`/cal/google/backfill`, {
+        method: "POST",
+        body: JSON.stringify({ tz: timezone }),
+      });
+
+      const total = Number(res?.total || 0);
+      const success = Number(res?.success || 0);
+      const failed = Number(res?.failed || 0);
+
+      tg.showPopup({
+        message: total
+          ? `Backfill complete: ${success}/${total} synced${failed ? ` (${failed} failed)` : ""}`
+          : "Backfill complete",
+      });
+    } catch (e) {
+      tg.showAlert("Backfill failed: " + (e?.message || "Unknown error"));
+    } finally {
+      setGcalLoading(false);
+    }
+  });
+};
+
   const save = async () => {
     try {
       setSaving(true);
@@ -12656,6 +12686,15 @@ return (
         >
           Refresh Calendars
         </button>
+        
+        <button
+  className="btn btn-secondary btn-sm"
+  type="button"
+  onClick={backfillGoogleEvents}
+  disabled={gcalLoading}
+>
+  Backfill Existing Events
+</button>
 
         <button
           className="btn btn-danger btn-sm"

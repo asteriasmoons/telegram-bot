@@ -8,6 +8,7 @@ import {
   googleDisconnect,
   googleListCalendars,
   googleSetCalendar,
+  googleBackfillAllEvents,
 } from "../integrations/google-calendar";
 import { DateTime } from "luxon";
 
@@ -218,6 +219,34 @@ router.get("/ical/:eventId", async (req, res) => {
   } catch (err: any) {
     console.error("ical error:", err.message);
     return res.status(500).send("Failed to create iCal");
+  }
+});
+
+// POST BACKFILL
+router.post("/api/miniapp/cal/google/backfill", requireMiniAppAuth, async (req, res) => {
+  try {
+    const userId = req.user.id; // however you store it
+    const tz = String(req.body?.tz || "America/Chicago");
+
+    const result = await googleBackfillAllEvents({
+      userId,
+      tz,
+      loadEvents: async (uid) => {
+        // load ALL events for this user
+        return await Event.find({ userId: uid }).lean();
+      },
+      saveGoogleIds: async (eventId, googleEventId, googleCalendarId) => {
+        await Event.updateOne(
+          { _id: eventId },
+          { $set: { googleEventId, googleCalendarId } }
+        );
+      },
+    });
+
+    res.json(result);
+  } catch (e: any) {
+    console.error("[GCAL] backfill failed", e);
+    res.status(500).json({ ok: false, message: e?.message || "Backfill failed" });
   }
 });
 

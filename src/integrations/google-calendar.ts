@@ -323,6 +323,72 @@ export async function googleUpsertEvent(args: {
   }
 }
 
+export async function googleBackfillAllEvents(args: {
+  userId: number;
+  tz: string;
+  // pass in a function that loads events, so this file stays decoupled
+  loadEvents: (userId: number) => Promise<any[]>;
+  // pass in a function that persists google ids back to your DB
+  saveGoogleIds: (eventId: any, googleEventId: string, googleCalendarId: string) => Promise<void>;
+  // optional: limit for safety
+  limit?: number;
+}) {
+  const client = await getAuthedCalendarClient(args.userId);
+  if (!client) return { ok: false, reason: "not_connected" as const };
+
+  const events = await args.loadEvents(args.userId);
+  const list = Array.isArray(events) ? events : [];
+  const sliced = typeof args.limit === "number" ? list.slice(0, args.limit) : list;
+
+  let success = 0;
+  let failed = 0;
+
+  const results: Array<{
+    eventId: any;
+    title?: string;
+    ok: boolean;
+    googleEventId?: string | null;
+    message?: string;
+  }> = [];
+
+  for (const ev of sliced) {
+    try {
+      const r = await googleUpsertEvent({
+        userId: args.userId,
+        event: ev,
+        tz: args.tz,
+      });
+
+      if (r?.synced && r.googleEventId) {
+        await args.saveGoogleIds(ev._id ?? ev.id, String(r.googleEventId), String(r.googleCalendarId || client.calendarId));
+        success++;
+        results.push({ eventId: ev._id ?? ev.id, title: ev.title, ok: true, googleEventId: r.googleEventId });
+      } else {
+        failed++;
+        results.push({ eventId: ev._id ?? ev.id, title: ev.title, ok: false, message: r?.reason || "not_synced" });
+      }
+    } catch (err: any) {
+      failed++;
+      console.error("[GCAL] backfill item failed", {
+        userId: args.userId,
+        eventId: ev._id ?? ev.id,
+        title: ev?.title,
+        error: err?.message,
+        googleError: err?.response?.data || err?.errors || null,
+      });
+      results.push({ eventId: ev._id ?? ev.id, title: ev.title, ok: false, message: err?.message || "error" });
+    }
+  }
+
+  return {
+    ok: true,
+    total: sliced.length,
+    success,
+    failed,
+    results,
+  };
+}
+
 export async function googleDeleteEvent(args: {
   userId: number;
   googleEventId?: string | null;
