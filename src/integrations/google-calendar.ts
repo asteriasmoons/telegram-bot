@@ -98,7 +98,11 @@ async function getAuthedCalendarClient(userId: number) {
 }
 
 function toRfc3339(d: Date, tz: string) {
-  return DateTime.fromJSDate(d, { zone: tz }).toISO({ suppressMilliseconds: true });
+  const dt = DateTime.fromJSDate(d, { zone: tz });
+  if (!dt.isValid) throw new Error(`Invalid date for tz=${tz}: ${String(d)}`);
+  const iso = dt.toISO({ suppressMilliseconds: true });
+  if (!iso) throw new Error(`Failed to build ISO for tz=${tz}: ${dt.toString()}`);
+  return iso;
 }
 
 function weekdayToByDay(n: number) {
@@ -195,60 +199,128 @@ export async function googleUpsertEvent(args: {
 
   const { calendar, calendarId } = client;
 
-  const e = args.event;
-  const title = String(e.title || "(untitled)").trim();
-  const description = e.description ? String(e.description) : undefined;
-  const location = e.location ? String(e.location) : undefined;
+  try {
+    const e = args.event;
 
-  const recurrence = buildGoogleRecurrence(e.recurrence);
+    const title = String(e.title || "(untitled)").trim();
+    const description = e.description ? String(e.description) : undefined;
+    const location = e.location ? String(e.location) : undefined;
+    const recurrence = buildGoogleRecurrence(e.recurrence);
 
-  const body: any = {
-    summary: title,
-    description,
-    location,
-    recurrence,
-  };
+    const body: any = {
+      summary: title,
+      description,
+      location,
+      recurrence,
+    };
 
-  if (e.allDay) {
-    const startKey = DateTime.fromJSDate(new Date(e.startDate), { zone: args.tz }).toFormat("yyyy-LL-dd");
-    const endKey = e.endDate
-      ? DateTime.fromJSDate(new Date(e.endDate), { zone: args.tz }).toFormat("yyyy-LL-dd")
-      : startKey;
+    // -----------------------------
+    // DATE HANDLING (SAFE + STRICT)
+    // -----------------------------
 
-    body.start = { date: startKey };
-    body.end = { date: DateTime.fromISO(endKey, { zone: args.tz }).plus({ days: 1 }).toFormat("yyyy-LL-dd") };
-  } else {
-    const startIso = toRfc3339(new Date(e.startDate), args.tz);
-    const endIso = e.endDate ? toRfc3339(new Date(e.endDate), args.tz) : startIso;
+    if (e.allDay) {
+      if (!e.startDate) {
+        throw new Error("All-day event missing startDate");
+      }
 
-    body.start = { dateTime: startIso, timeZone: args.tz };
-    body.end = { dateTime: endIso, timeZone: args.tz };
-  }
+      const startDT = DateTime.fromJSDate(new Date(e.startDate), { zone: args.tz });
+      if (!startDT.isValid) {
+        throw new Error(`Invalid all-day startDate: ${e.startDate}`);
+      }
 
-  if (e.googleEventId) {
-    const updated = await calendar.events.patch({
+      const startKey = startDT.toFormat("yyyy-LL-dd");
+
+      let endDT;
+      if (e.endDate) {
+        const parsedEnd = DateTime.fromJSDate(new Date(e.endDate), { zone: args.tz });
+        if (!parsedEnd.isValid) {
+          throw new Error(`Invalid all-day endDate: ${e.endDate}`);
+        }
+        endDT = parsedEnd.plus({ days: 1 });
+      } else {
+        endDT = startDT.plus({ days: 1 });
+      }
+
+      body.start = { date: startKey };
+      body.end = { date: endDT.toFormat("yyyy-LL-dd") };
+
+    } else {
+      if (!e.startDate) {
+        throw new Error("Timed event missing startDate");
+      }
+
+      const startDT = DateTime.fromJSDate(new Date(e.startDate), { zone: args.tz });
+      if (!startDT.isValid) {
+        throw new Error(`Invalid startDate: ${e.startDate}`);
+      }
+
+      const startIso = startDT.toISO({ suppressMilliseconds: true });
+
+      let endDT;
+      if (e.endDate) {
+        const parsedEnd = DateTime.fromJSDate(new Date(e.endDate), { zone: args.tz });
+        if (!parsedEnd.isValid) {
+          throw new Error(`Invalid endDate: ${e.endDate}`);
+        }
+        endDT = parsedEnd;
+      } else {
+        // default duration 30 minutes
+        endDT = startDT.plus({ minutes: 30 });
+      }
+
+      const endIso = endDT.toISO({ suppressMilliseconds: true });
+
+      body.start = { dateTime: startIso, timeZone: args.tz };
+      body.end = { dateTime: endIso, timeZone: args.tz };
+    }
+
+    // -----------------------------
+    // UPSERT LOGIC
+    // -----------------------------
+
+    if (e.googleEventId) {
+      const updated = await calendar.events.patch({
+        calendarId,
+        eventId: String(e.googleEventId),
+        requestBody: body,
+      });
+
+      return {
+        synced: true,
+        googleEventId: updated.data.id || String(e.googleEventId),
+        googleCalendarId: calendarId,
+      };
+    }
+
+    const created = await calendar.events.insert({
       calendarId,
-      eventId: String(e.googleEventId),
       requestBody: body,
     });
 
     return {
       synced: true,
-      googleEventId: updated.data.id || String(e.googleEventId),
+      googleEventId: created.data.id || null,
       googleCalendarId: calendarId,
     };
+
+  } catch (err: any) {
+    console.error("[GCAL] upsert failed", {
+      userId: args.userId,
+      calendarId,
+      eventTitle: args?.event?.title,
+      startDate: args?.event?.startDate,
+      endDate: args?.event?.endDate,
+      allDay: args?.event?.allDay,
+      error: err?.message,
+      googleError: err?.response?.data || err?.errors || null,
+    });
+
+    return {
+      synced: false,
+      reason: "google_error" as const,
+      message: err?.message || "Unknown error",
+    };
   }
-
-  const created = await calendar.events.insert({
-    calendarId,
-    requestBody: body,
-  });
-
-  return {
-    synced: true,
-    googleEventId: created.data.id || null,
-    googleCalendarId: calendarId,
-  };
 }
 
 export async function googleDeleteEvent(args: {
