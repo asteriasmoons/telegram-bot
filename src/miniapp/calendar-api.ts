@@ -442,71 +442,158 @@ function expandRecurringEventIntoRange(event: any, rangeStart: Date, rangeEnd: D
   const durationMs = baseEnd ? baseEnd.getTime() - baseStart.getTime() : 0;
 
   const occurrences: any[] = [];
-  let current = new Date(baseStart);
-  let index = 0;
 
-  // Fast-forward rough
+  // Helpers
+  const startKey = (d: Date) => DateTime.fromJSDate(d, { zone: tz }).toFormat("yyyy-LL-dd");
+
+  const overlapsRange = (s: Date, e: Date | null) => {
+    if (e) return s <= rangeEnd && e >= rangeStart;
+    return s >= rangeStart && s <= rangeEnd;
+  };
+
+  // Count occurrences properly (only increments when we actually produce one)
+  let producedCount = 0;
+
+  // End handling
+  const end = rule?.end;
+  const isPastEnd = (occStart: Date) => {
+    if (!end || end.kind === "never") return false;
+
+    if (end.kind === "until") {
+      const until = new Date(end.until);
+      if (isNaN(until.getTime())) return false;
+      return occStart.getTime() > until.getTime();
+    }
+
+    if (end.kind === "count") {
+      const c = Number(end.count);
+      if (!Number.isFinite(c) || c < 1) return true;
+      return producedCount >= c;
+    }
+
+    return false;
+  };
+
+  // =========================
+  // WEEKLY (FIXED)
+  // =========================
+  if (freq === "weekly") {
+    // If byWeekday not provided, default to the weekday of baseStart.
+    const byWeekdayArr: number[] =
+      Array.isArray(rule.byWeekday) && rule.byWeekday.length
+        ? rule.byWeekday.map((n: any) => Number(n)).filter((n: number) => n >= 0 && n <= 6)
+        : [DateTime.fromJSDate(baseStart, { zone: tz }).weekday % 7];
+
+    const byWeekday = new Set(byWeekdayArr);
+
+    // Anchor week start from baseStart (in tz)
+    const baseWeekStart = DateTime.fromJSDate(baseStart, { zone: tz }).startOf("week"); // Luxon: week starts Monday by default
+    // NOTE: That’s fine as long as it’s consistent--interval weeks are relative to baseStart’s week.
+
+    // Iterate day-by-day across the requested range (in tz)
+    let cursor = DateTime.fromJSDate(rangeStart, { zone: tz }).startOf("day");
+    const endCursor = DateTime.fromJSDate(rangeEnd, { zone: tz }).endOf("day");
+
+    // Hard guard
+    let safety = 0;
+
+    while (cursor <= endCursor) {
+      safety++;
+      if (safety > 20000) break;
+
+      const occStartZ = cursor; // start of this day in tz
+      const occStart = occStartZ.toJSDate();
+
+      // Must not occur before the series start date
+      if (occStart.getTime() >= baseStart.getTime()) {
+        const dow = occStartZ.weekday % 7; // 0..6 (Sun..Sat), matches your rule storage
+        if (byWeekday.has(dow)) {
+          // Check interval weeks: only allow weeks where (weekDiff % interval === 0)
+          const cursorWeekStart = occStartZ.startOf("week");
+          const weekDiff = Math.floor(cursorWeekStart.diff(baseWeekStart, "weeks").weeks);
+
+          if (weekDiff >= 0 && weekDiff % interval === 0) {
+            // End checks
+            if (isPastEnd(occStart)) break;
+
+            const key = occStartZ.toFormat("yyyy-LL-dd");
+            if (!exceptions.has(key)) {
+              const occEnd = baseEnd ? new Date(occStart.getTime() + durationMs) : null;
+
+              if (overlapsRange(occStart, occEnd)) {
+                occurrences.push({
+                  ...event,
+                  parentId: event._id,
+                  occurrenceId: `${String(event._id)}|${occStart.toISOString()}`,
+                  isOccurrence: true,
+                  startDate: occStart,
+                  endDate: occEnd || undefined,
+                });
+
+                producedCount += 1;
+
+                // If end.kind === "count", stop as soon as we hit the count
+                if (end?.kind === "count") {
+                  const c = Number(end.count);
+                  if (Number.isFinite(c) && producedCount >= c) break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      cursor = cursor.plus({ days: 1 });
+    }
+
+    return occurrences;
+  }
+
+  // =========================
+  // NON-WEEKLY (keep your existing approach, but with producedCount for count)
+  // =========================
+  let current = new Date(baseStart);
+
+  // Fast-forward rough (your existing logic, but keep it)
   if (current < rangeStart) {
     if (freq === "daily") {
       const diffDays = Math.floor((rangeStart.getTime() - current.getTime()) / 86400000);
       const jumps = Math.floor(diffDays / interval) * interval;
-      if (jumps > 0) {
-        current = addDays(current, jumps);
-        index += Math.floor(jumps / interval);
-      }
-    } else if (freq === "weekly") {
-      const diffDays = Math.floor((rangeStart.getTime() - current.getTime()) / 86400000);
-      const diffWeeks = Math.floor(diffDays / 7);
-      const jumps = Math.floor(diffWeeks / interval) * interval;
-      if (jumps > 0) {
-        current = addWeeks(current, jumps);
-        index += Math.floor(jumps / interval);
-      }
+      if (jumps > 0) current = addDays(current, jumps);
     } else if (freq === "monthly") {
       while (current < rangeStart) {
         const next = addMonthsClamped(current, interval);
         if (next.getTime() === current.getTime()) break;
         current = next;
-        index += 1;
-        if (index > 5000) break;
+        if (++producedCount > 5000) break; // safety
       }
+      producedCount = 0; // reset after fast-forward
     } else if (freq === "yearly") {
       while (current < rangeStart) {
         const next = addYearsClamped(current, interval);
         if (next.getTime() === current.getTime()) break;
         current = next;
-        index += 1;
-        if (index > 5000) break;
+        if (++producedCount > 5000) break; // safety
       }
+      producedCount = 0; // reset after fast-forward
     }
   }
 
-  const byWeekday =
-    Array.isArray(rule.byWeekday) && rule.byWeekday.length
-      ? new Set(rule.byWeekday.map((n: any) => Number(n)).filter((n: number) => n >= 0 && n <= 6))
-      : null;
+  producedCount = 0; // count means "occurrences emitted", not loop steps
 
+  let indexSafety = 0;
   while (current <= rangeEnd) {
-    if (!isRecurrenceActiveOnDate(rule, index, current)) break;
+    indexSafety++;
+    if (indexSafety > 5000) break;
 
-    if (freq === "weekly" && byWeekday) {
-      const dow = DateTime.fromJSDate(current, { zone: tz }).weekday % 7; // 0..6
-      if (!byWeekday.has(dow)) {
-        current = addDays(current, 1);
-        continue;
-      }
-    }
+    if (isPastEnd(current)) break;
 
     const occStart = new Date(current);
     const occEnd = baseEnd ? new Date(occStart.getTime() + durationMs) : null;
 
-    const key = startOfDayKey(occStart, tz);
+    const key = startKey(occStart);
     if (!exceptions.has(key)) {
-      const overlaps = occEnd
-        ? occStart <= rangeEnd && occEnd >= rangeStart
-        : occStart >= rangeStart && occStart <= rangeEnd;
-
-      if (overlaps) {
+      if (overlapsRange(occStart, occEnd)) {
         occurrences.push({
           ...event,
           parentId: event._id,
@@ -515,17 +602,20 @@ function expandRecurringEventIntoRange(event: any, rangeStart: Date, rangeEnd: D
           startDate: occStart,
           endDate: occEnd || undefined,
         });
+
+        producedCount += 1;
+
+        if (end?.kind === "count") {
+          const c = Number(end.count);
+          if (Number.isFinite(c) && producedCount >= c) break;
+        }
       }
     }
 
     if (freq === "daily") current = addDays(current, interval);
-    else if (freq === "weekly") current = addWeeks(current, interval);
     else if (freq === "monthly") current = addMonthsClamped(current, interval);
     else if (freq === "yearly") current = addYearsClamped(current, interval);
     else break;
-
-    index += 1;
-    if (index > 5000) break;
   }
 
   return occurrences;
