@@ -7864,9 +7864,71 @@ const filteredItems = safeItems
   );
 }
 
+// Book Page Update
+  function QuickPageModal({ book, initialPage, onClose, onSubmit }) {
+    const [page, setPage] = React.useState(
+      initialPage === null || initialPage === undefined ? "" : String(initialPage)
+    );
+
+    const total = book?.totalPages ?? null;
+
+    function clampPage(n) {
+      if (!Number.isFinite(n) || n < 0) return 0;
+      if (total !== null && total !== undefined && total >= 0) {
+        return Math.min(n, total);
+      }
+      return n;
+    }
+
+    function handleSubmit() {
+      const raw = page === "" ? 0 : Number(page);
+      if (!Number.isFinite(raw) || raw < 0) return; // keep it simple: ignore bad submit
+      const next = clampPage(Math.floor(raw));
+      onSubmit(next);
+    }
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <div className="modal-title">Update Page</div>
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              ×
+            </button>
+          </div>
+
+          <div className="form-group">
+            <label>Current Page</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              max={total ?? undefined}
+              value={page}
+              onChange={(e) => setPage(e.target.value)}
+              placeholder="0"
+            />
+            {total !== null && total !== undefined ? (
+              <div className="hint">Total pages: {total}</div>
+            ) : null}
+          </div>
+
+          <div className="row-actions">
+            <button className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={handleSubmit}>
+              Submit
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
 // Book Card Component
-function BookCard({ book, onEdit, onDelete, onRate }) {
+function BookCard({ book, onEdit, onDelete, onRate, onQuickPage }) {
   const [expanded, setExpanded] = React.useState(false);
 
   const title = book.title?.trim() ? book.title.trim() : "(untitled)";
@@ -8012,6 +8074,18 @@ function BookCard({ book, onEdit, onDelete, onRate }) {
 
       {expanded && (
         <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+        {book.status === "reading" && (
+  <button
+    className="btn btn-secondary"
+    onClick={(e) => {
+      e.stopPropagation();
+      onQuickPage();
+    }}
+  >
+    Update Page
+  </button>
+)}
+        
           <button className="btn btn-primary" onClick={() => onEdit(book)}>
             <img src="/icons/pencil.svg" alt="" />
             Edit
@@ -8436,6 +8510,8 @@ function ReadingView({ activeView, refreshTick }) {
   const [streak, setStreak] = useState(null);
 const [streakLoading, setStreakLoading] = useState(false);
 
+const [quickPageBook, setQuickPageBook] = useState(null);
+
 const loadRecs = React.useCallback(async (genre) => {
   try {
     setRecsLoading(true);
@@ -8601,6 +8677,46 @@ const loadBooks = async () => {
       setSummaryLoading(false);
     }
   };
+  
+  
+  function openQuickPage(book) {
+  setQuickPageBook(book);
+}
+
+function closeQuickPage() {
+  setQuickPageBook(null);
+}
+
+async function submitQuickPage(nextPage) {
+  const book = quickPageBook;
+  if (!book) return;
+
+  const id = book.id || book._id;
+  if (!id) return;
+
+  // Important: your backend PUT requires title + status (and validates status).
+  const payload = {
+    title: book.title || "",
+    author: book.author || "",
+    shortSummary: book.shortSummary || "",
+    status: book.status || "reading",
+    totalPages: book.totalPages ?? null,
+    currentPage: nextPage,
+    // only include rating if your UI already tracks it; harmless either way:
+    rating: typeof book.rating === "number" ? book.rating : 0,
+  };
+
+  const res = await apiCall(`/books/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+  if (res?.book) {
+    setBooks((prev) => prev.map((b) => (String(b.id || b._id) === String(id) ? res.book : b)));
+  }
+
+  closeQuickPage();
+}
 
   return (
     <div>
@@ -8679,7 +8795,7 @@ const loadBooks = async () => {
         </div>
       ) : (
         books.map((book) => (
-          <BookCard key={book._id} book={book} onEdit={handleEdit} onDelete={handleDelete} onRate={handleRating} />
+          <BookCard key={book._id} book={book} onEdit={handleEdit} onDelete={handleDelete} onRate={handleRating} onQuickPage={openQuickPage} />
         ))
       )}
 
@@ -8698,6 +8814,15 @@ const loadBooks = async () => {
           onDelete={handleDelete}
         />
       )}
+      
+      {quickPageBook && (
+  <QuickPageModal
+    book={quickPageBook}
+    initialPage={quickPageBook.currentPage}
+    onClose={closeQuickPage}
+    onSubmit={submitQuickPage}
+  />
+)}
 
       {summaryOpen && (
         <SummaryModal
