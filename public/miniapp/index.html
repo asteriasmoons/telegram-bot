@@ -7865,41 +7865,44 @@ const filteredItems = safeItems
 }
 
 // Book Page Update
-  function QuickPageModal({ book, initialPage, onClose, onSubmit }) {
-    const [page, setPage] = React.useState(
-      initialPage === null || initialPage === undefined ? "" : String(initialPage)
-    );
+function QuickPageModal({ book, initialPage, onClose, onSubmit }) {
+  const [page, setPage] = React.useState(
+    initialPage === null || initialPage === undefined ? "" : String(initialPage)
+  );
 
-    const total = book?.totalPages ?? null;
+  const total =
+    typeof book?.totalPages === "number" && Number.isFinite(book.totalPages)
+      ? book.totalPages
+      : null;
 
-    function clampPage(n) {
-      if (!Number.isFinite(n) || n < 0) return 0;
-      if (total !== null && total !== undefined && total >= 0) {
-        return Math.min(n, total);
-      }
-      return n;
-    }
+  function clampPage(n) {
+    if (!Number.isFinite(n) || n < 0) return 0;
+    if (total !== null && total >= 0) return Math.min(n, total);
+    return n;
+  }
 
-    function handleSubmit() {
-      const raw = page === "" ? 0 : Number(page);
-      if (!Number.isFinite(raw) || raw < 0) return; // keep it simple: ignore bad submit
-      const next = clampPage(Math.floor(raw));
-      onSubmit(next);
-    }
+  function handleSubmit() {
+    const raw = page === "" ? 0 : Number(page);
+    if (!Number.isFinite(raw) || raw < 0) return;
+    const next = clampPage(Math.floor(raw));
+    onSubmit(next);
+  }
 
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <div className="modal-title">Update Page</div>
-            <button className="icon-btn" onClick={onClose} aria-label="Close">
-              ×
-            </button>
-          </div>
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Update Page</h2>
+          <button className="modal-close" type="button" onClick={onClose}>
+            ×
+          </button>
+        </div>
 
+        <div className="modal-body">
           <div className="form-group">
-            <label>Current Page</label>
+            <label className="form-label">Current Page</label>
             <input
+              className="form-input"
               type="number"
               inputMode="numeric"
               min="0"
@@ -7908,23 +7911,22 @@ const filteredItems = safeItems
               onChange={(e) => setPage(e.target.value)}
               placeholder="0"
             />
-            {total !== null && total !== undefined ? (
-              <div className="hint">Total pages: {total}</div>
-            ) : null}
-          </div>
-
-          <div className="row-actions">
-            <button className="btn btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={handleSubmit}>
-              Submit
-            </button>
+            {total !== null ? <div className="hint">Total pages: {total}</div> : null}
           </div>
         </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" type="button" onClick={handleSubmit}>
+            Submit
+          </button>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
 
 // Book Card Component
