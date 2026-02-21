@@ -233,6 +233,58 @@ router.post("/streak/checkin", async (req: any, res) => {
   }
 });
 
+// RESET streak (keeps bestStreak by default)
+router.post("/streak/reset", async (req: any, res) => {
+  try {
+    const userId = req.userId as number;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const existing = await ReadingStreak.findOne({ userId }).lean();
+
+    // If no doc yet, create a clean one
+    if (!existing) {
+      const created = await ReadingStreak.create({
+        userId,
+        currentStreak: 0,
+        bestStreak: 0,
+        lastCheckInDate: null,
+      });
+
+      return res.json({
+        streak: {
+          currentStreak: created.currentStreak,
+          bestStreak: created.bestStreak,
+          lastCheckInDate: created.lastCheckInDate,
+          checkedInToday: false,
+        },
+      });
+    }
+
+    // Reset current + last check-in, keep best
+    const updated = await ReadingStreak.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          currentStreak: 0,
+          lastCheckInDate: null,
+        },
+      },
+      { new: true }
+    ).lean();
+
+    return res.json({
+      streak: {
+        currentStreak: updated?.currentStreak ?? 0,
+        bestStreak: updated?.bestStreak ?? existing.bestStreak ?? 0,
+        lastCheckInDate: updated?.lastCheckInDate ?? null,
+        checkedInToday: false,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to reset streak" });
+  }
+});
+
 /**
  * POST /api/miniapp/books
  * body: { title, author?, status, shortSummary?, totalPages?, currentPage? }

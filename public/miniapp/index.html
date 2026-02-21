@@ -8399,6 +8399,15 @@ function ReadingStreakCard({ streak, loading, onCheckIn }) {
           <img src="/icons/check.svg" alt="" />
           {checked ? "Checked In" : loading ? "Saving…" : "Check In"}
         </button>
+        
+        <button
+          className="btn btn-secondary"
+          type="button"
+          onClick={onReset}
+          disable={loading}
+          >
+          Reset Streak
+          </button>
       </div>
     </div>
   );
@@ -8581,6 +8590,28 @@ const handleCheckIn = async (e) => {
   }
 };
 
+const handleResetStreak = async (e) => {
+  if (e) e.stopPropagation();
+
+  const ok = window.confirm("Reset your current streak to 0?");
+  if (!ok) return;
+
+  try {
+    setStreakLoading(true);
+    const data = await apiCall(`/books/streak/reset`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+
+    setStreak(data?.streak || null);
+    tg.showPopup({ message: "Streak reset" });
+  } catch (error) {
+    tg.showAlert("Failed to reset streak: " + (error?.message || "Unknown error"));
+  } finally {
+    setStreakLoading(false);
+  }
+};
+
 const loadBooks = async () => {
   try {
     setLoading(true);
@@ -8740,6 +8771,7 @@ async function submitQuickPage(nextPage) {
   streak={streak}
   loading={streakLoading}
   onCheckIn={handleCheckIn}
+  onReset={handleResetStreak}
 />
 
       <div className="book-quick-actions">
