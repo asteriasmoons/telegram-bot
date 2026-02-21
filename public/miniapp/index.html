@@ -8348,7 +8348,7 @@ function SummaryModal({ onClose, title, author, loading, summary, source, error,
 }
 
 // READING STREAKS CARD
-function ReadingStreakCard({ streak, loading, onCheckIn }) {
+function ReadingStreakCard({ streak, loading, onCheckIn, onReset }) {
   const current = streak?.currentStreak ?? 0;
   const best = streak?.bestStreak ?? 0;
   const checked = !!streak?.checkedInToday;
@@ -8404,7 +8404,7 @@ function ReadingStreakCard({ streak, loading, onCheckIn }) {
           className="btn btn-secondary"
           type="button"
           onClick={onReset}
-          disable={loading}
+          disabled={loading}
           >
           Reset Streak
           </button>
