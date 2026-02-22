@@ -12110,7 +12110,7 @@ function renderCalendarInlineSymbols(text) {
                                       </div>
                                     )}
                                     <div className="calendar-event-title">
-  {renderTextWithSymbols(
+  {renderTextWithSymbolsSpans(
     event.title || event.text || event.name || "(untitled)"
   )}
   {hasReminder(event) && (
