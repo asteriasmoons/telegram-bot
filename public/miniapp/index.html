@@ -12007,14 +12007,25 @@ const CALENDAR_SYMBOL_SVG_MAP = {
 function renderCalendarInlineSymbols(text) {
   if (!text) return null;
 
+  // Normalize to avoid weird composed / decomposed symbol variants
+  const normalized = String(text).normalize("NFC");
+
+  const keys = Object.keys(CALENDAR_SYMBOL_SVG_MAP);
+  if (!keys.length) return <span>{normalized}</span>;
+
+  // Longest first so multi-codepoint sequences match before shorter ones
+  const sortedKeys = [...keys].sort((a, b) => b.length - a.length);
+
   const symbolRegex = new RegExp(
-    `(${Object.keys(CALENDAR_SYMBOL_SVG_MAP)
+    `(${sortedKeys
       .map(s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
       .join("|")})`,
-    "g"
+    "gu"
   );
 
-  return text.split(symbolRegex).map((part, index) => {
+  const parts = normalized.split(symbolRegex);
+
+  return parts.map((part, index) => {
     if (CALENDAR_SYMBOL_SVG_MAP[part]) {
       return (
         <span key={index} className="calendar-inline-wrapper">
@@ -12022,7 +12033,6 @@ function renderCalendarInlineSymbols(text) {
         </span>
       );
     }
-
     return <span key={index}>{part}</span>;
   });
 }
@@ -12110,7 +12120,7 @@ function renderCalendarInlineSymbols(text) {
                                       </div>
                                     )}
                                     <div className="calendar-event-title">
-  {renderTextWithSymbolsSpans(
+  {renderCalendarInlineSymbols(
     event.title || event.text || event.name || "(untitled)"
   )}
   {hasReminder(event) && (
